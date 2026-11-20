@@ -88,6 +88,9 @@ pub fn run() {
             // fullscreen off the table — see macos_embed.
             #[cfg(target_os = "macos")]
             platform::macos::prepare_main_window(_app.handle());
+            // Put a GTK video layer under the webview for mpv to render into.
+            #[cfg(target_os = "linux")]
+            platform::linux::prepare_main_window(_app.handle());
 
             // The WebDriver plugin installs its own logger so it can forward
             // backend output to the runner. Registering both panics at startup.
