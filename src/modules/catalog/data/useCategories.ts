@@ -1,3 +1,4 @@
+import { perfLog } from '@/shared/lib/perf';
 import { useMemo } from 'react';
 import { queryOptions, useQuery } from '@tanstack/react-query';
 import {
@@ -31,54 +32,60 @@ export function categoriesQueryOptions(type: CatalogType, sources: EnabledSource
   return queryOptions({
     queryKey: queryKeys.categories(type, sources.queryScope),
     queryFn: async ({ signal }): Promise<SourceCategory[]> => {
-      const groups = new Map<string, SourceCategory>();
-      for (const source of sources.availableM3uSources) {
-        for (const entry of source.runtime?.playlist?.entries ?? []) {
-          if (entry.type !== type) continue;
-          groups.set(entry.categoryId, {
-            category_id: entry.categoryId,
-            category_name: entry.groupTitle,
-            parent_id: 0,
-          });
+      const perfStart = performance.now();
+      try {
+        const groups = new Map<string, SourceCategory>();
+        for (const source of sources.availableM3uSources) {
+          for (const entry of source.runtime?.playlist?.entries ?? []) {
+            if (entry.type !== type) continue;
+            groups.set(entry.categoryId, {
+              category_id: entry.categoryId,
+              category_name: entry.groupTitle,
+              parent_id: 0,
+            });
+          }
         }
-      }
-      const results = await Promise.allSettled(
-        sources.availableXtreamSources.map(async (source) => {
-          let res;
-          if (type === 'vod') res = await getVodCategories(source.credentials!, signal);
-          else if (type === 'series') res = await getSeriesCategories(source.credentials!, signal);
-          else res = await getLiveCategories(source.credentials!, signal);
-          return (Array.isArray(res) ? res : []).map((category) => ({
-            ...category,
-            category_id: xtreamCategoryId(source.id, category.category_id)!,
-            category_name: category.category_name,
-          }));
-        }),
-      );
-      const providerCategories = results.flatMap((result) =>
-        result.status === 'fulfilled' ? result.value : [],
-      );
-      const providerFailures = results.flatMap((result, index) =>
-        result.status === 'rejected'
-          ? [
-              `${sources.availableXtreamSources[index]?.profile.name ?? `Source ${index + 1}`}: ${getErrorMessage(result.reason, 'Category request failed without an error message.')}`,
-            ]
-          : [],
-      );
-      const failedProviders = providerFailures.length;
-      if (groups.size === 0 && results.length > 0 && failedProviders === results.length) {
-        throw new Error(providerFailures.join('\n'));
-      }
-      if (failedProviders > 0 && (providerCategories.length > 0 || groups.size > 0)) {
-        notify.warning(
-          'Some Categories Unavailable',
-          `${failedProviders} enabled source${failedProviders === 1 ? '' : 's'} could not load categories. Available categories are still shown.\n${providerFailures.join('\n')}`,
-          undefined,
-          undefined,
-          'connection',
+        const results = await Promise.allSettled(
+          sources.availableXtreamSources.map(async (source) => {
+            let res;
+            if (type === 'vod') res = await getVodCategories(source.credentials!, signal);
+            else if (type === 'series')
+              res = await getSeriesCategories(source.credentials!, signal);
+            else res = await getLiveCategories(source.credentials!, signal);
+            return (Array.isArray(res) ? res : []).map((category) => ({
+              ...category,
+              category_id: xtreamCategoryId(source.id, category.category_id)!,
+              category_name: category.category_name,
+            }));
+          }),
         );
+        const providerCategories = results.flatMap((result) =>
+          result.status === 'fulfilled' ? result.value : [],
+        );
+        const providerFailures = results.flatMap((result, index) =>
+          result.status === 'rejected'
+            ? [
+                `${sources.availableXtreamSources[index]?.profile.name ?? `Source ${index + 1}`}: ${getErrorMessage(result.reason, 'Category request failed without an error message.')}`,
+              ]
+            : [],
+        );
+        const failedProviders = providerFailures.length;
+        if (groups.size === 0 && results.length > 0 && failedProviders === results.length) {
+          throw new Error(providerFailures.join('\n'));
+        }
+        if (failedProviders > 0 && (providerCategories.length > 0 || groups.size > 0)) {
+          notify.warning(
+            'Some Categories Unavailable',
+            `${failedProviders} enabled source${failedProviders === 1 ? '' : 's'} could not load categories. Available categories are still shown.\n${providerFailures.join('\n')}`,
+            undefined,
+            undefined,
+            'connection',
+          );
+        }
+        return [...providerCategories, ...groups.values()];
+      } finally {
+        perfLog(`categories:fetch:${type}`, performance.now() - perfStart);
       }
-      return [...providerCategories, ...groups.values()];
     },
     staleTime: 1000 * 60 * 60,
     gcTime: 1000 * 60 * 60 * 12,

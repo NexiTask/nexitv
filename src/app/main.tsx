@@ -2,11 +2,13 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/shared/design/index.css';
 import App from './App';
+import { perfLog } from '@/shared/lib/perf';
 import { ensureUiMessages } from '@/shared/i18n/i18n';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { initializeTmdbApiKey } from '@/modules/metadata/services/tmdbCredentialVault';
 import { activeSeason, applyAppearanceTheme } from '@/shared/design/appearance';
 
+perfLog('boot:main_module');
 const initialSettings = useSettingsStore.getState();
 applyAppearanceTheme(
   initialSettings.themePreference,

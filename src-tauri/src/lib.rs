@@ -2,12 +2,14 @@ mod app_data;
 mod credentials;
 mod downloads;
 mod metadata;
+mod perf;
 mod platform;
 mod player;
 mod sources;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    perf::init();
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -25,6 +27,7 @@ pub fn run() {
         .manage(player::NativePlayerManager::default())
         .manage(downloads::DownloadManager::default())
         .invoke_handler(tauri::generate_handler![
+            perf::perf_log,
             platform::commands::player_set_fullscreen,
             platform::commands::player_set_cursor_hidden,
             credentials::xtream::credential_store,

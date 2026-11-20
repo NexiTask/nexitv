@@ -305,7 +305,11 @@ unsafe fn create_context(mpv: *mut mpv_handle) -> Result<(), String> {
     area.queue_render();
     log::info!(
         "mpv rendering into the GTK video layer ({})",
-        if USES_EGL.load(Ordering::SeqCst) { "EGL" } else { "GLX" }
+        if USES_EGL.load(Ordering::SeqCst) {
+            "EGL"
+        } else {
+            "GLX"
+        }
     );
     Ok(())
 }
@@ -314,8 +318,10 @@ unsafe fn create_context(mpv: *mut mpv_handle) -> Result<(), String> {
 /// `loadfile`: `vo_libmpv` fails if no render context exists when it starts.
 pub fn start(app: &AppHandle, mpv: *mut mpv_handle) -> Result<(), String> {
     let mpv = mpv as usize;
-    on_main(app, move || unsafe { create_context(mpv as *mut mpv_handle) })
-        .unwrap_or_else(|| Err("Timed out creating the video surface".to_string()))
+    on_main(app, move || unsafe {
+        create_context(mpv as *mut mpv_handle)
+    })
+    .unwrap_or_else(|| Err("Timed out creating the video surface".to_string()))
 }
 
 /// Free the render context. Must happen before `mpv_terminate_destroy`.

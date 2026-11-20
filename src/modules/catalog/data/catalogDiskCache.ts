@@ -2,6 +2,7 @@ import { tauriApi, type CatalogCacheKind } from '@/platform/tauri';
 import { desktopApi } from '@/platform/desktop';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 import { getErrorMessage } from '@/shared/lib/error';
+import { perfAsync, perfSync } from '@/shared/lib/perf';
 
 /**
  * Serialising a large list blocks the UI thread for a few dozen
@@ -20,14 +21,19 @@ export function rememberProviderList(
   // and showing it at the next start would read as "nothing here".
   if (!desktopApi.isDesktop() || list.length === 0) return;
   setTimeout(() => {
-    void tauriApi
-      .catalogCacheStore(sourceId, kind, scope, JSON.stringify(list))
-      .catch((error: unknown) => {
-        debugLog.warn('api', 'Catalogue could not be saved for the next start', {
-          kind,
-          error: getErrorMessage(error, 'Saving the catalogue failed.'),
-        });
+    const content = perfSync(
+      `store:stringify:${kind}`,
+      () => JSON.stringify(list),
+      (s) => `chars=${s.length}`,
+    );
+    void perfAsync(`store:ipc:${kind}`, () =>
+      tauriApi.catalogCacheStore(sourceId, kind, scope, content),
+    ).catch((error: unknown) => {
+      debugLog.warn('api', 'Catalogue could not be saved for the next start', {
+        kind,
+        error: getErrorMessage(error, 'Saving the catalogue failed.'),
       });
+    });
   }, STORE_DELAY_MS);
 }
 
@@ -37,8 +43,12 @@ export async function loadProviderList(
   kind: CatalogCacheKind,
   scope: string,
 ): Promise<{ list: unknown[]; savedAt: number } | null> {
-  const entry = await tauriApi.catalogCacheLoad(sourceId, kind, scope);
+  const entry = await perfAsync(
+    `cache:load_ipc:${kind}`,
+    () => tauriApi.catalogCacheLoad(sourceId, kind, scope),
+    (e) => (e ? `chars=${e.content.length}` : 'miss'),
+  );
   if (!entry) return null;
-  const list: unknown = JSON.parse(entry.content);
+  const list: unknown = perfSync(`cache:json_parse:${kind}`, () => JSON.parse(entry.content));
   return Array.isArray(list) ? { list, savedAt: entry.savedAt } : null;
 }

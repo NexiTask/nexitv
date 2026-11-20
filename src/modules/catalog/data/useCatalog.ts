@@ -13,6 +13,7 @@ import { desktopApi } from '@/platform/desktop';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 import { loadProviderList, rememberProviderList } from './catalogDiskCache';
 import type { MediaItem } from '../model/media';
+import { perfAsync, perfLog, perfSync } from '@/shared/lib/perf';
 import { queryKeys } from '@/modules/sources/public/model/queryKeys';
 import { parseLiveChannelTitle, parseMediaDisplayTitle, parseMediaTitle } from '../lib/titleParser';
 import {
@@ -199,17 +200,22 @@ export function seedCatalogFromDisk(
       ),
     );
     if (copies.some((copy) => copy === null) || client.getQueryData(queryKey) !== undefined) return;
-    const items = [
-      ...sources.availableXtreamSources.flatMap((source, index) =>
-        mapXtreamList(type, source, copies[index]!.list),
-      ),
-      ...playlistCatalog(type, sources),
-    ];
+    const items = perfSync(
+      `seed:map:${type}`,
+      () => [
+        ...sources.availableXtreamSources.flatMap((source, index) =>
+          mapXtreamList(type, source, copies[index]!.list),
+        ),
+        ...playlistCatalog(type, sources),
+      ],
+      (list) => `items=${list.length}`,
+    );
     // The provider may have answered while the copy was read and mapped.
     if (client.getQueryData(queryKey) !== undefined) return;
     client.setQueryData<CatalogItem[]>(queryKey, items, {
       updatedAt: Math.min(...copies.map((copy) => copy!.savedAt)),
     });
+    perfLog(`seed:applied:${type}`);
   })()
     .catch((error: unknown) => {
       debugLog.warn('api', 'Saved catalogue could not be read; waiting for the provider', {
@@ -243,9 +249,13 @@ export function catalogQueryOptions(
       const playlistItems = playlistCatalog(type, sources);
       const results = await Promise.allSettled(
         sources.availableXtreamSources.map(async (source) => {
-          const list = await fetchXtreamList(type, source, signal);
+          const list = await perfAsync(
+            `net:fetch_json:${type}`,
+            () => fetchXtreamList(type, source, signal),
+            (l) => `items=${l.length}`,
+          );
           rememberProviderList(source.id, type, source.queryScope, list);
-          return mapXtreamList(type, source, list);
+          return perfSync(`net:map:${type}`, () => mapXtreamList(type, source, list));
         }),
       );
       const providerItems = successful(results);

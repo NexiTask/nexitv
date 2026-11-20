@@ -1,4 +1,5 @@
-import { useMemo, type ReactNode } from 'react';
+import { perfLog, perfSync } from '@/shared/lib/perf';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { PageTransition } from '@/app/shell/PageTransition';
 import { HorizontalCarousel } from '@/modules/catalog/components/HorizontalCarousel';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
@@ -64,6 +65,7 @@ export function HomePage() {
   const { data: liveChannelsData = [], isLoading: loadingLive } = liveQuery;
 
   const recentMovies = useMemo(() => {
+    if (movies.length) perfLog('home:movies_ready', undefined, `items=${movies.length}`);
     return [...movies]
       .sort((a, b) => Number.parseInt(b.added || '0', 10) - Number.parseInt(a.added || '0', 10))
       .slice(0, 20);
@@ -79,7 +81,9 @@ export function HomePage() {
   const seriesRatingChecks = useTmdbRatingChecks(series, 'tv');
 
   const popularMovies = useMemo(() => {
-    return sortCatalogItems(movies, 'rating', movieRatingChecks).slice(0, 20);
+    return perfSync('home:popular_sort:vod', () =>
+      sortCatalogItems(movies, 'rating', movieRatingChecks).slice(0, 20),
+    );
   }, [movies, movieRatingChecks]);
 
   const popularSeries = useMemo(() => {
@@ -91,6 +95,16 @@ export function HomePage() {
   }, [liveChannelsData]);
 
   const isLoading = loadingMovies || loadingSeries || loadingLive;
+  const firstRowsLogged = useRef(false);
+  useEffect(() => {
+    if (firstRowsLogged.current || isLoading || !(movies.length || series.length)) return;
+    firstRowsLogged.current = true;
+    perfLog(
+      'home:rows_rendered',
+      undefined,
+      `movies=${movies.length} series=${series.length} live=${liveChannelsData.length}`,
+    );
+  }, [isLoading, movies.length, series.length, liveChannelsData.length]);
   const catalogError = getCombinedErrorMessage(
     [moviesQuery.error, seriesQuery.error, liveQuery.error],
     '',

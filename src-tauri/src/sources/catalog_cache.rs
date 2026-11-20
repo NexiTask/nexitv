@@ -211,7 +211,13 @@ fn load_at(
         remove_entry(paths)?;
         return Ok(None);
     }
+    let read_start = std::time::Instant::now();
     let content = std::fs::read_to_string(&paths.content).map_err(|_| invalid())?;
+    crate::perf::log(
+        "rust:cache_read",
+        Some(read_start.elapsed().as_millis()),
+        &format!("bytes={}", content.len()),
+    );
     Ok(Some(CatalogCacheEntry {
         content,
         saved_at: metadata.saved_at,
