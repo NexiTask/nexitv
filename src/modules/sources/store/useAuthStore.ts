@@ -1,4 +1,4 @@
-import { perfAsync } from '@/shared/lib/perf';
+import { perfAsync } from '@/platform/perf';
 import { create } from 'zustand';
 import { authenticateXtream } from '../data/xtreamClient';
 import { deleteProviderPassword, loadProviderPassword } from '../services/credentialVault';

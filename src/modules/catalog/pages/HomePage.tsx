@@ -1,4 +1,4 @@
-import { perfLog, perfSync } from '@/shared/lib/perf';
+import { perfLog, perfSync } from '@/platform/perf';
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { PageTransition } from '@/app/shell/PageTransition';
 import { HorizontalCarousel } from '@/modules/catalog/components/HorizontalCarousel';

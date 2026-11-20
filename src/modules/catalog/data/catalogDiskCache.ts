@@ -2,7 +2,7 @@ import { tauriApi, type CatalogCacheKind } from '@/platform/tauri';
 import { desktopApi } from '@/platform/desktop';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 import { getErrorMessage } from '@/shared/lib/error';
-import { perfAsync, perfSync } from '@/shared/lib/perf';
+import { perfAsync, perfSync } from '@/platform/perf';
 
 /**
  * Serialising a large list blocks the UI thread for a few dozen

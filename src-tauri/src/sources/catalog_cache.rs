@@ -10,7 +10,7 @@
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -18,12 +18,9 @@ use tauri::Manager;
 use crate::credentials::source::validate_source_id;
 
 const CATALOG_KINDS: [&str; 3] = ["live", "vod", "series"];
-const MAX_CATALOG_BYTES: usize = 128 * 1024 * 1024;
+const MAX_CATALOG_BYTES: usize = 512 * 1024 * 1024;
 const METADATA_LIMIT: u64 = 4 * 1024;
 const METADATA_VERSION: u8 = 1;
-/// Older copies are more likely to show titles the provider has since removed
-/// than to save a meaningful wait; they are dropped instead of shown.
-const MAX_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -207,7 +204,10 @@ fn load_at(
     if metadata.scope != scope {
         return Ok(None);
     }
-    if metadata.saved_at > now || now - metadata.saved_at > MAX_AGE.as_millis() as u64 {
+    // Old copies are kept: offline, an outdated catalogue beats an empty one,
+    // and the frontend decides freshness. Only a copy from the future (a
+    // clock that moved back) is dropped.
+    if metadata.saved_at > now {
         remove_entry(paths)?;
         return Ok(None);
     }
@@ -309,7 +309,7 @@ mod tests {
     }
 
     #[test]
-    fn ignores_another_accounts_copy_and_drops_expired_ones() {
+    fn ignores_another_accounts_copy_and_keeps_old_ones() {
         let directory = test_directory("scope");
         let paths = paths_in(&directory, "xtream-one", "live");
         store_at(&paths, SCOPE, "[]", NOW - 1_000).unwrap();
@@ -317,10 +317,12 @@ mod tests {
         assert_eq!(load_at(&paths, "sources-other", NOW).unwrap(), None);
         assert!(paths.content.exists());
 
-        let a_week_later = NOW - 1_000 + MAX_AGE.as_millis() as u64 + 1;
-        assert_eq!(load_at(&paths, SCOPE, a_week_later).unwrap(), None);
+        let a_month_later = NOW + 30 * 24 * 60 * 60 * 1000;
+        assert!(load_at(&paths, SCOPE, a_month_later).unwrap().is_some());
+        assert!(paths.content.exists());
+
+        assert_eq!(load_at(&paths, SCOPE, NOW - 2_000).unwrap(), None);
         assert!(!paths.content.exists());
-        assert!(!paths.metadata.exists());
         let _ = std::fs::remove_dir_all(directory);
     }
 

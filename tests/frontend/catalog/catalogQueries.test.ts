@@ -1,12 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseM3u } from '@/modules/sources/data/m3uClient';
 import { QueryClient } from '@tanstack/react-query';
-import {
-  catalogQueryOptions,
-  seedCatalogFromDisk,
-  selectFoldedLiveCatalog,
-} from '@/modules/catalog/data/useCatalog';
-import { debugLog } from '@/modules/diagnostics/store/useDebugStore';
+import { CATALOG_FRESH_MS } from '@/modules/catalog/data/catalogFreshness';
+import { catalogQueryOptions, selectFoldedLiveCatalog } from '@/modules/catalog/data/useCatalog';
 import { queryKeys } from '@/modules/sources/model/queryKeys';
 import { categoriesQueryOptions } from '@/modules/catalog/data/useCategories';
 import type { EnabledSourcesSnapshot } from '@/modules/sources/hooks/useEnabledSources';
@@ -84,7 +80,12 @@ async function runQuery<T>(options: { queryFn?: unknown }): Promise<T> {
 }
 
 describe('source-scoped catalog and category queries', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    disk.loadProviderList.mockResolvedValue(null);
+    desktop.value = true;
+    localStorage.clear();
+  });
 
   it('maps Xtream and M3U live items without leaking source identity', async () => {
     xc.getLiveStreams.mockResolvedValue([
@@ -327,7 +328,7 @@ describe('source-scoped catalog and category queries', () => {
 
     beforeEach(() => {
       desktop.value = true;
-      client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
     });
 
     it('keeps each provider list for the next start under its account scope', async () => {
@@ -343,80 +344,101 @@ describe('source-scoped catalog and category queries', () => {
       );
     });
 
-    it('shows the saved catalogue at once, dated when it was fetched', async () => {
-      disk.loadProviderList.mockResolvedValue({ list: streams, savedAt: 1_700_000_000_000 });
+    it('uses a fresh saved copy without asking the provider', async () => {
+      disk.loadProviderList.mockResolvedValue({ list: streams, savedAt: Date.now() - 1_000 });
 
-      await seedCatalogFromDisk(client, 'vod', sources());
+      const items = await runQuery<any[]>(catalogQueryOptions('vod', sources(), client));
 
-      const items = client.getQueryData<any[]>(vodKey)!;
       expect(items.map((item) => [item.id, item.title, item.rating])).toEqual([
         ['xtream-one:vod:7', 'DE - Saved Film (2020)', 7.1],
         ['xtream-one:vod:8', 'Second Film', undefined],
       ]);
       // Stream URLs come from the vault's credentials, never from the copy.
       expect(items[0].streamUrl).toBe('https://provider.test/vod/7.mp4');
-      expect(client.getQueryState(vodKey)?.dataUpdatedAt).toBe(1_700_000_000_000);
       expect(disk.loadProviderList).toHaveBeenCalledWith('xtream-one', 'vod', 'xtream-scope');
+      expect(xc.getVodStreams).not.toHaveBeenCalled();
     });
 
-    it('leaves the query to the provider when a source has no saved copy', async () => {
-      disk.loadProviderList.mockResolvedValue(null);
+    it('shows a stale copy at once and swaps in the provider list later', async () => {
+      vi.useFakeTimers();
+      try {
+        disk.loadProviderList.mockResolvedValue({
+          list: streams,
+          savedAt: Date.now() - CATALOG_FRESH_MS - 1,
+        });
+        xc.getVodStreams.mockResolvedValue([{ stream_id: 9, name: 'New Film', category_id: '3' }]);
 
-      await seedCatalogFromDisk(client, 'vod', sources());
+        const items = await runQuery<any[]>(catalogQueryOptions('vod', sources(), client));
+        client.setQueryData(vodKey, items);
+        expect(items).toHaveLength(2);
+        expect(xc.getVodStreams).not.toHaveBeenCalled();
 
-      expect(client.getQueryData(vodKey)).toBeUndefined();
+        await vi.runAllTimersAsync();
+
+        expect(xc.getVodStreams).toHaveBeenCalledTimes(1);
+        expect(client.getQueryData<any[]>(vodKey)!.map((item) => item.id)).toEqual([
+          'xtream-one:vod:9',
+        ]);
+        expect(disk.rememberProviderList).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
-    it('never replaces what the provider already answered', async () => {
-      let finishRead!: (value: unknown) => void;
-      disk.loadProviderList.mockReturnValue(new Promise((resolve) => (finishRead = resolve)));
+    it('keeps the saved copy when the background refresh fails', async () => {
+      vi.useFakeTimers();
+      try {
+        disk.loadProviderList.mockResolvedValue({
+          list: streams,
+          savedAt: Date.now() - CATALOG_FRESH_MS - 1,
+        });
+        xc.getVodStreams.mockRejectedValue(new Error('offline'));
 
-      const seeding = seedCatalogFromDisk(client, 'vod', sources());
-      client.setQueryData(vodKey, [{ id: 'fresh' }]);
-      finishRead({ list: streams, savedAt: 1 });
-      await seeding;
+        const items = await runQuery<any[]>(catalogQueryOptions('vod', sources(), client));
+        client.setQueryData(vodKey, items);
+        await vi.runAllTimersAsync();
 
-      expect(client.getQueryData(vodKey)).toEqual([{ id: 'fresh' }]);
-      await seedCatalogFromDisk(client, 'vod', sources());
-      expect(disk.loadProviderList).toHaveBeenCalledTimes(1);
+        expect(client.getQueryData<any[]>(vodKey)).toHaveLength(2);
+        expect(disk.rememberProviderList).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
-    it('reads each copy once when several views ask at the same time', async () => {
-      disk.loadProviderList.mockResolvedValue({ list: streams, savedAt: 1 });
+    it('asks the provider when a source has no saved copy or it is unreadable', async () => {
+      xc.getVodStreams.mockResolvedValue(streams);
+      disk.loadProviderList.mockRejectedValueOnce(new Error('The catalog cache is invalid'));
 
-      await Promise.all([
-        seedCatalogFromDisk(client, 'vod', sources()),
-        seedCatalogFromDisk(client, 'vod', sources()),
-      ]);
+      await expect(
+        runQuery<any[]>(catalogQueryOptions('vod', sources(), client)),
+      ).resolves.toHaveLength(2);
+      await expect(
+        runQuery<any[]>(catalogQueryOptions('vod', sources(), client)),
+      ).resolves.toHaveLength(2);
 
-      expect(disk.loadProviderList).toHaveBeenCalledTimes(1);
+      expect(xc.getVodStreams).toHaveBeenCalledTimes(2);
     });
 
-    it('logs an unreadable copy and waits for the provider', async () => {
-      const warn = vi.spyOn(debugLog, 'warn');
-      disk.loadProviderList.mockRejectedValue(new Error('The catalog cache is invalid'));
-
-      await seedCatalogFromDisk(client, 'vod', sources());
-
-      expect(client.getQueryData(vodKey)).toBeUndefined();
-      expect(warn).toHaveBeenCalledWith(
-        'api',
-        'Saved catalogue could not be read; waiting for the provider',
-        { type: 'vod', error: 'The catalog cache is invalid' },
-      );
-    });
-
-    it('does nothing outside the desktop app or without Xtream sources', async () => {
+    it('skips the saved copy outside the desktop app', async () => {
       desktop.value = false;
-      await seedCatalogFromDisk(client, 'vod', sources());
-      desktop.value = true;
-      await seedCatalogFromDisk(
-        client,
-        'vod',
-        sources({ availableXtreamSources: [], xtreamSources: [] }),
-      );
+      xc.getVodStreams.mockResolvedValue(streams);
+
+      await runQuery<any[]>(catalogQueryOptions('vod', sources(), client));
 
       expect(disk.loadProviderList).not.toHaveBeenCalled();
+    });
+
+    it('uses saved categories on the next start', async () => {
+      xc.getSeriesCategories.mockResolvedValue([
+        { category_id: '9', category_name: 'Drama', parent_id: 0 },
+      ]);
+      const first = await runQuery<any[]>(categoriesQueryOptions('series', sources(), client));
+      xc.getSeriesCategories.mockRejectedValue(new Error('offline'));
+
+      await expect(
+        runQuery<any[]>(categoriesQueryOptions('series', sources(), client)),
+      ).resolves.toEqual(first);
+      expect(xc.getSeriesCategories).toHaveBeenCalledTimes(1);
     });
   });
 });
