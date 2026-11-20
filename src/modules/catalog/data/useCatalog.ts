@@ -129,7 +129,7 @@ export function mapM3uCatalog(
   });
 }
 
-function playlistCatalog(
+export function playlistCatalog(
   type: 'live' | 'vod' | 'series',
   sources: EnabledSourcesSnapshot,
 ): CatalogItem[] {
@@ -156,7 +156,7 @@ async function fetchXtreamList(
   return Array.isArray(response) ? response : [];
 }
 
-function mapXtreamList(
+export function mapXtreamList(
   type: 'live' | 'vod' | 'series',
   source: EnabledXtreamSource,
   list: unknown[],
@@ -478,9 +478,13 @@ export function useSeriesList(options?: { enabled?: boolean | undefined }) {
 }
 
 /** Picks the catalogue that belongs to a category sidebar's type. */
-export function useCatalogByType(type: 'live' | 'vod' | 'series') {
-  const live = useLiveStreams({ enabled: type === 'live' });
-  const vod = useVodStreams({ enabled: type === 'vod' });
-  const series = useSeriesList({ enabled: type === 'series' });
+export function useCatalogByType(
+  type: 'live' | 'vod' | 'series',
+  options?: { enabled?: boolean | undefined },
+) {
+  const enabled = options?.enabled ?? true;
+  const live = useLiveStreams({ enabled: enabled && type === 'live' });
+  const vod = useVodStreams({ enabled: enabled && type === 'vod' });
+  const series = useSeriesList({ enabled: enabled && type === 'series' });
   return type === 'live' ? live : type === 'vod' ? vod : series;
 }

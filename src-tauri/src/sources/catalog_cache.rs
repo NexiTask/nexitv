@@ -128,7 +128,7 @@ fn remove_entry(paths: &CatalogCachePaths) -> Result<(), String> {
 
 fn check_size(bytes: usize) -> Result<(), String> {
     if bytes > MAX_CATALOG_BYTES {
-        return Err("The catalog is larger than 128 MiB".to_string());
+        return Err("The catalog is larger than 512 MiB".to_string());
     }
     Ok(())
 }
@@ -242,12 +242,36 @@ pub fn catalog_cache_store(
     scope: String,
     content: String,
 ) -> Result<(), String> {
+    let saved_at = now_millis();
     store_at(
         &entry_paths(&app, &source_id, &kind)?,
         &scope,
         &content,
-        now_millis(),
+        saved_at,
+    )?;
+    // The index is a convenience: a failure here only costs the fast path.
+    match super::catalog_index::ingest(&app, &source_id, &kind, &scope, saved_at, &content) {
+        Ok(_) => super::catalog_index::notify_updated(&app, &kind),
+        Err(error) => log::warn!("catalog index not updated: {error}"),
+    }
+    Ok(())
+}
+
+/// The saved copy's content and save time, for building the index.
+pub(crate) fn load_saved(
+    app: &tauri::AppHandle,
+    source_id: &str,
+    kind: &str,
+    scope: &str,
+) -> Result<Option<(String, u64)>, String> {
+    Ok(
+        load_at(&entry_paths(app, source_id, kind)?, scope, now_millis())?
+            .map(|entry| (entry.content, entry.saved_at)),
     )
+}
+
+pub(crate) fn validate_kind_public(kind: &str) -> Result<(), String> {
+    validate_kind(kind)
 }
 
 #[tauri::command(async)]
@@ -267,6 +291,9 @@ pub fn catalog_cache_delete(app: tauri::AppHandle, source_id: String) -> Result<
     for kind in CATALOG_KINDS {
         remove_entry(&paths_in(&directory, &source_id, kind))
             .map_err(|_| "Could not remove the catalog cache".to_string())?;
+    }
+    if let Err(error) = super::catalog_index::delete_source(&app, &source_id) {
+        log::warn!("catalog index not cleared: {error}");
     }
     Ok(())
 }

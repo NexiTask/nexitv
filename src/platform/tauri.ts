@@ -40,6 +40,21 @@ export interface M3uDocument {
 /** The provider lists an Xtream catalogue is built from. */
 export type CatalogCacheKind = 'live' | 'vod' | 'series';
 
+export type CatalogIndexOrder = 'added' | 'rating' | 'provider';
+
+export interface CatalogIndexSource {
+  sourceId: string;
+  scope: string;
+  /** The provider's own category ids, not Movena's source-prefixed ones. */
+  hiddenCategoryIds: string[];
+}
+
+export interface CatalogIndexRows {
+  /** False when some source has neither an index nor a saved copy yet. */
+  ready: boolean;
+  rows: { sourceId: string; raw: unknown }[];
+}
+
 export interface CatalogCacheEntry {
   /** The provider's JSON list, exactly as it was received. */
   content: string;
@@ -225,6 +240,14 @@ export const tauriApi = {
   /** A stored catalogue list, or null when there is none for this account or it is too old. */
   catalogCacheLoad: (sourceId: string, kind: CatalogCacheKind, scope: string) =>
     invoke<CatalogCacheEntry | null>('catalog_cache_load', { sourceId, kind, scope }),
+
+  /** A pre-ordered candidate pool from the catalogue index (hidden categories left out). */
+  catalogIndexRows: (
+    kind: CatalogCacheKind,
+    sources: CatalogIndexSource[],
+    order: CatalogIndexOrder,
+    limit: number,
+  ) => invoke<CatalogIndexRows>('catalog_index_rows', { kind, sources, order, limit }),
 
   /** Remove every stored catalogue list of one source. */
   catalogCacheDelete: (sourceId: string) => invoke<void>('catalog_cache_delete', { sourceId }),

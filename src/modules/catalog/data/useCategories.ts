@@ -184,7 +184,7 @@ export function useCategories(type: CatalogType, options?: { enabled?: boolean |
 /** Stable empty list so an unresolved query does not thrash memo identities. */
 const EMPTY_LIST: never[] = [];
 
-interface HiddenCategoryState {
+export interface HiddenCategoryState {
   ids: Set<string>;
   /**
    * False while the answer is still incomplete — a hidden country only maps to
@@ -194,7 +194,7 @@ interface HiddenCategoryState {
   isResolved: boolean;
 }
 
-function useHiddenCategoryState(
+export function useHiddenCategoryState(
   type: CatalogType,
   options?: { enabled?: boolean | undefined },
 ): HiddenCategoryState {
@@ -278,9 +278,9 @@ export function useWithoutHiddenCategories<T extends { categoryId?: string | und
  * pages deliberately keep the unfiltered list: there, picking a hidden category
  * outright still has to show it, or "show hidden" would lead nowhere.
  */
-export function useVisibleCatalog(type: CatalogType) {
-  const query = useCatalogByType(type);
-  const { data, isPending } = useWithoutHiddenCategories(type, query.data ?? EMPTY_LIST);
+export function useVisibleCatalog(type: CatalogType, options?: { enabled?: boolean | undefined }) {
+  const query = useCatalogByType(type, options);
+  const { data, isPending } = useWithoutHiddenCategories(type, query.data ?? EMPTY_LIST, options);
 
   return { ...query, data, isLoading: query.isLoading || isPending };
 }

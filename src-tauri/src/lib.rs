@@ -53,6 +53,7 @@ pub fn run() {
             sources::catalog_cache::catalog_cache_store,
             sources::catalog_cache::catalog_cache_load,
             sources::catalog_cache::catalog_cache_delete,
+            sources::catalog_index::catalog_index_rows,
             app_data::app_data_clear,
             app_data::files::settings_config_read,
             app_data::files::settings_config_write,
