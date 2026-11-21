@@ -21,6 +21,7 @@ import { notify } from '@/shared/notifications/useNotificationStore';
 import type { MediaItem } from '../model/media';
 import styles from './MediaCard.module.css';
 import { getDisplayTitle } from '../lib/titleParser';
+import { isSeriesCard, setSeriesWatched } from '../lib/seriesWatched';
 import { downloadMediaItem } from '@/modules/downloads/public/services/mediaDownload';
 import { useI18n } from '@/shared/i18n/i18n';
 import { IconButton } from '@/shared/ui/Button';
@@ -184,7 +185,11 @@ export function MediaCardMenu({
               type="button"
               className={styles.menuItem}
               onClick={(event) =>
-                run(event, () => useLibraryStore.getState().toggleWatched(item.id))
+                run(event, () =>
+                  isSeriesCard(item)
+                    ? void setSeriesWatched(item, !isWatched)
+                    : useLibraryStore.getState().toggleWatched(item.id),
+                )
               }
             >
               {isWatched ? (

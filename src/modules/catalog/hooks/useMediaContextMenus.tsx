@@ -23,6 +23,7 @@ import { notify } from '@/shared/notifications/useNotificationStore';
 import type { MediaItem } from '../model/media';
 import type { HistoryItem } from '@/modules/library/public/store/useLibraryStore';
 import { getDisplayTitle } from '../lib/titleParser';
+import { isSeriesCard, setSeriesWatched } from '../lib/seriesWatched';
 import { downloadMediaItem } from '@/modules/downloads/public/services/mediaDownload';
 import { useI18n } from '@/shared/i18n/i18n';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
@@ -171,7 +172,8 @@ export function useMediaContextMenus() {
           ) : (
             <Circle size={16} />
           ),
-          action: () => state.toggleWatched(item.id),
+          action: () =>
+            isSeriesCard(item) ? void setSeriesWatched(item, !isW) : state.toggleWatched(item.id),
         },
       );
 

@@ -406,15 +406,17 @@ function XtreamSeriesDetailsDialog({
   useEffect(() => {
     if (!data?.episodes) return;
     const watchedSet = new Set(watchedIds);
-    const anyWatched = Object.values(data.episodes).some((episodes) =>
-      episodes.some((episode) =>
-        watchedSet.has(
-          resolvedSourceId
-            ? xtreamItemId(resolvedSourceId, 'episode', episode.id)
-            : episode.id.toString(),
+    const anyWatched =
+      watchedSet.has(seriesId) ||
+      Object.values(data.episodes).some((episodes) =>
+        episodes.some((episode) =>
+          watchedSet.has(
+            resolvedSourceId
+              ? xtreamItemId(resolvedSourceId, 'episode', episode.id)
+              : episode.id.toString(),
+          ),
         ),
-      ),
-    );
+      );
     setSeriesStarted(seriesId, anyWatched);
   }, [data?.episodes, watchedIds, resolvedSourceId, seriesId, setSeriesStarted]);
 
