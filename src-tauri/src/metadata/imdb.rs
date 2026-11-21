@@ -47,7 +47,9 @@ const RATINGS_URL: &str = "https://datasets.imdbws.com/title.ratings.tsv.gz";
 const REFRESH_AFTER: Duration = Duration::from_secs(7 * 24 * 3600);
 /// Newly ingested lists wait at most a day for their first match.
 const BACKFILL_AFTER: Duration = Duration::from_secs(24 * 3600);
-const SCHEDULE_TICK: Duration = Duration::from_secs(6 * 3600);
+/// A tick is two cheap reads unless something is due, so it can be short: a
+/// source added while the app runs gets its ratings within half an hour.
+const SCHEDULE_TICK: Duration = Duration::from_secs(30 * 60);
 /// The first pass waits out the startup budget (the NTV-1 lesson).
 const STARTUP_DELAY: Duration = Duration::from_secs(120);
 /// Rows per backfill transaction: bounded commits keep readers unblocked.
@@ -183,6 +185,13 @@ fn meta_set(connection: &rusqlite::Connection, name: &str, value: u64) {
             params![name, value.to_string()],
         )
         .ok();
+}
+
+/// Whether the rematch pass is due: a day since the last one, or the catalogue's
+/// lists changed since it ran (a new source, a re-ingested list), so rows the
+/// last pass never saw are waiting.
+fn backfill_due(age: Option<u64>, stored_lists: Option<u64>, current_lists: u64) -> bool {
+    age.map_or(true, |age| age >= BACKFILL_AFTER.as_secs()) || stored_lists != Some(current_lists)
 }
 
 fn now_secs() -> u64 {
@@ -662,6 +671,8 @@ type MatchUpdate = (
 /// only; candidates were pre-filtered to the catalogue's keys at parse time.
 fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
     let start = Instant::now();
+    // Taken before matching, so a list that changes mid-pass is seen again.
+    let lists = catalog_index::lists_fingerprint(app)?;
     let mut matched = 0usize;
     let mut cursor: i64 = 0;
     loop {
@@ -766,6 +777,7 @@ fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
     let refreshed = resync_matched(app)?;
     with_connection(app, |connection| {
         meta_set(connection, "last_backfill", now_secs());
+        meta_set(connection, "lists_hash", lists);
         Ok(())
     })?;
     catalog_index::invalidate_imdb_facets();
@@ -958,13 +970,16 @@ pub(crate) fn schedule(app: tauri::AppHandle) {
             let outcome = if !automatic {
                 Ok(0)
             } else {
+                let current_lists = catalog_index::lists_fingerprint(&app).unwrap_or(0);
                 let due = with_connection(&app, |connection| {
                     let refresh = age_secs(connection, "last_refresh")
                         .map(|age| age >= REFRESH_AFTER.as_secs())
                         .unwrap_or(true);
-                    let backfill = age_secs(connection, "last_backfill")
-                        .map(|age| age >= BACKFILL_AFTER.as_secs())
-                        .unwrap_or(true);
+                    let backfill = backfill_due(
+                        age_secs(connection, "last_backfill"),
+                        meta_get(connection, "lists_hash"),
+                        current_lists,
+                    );
                     Ok((refresh, backfill))
                 })
                 .unwrap_or((false, false));
@@ -988,6 +1003,21 @@ pub(crate) fn schedule(app: tauri::AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_rematch_waits_a_day_unless_the_lists_changed() {
+        let day = BACKFILL_AFTER.as_secs();
+        // Recent pass, same lists: not due.
+        assert!(!backfill_due(Some(60), Some(7), 7));
+        // A day on: due.
+        assert!(backfill_due(Some(day), Some(7), 7));
+        // A new source or re-ingested list: due now, even minutes after a pass.
+        assert!(backfill_due(Some(60), Some(7), 8));
+        // A database from before the fingerprint existed: due once.
+        assert!(backfill_due(Some(60), None, 7));
+        // Never run: due.
+        assert!(backfill_due(None, Some(7), 7));
+    }
 
     #[test]
     fn title_key_mirrors_the_frontend() {

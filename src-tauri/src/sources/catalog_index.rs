@@ -489,6 +489,28 @@ pub(crate) fn facets_pending(app: &tauri::AppHandle) -> Result<bool, String> {
     })
 }
 
+/// A fingerprint of the catalogue's lists (which sources hold which kinds, and
+/// each list's generation). It changes when a source is added or a list is
+/// re-ingested, which is when rows the IMDb pass has not seen exist.
+pub(crate) fn lists_fingerprint(app: &tauri::AppHandle) -> Result<u64, String> {
+    with_reader(app, |connection| {
+        let mut statement = connection
+            .prepare("SELECT source_id, kind, generation FROM lists ORDER BY source_id, kind")?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let mut hasher = DefaultHasher::new();
+        rows.hash(&mut hasher);
+        Ok(hasher.finish())
+    })
+}
+
 /// The keys and provider IMDb ids the catalogue's IMDb pipeline can match
 /// against: every facet match key, plus the IMDb ids the ingest picked out of
 /// provider JSON. The dumps are pre-filtered to these, which is what keeps
