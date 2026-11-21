@@ -4,6 +4,7 @@ import { resolveMediaRating } from '@/shared/lib/rating';
 import {
   CATALOG_GENRES,
   catalogGenreMask,
+  RECENT_CHANNELS_CATEGORY,
   smartCategoryTargetIds,
   type CategoryLike,
   type RatingLookups,
@@ -73,6 +74,10 @@ export interface CatalogPageQueryInput {
   genre: string | null;
   sort: string;
   fold: boolean;
+  orderedIds?: readonly string[] | null | undefined;
+  titleFilter?: string | null | undefined;
+  /** The library's recently played channels, for the recent-channels hub. */
+  recentChannelIds?: readonly string[] | undefined;
 }
 
 /** The index query for exactly what CatalogPage would compute in memory. */
@@ -92,6 +97,12 @@ export function buildCatalogPageQuery(input: CatalogPageQueryInput): CatalogPage
     genre: genreBit >= 0 ? genreBit : null,
     sort: input.sort,
     fold: input.fold,
+    ...(input.orderedIds
+      ? { orderedIds: [...input.orderedIds] }
+      : input.activeCategoryId === RECENT_CHANNELS_CATEGORY
+        ? { orderedIds: [...(input.recentChannelIds ?? [])] }
+        : {}),
+    ...(input.titleFilter?.trim() ? { titleFilter: input.titleFilter } : {}),
     ...lookupOverrides(input.ratingLookups),
   };
 }

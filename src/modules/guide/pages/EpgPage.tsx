@@ -26,7 +26,18 @@ import { playableFromMediaItem } from '@/modules/playback/public/lib/playback';
 import { useEnabledSources } from '@/modules/sources/public/hooks/useEnabledSources';
 import { useVerifiedResolutionMap } from '@/modules/sources/public/store/useStreamVerificationStore';
 import { CatalogPageHeader } from '@/modules/catalog/public/components/CatalogPageHeader';
-import { filterItemsBySmartCategory } from '@/modules/catalog/public/lib/smartCatalogFilter';
+import {
+  filterItemsBySmartCategory,
+  RECENT_CHANNELS_CATEGORY,
+} from '@/modules/catalog/public/lib/smartCatalogFilter';
+import {
+  useCatalogPageMode,
+  useIndexedCatalogPage,
+  useIndexedCatalogStats,
+  type IndexedPageParams,
+} from '@/modules/catalog/public/data/useIndexedCatalog';
+import { ultraHdOverrides } from '@/modules/catalog/public/lib/catalogPageQuery';
+import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import {
   resolveM3uCatchupUrl,
   resolveXtreamCatchupUrl,
@@ -70,6 +81,9 @@ const MAX_WINDOW_HOURS = 24 * 14;
 /** Where the now line sits when the guide jumps to it. */
 const NOW_INSET = 160;
 
+const NO_OVERRIDES: Record<string, never> = {};
+const NO_LOOKUPS = new Map<string, never>();
+
 // ── Page ──────────────────────────────────────────────────────
 
 export function EpgPage() {
@@ -91,14 +105,40 @@ export function EpgPage() {
   } | null>(null);
   const [channelSearchQuery, setChannelSearchQuery] = useState('');
 
+  // Channels come from the catalogue index (folded like the Live page), one
+  // group at a time; M3U sources keep the full list in memory.
+  const { mode, fallBack } = useCatalogPageMode('live');
+  const isLegacy = mode === 'legacy';
+  const isIndexed = mode === 'index';
+  const favorites = useLibraryStore((state) => state.favorites);
+  const recentChannelIds = useLibraryStore((state) => state.recentChannels);
+  const categoryPrefs = useSettingsStore((state) => state.categoryPrefs);
+  const streamFoldingEnabled = useSettingsStore((state) => state.streamFoldingEnabled);
+
+  // Without a selection the guide opens on what the user keeps close:
+  // favourites, then recent channels, then the first pinned category.
+  const defaultGroup = useMemo(() => {
+    if (favorites.some((favorite) => favorite.type === 'live')) return 'smart:favorites';
+    if (recentChannelIds.length > 0) return RECENT_CHANNELS_CATEGORY;
+    const pinned = categoryPrefs?.pinned?.live?.[0];
+    if (pinned) return pinned;
+    const pinnedCountry = categoryPrefs?.pinnedCountries?.live?.[0];
+    return pinnedCountry ? `country:${pinnedCountry}` : null;
+  }, [categoryPrefs, favorites, recentChannelIds.length]);
+  const guideCategory = activeCategoryId ?? defaultGroup;
+
   const {
-    data: allChannels = [],
-    isLoading,
+    data: legacyChannels,
+    isLoading: isLegacyLoading,
     isError,
     error,
     isFetching,
     refetch,
-  } = useLiveStreams();
+  } = useLiveStreams({ enabled: isLegacy });
+  const allChannels = useMemo(
+    () => (isLegacy ? (legacyChannels ?? []) : []),
+    [isLegacy, legacyChannels],
+  );
   const {
     data: categories = [],
     isError: isCategoriesError,
@@ -123,11 +163,13 @@ export function EpgPage() {
   const channels = useMemo(() => {
     let list = filterItemsBySmartCategory(
       allChannels,
-      activeCategoryId,
+      guideCategory,
       hiddenCategoryIds,
-      [],
+      favorites,
       categories,
       verifiedResolutions,
+      undefined,
+      recentChannelIds,
     );
     if (channelSearchQuery.trim()) {
       const q = channelSearchQuery.toLowerCase();
@@ -136,18 +178,74 @@ export function EpgPage() {
     return list;
   }, [
     allChannels,
-    activeCategoryId,
+    guideCategory,
     hiddenCategoryIds,
+    favorites,
     categories,
     channelSearchQuery,
     verifiedResolutions,
+    recentChannelIds,
   ]);
 
+  const ultraHd = useMemo(
+    () => (isIndexed ? ultraHdOverrides(verifiedResolutions) : NO_OVERRIDES),
+    [isIndexed, verifiedResolutions],
+  );
+  const indexParams = useMemo<IndexedPageParams>(
+    () => ({
+      activeCategoryId: guideCategory,
+      hiddenCategoryIds,
+      favorites,
+      categories,
+      categoryGenres: NO_OVERRIDES,
+      ultraHd,
+      ratingLookups: NO_LOOKUPS,
+      genre: null,
+      sort: 'default',
+      fold: streamFoldingEnabled,
+      recentChannelIds,
+      titleFilter: channelSearchQuery,
+    }),
+    [
+      categories,
+      channelSearchQuery,
+      favorites,
+      guideCategory,
+      hiddenCategoryIds,
+      recentChannelIds,
+      streamFoldingEnabled,
+      ultraHd,
+    ],
+  );
+  const indexed = useIndexedCatalogPage('live', indexParams, isIndexed && guideCategory !== null);
+  const indexStats = useIndexedCatalogStats(
+    'live',
+    { hiddenCategoryIds, favorites, ultraHd, fold: streamFoldingEnabled },
+    isIndexed,
+  );
   useEffect(() => {
+    if (isIndexed && indexed.isError) fallBack();
+  }, [fallBack, indexed.isError, isIndexed]);
+
+  const indexResult = isIndexed ? indexed.result : undefined;
+  const channelCount = isIndexed ? (indexResult?.total ?? 0) : channels.length;
+  const getIndexedItem = indexed.getItem;
+  const channelAt = useCallback(
+    (index: number): CatalogItem | undefined =>
+      isIndexed ? getIndexedItem(index) : channels[index],
+    [channels, getIndexedItem, isIndexed],
+  );
+  const needsGroup = isIndexed && guideCategory === null;
+  const isLoading = isLegacy
+    ? isLegacyLoading
+    : mode === 'pending' || (!needsGroup && (indexed.isLoading || !indexResult));
+
+  useEffect(() => {
+    if (!isLegacy) return;
     if (selected && !channels.some((channel) => channel.id === selected.channel.id)) {
       setSelected(null);
     }
-  }, [channels, selected]);
+  }, [channels, isLegacy, selected]);
 
   const selectCategory = useCallback(
     (categoryId: string | null) => {
@@ -206,12 +304,21 @@ export function EpgPage() {
   const [timelineViewport, setTimelineViewport] = useState({ scrollLeft: 0, width: 0 });
 
   const rows = useVirtualizer({
-    count: channels.length,
+    count: channelCount,
     getScrollElement: () => scrollerRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 6,
     isScrollingResetDelay: 100,
   });
+
+  // The index loads rows for the channels in view (and some runway).
+  const virtualRows = rows.getVirtualItems();
+  const firstRow = virtualRows[0]?.index ?? 0;
+  const lastRow = virtualRows[virtualRows.length - 1]?.index ?? -1;
+  const requestRange = indexed.requestRange;
+  useEffect(() => {
+    if (isIndexed && lastRow >= firstRow) requestRange(firstRow, lastRow + 1);
+  }, [firstRow, isIndexed, lastRow, requestRange]);
 
   const jumpToNow = useCallback(
     (behavior: ScrollBehavior = 'smooth') => {
@@ -259,7 +366,7 @@ export function EpgPage() {
   // hours of the morning. Layout effect so it never paints at the far left first.
   const landed = useRef(false);
   useLayoutEffect(() => {
-    if (landed.current || channels.length === 0) return;
+    if (landed.current || channelCount === 0) return;
     const scroller = scrollerRef.current;
     if (!scroller) return;
     const align = () => {
@@ -276,7 +383,7 @@ export function EpgPage() {
       landed.current = true;
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [channels.length, pixelsPerMinute, windowStart]);
+  }, [channelCount, pixelsPerMinute, windowStart]);
 
   // Zooming keeps whatever moment sits under the left edge in place, rather than
   // throwing the view to a different hour.
@@ -350,8 +457,10 @@ export function EpgPage() {
     <div className={`${appStyles.page} ${appStyles.catalogLayout}`}>
       <CategorySidebar
         type="live"
-        activeCategoryId={activeCategoryId}
+        activeCategoryId={guideCategory}
         onSelectCategory={selectCategory}
+        indexStats={isLegacy ? undefined : (indexStats ?? null)}
+        allowAllCategories={isLegacy}
       />
 
       <div className={appStyles.catalogMain}>
@@ -360,7 +469,7 @@ export function EpgPage() {
           meta={
             isLoading
               ? t('Loading channels')
-              : t('{count} channels', { count: number(channels.length) })
+              : t('{count} channels', { count: number(channelCount) })
           }
         />
 
@@ -381,7 +490,13 @@ export function EpgPage() {
             onAction={retryPage}
             isRetrying={(isError && isFetching) || (isCategoriesError && areCategoriesFetching)}
           />
-        ) : !isLoading && channels.length === 0 ? (
+        ) : needsGroup ? (
+          <EmptyState
+            icon={CalendarClock}
+            title="Pick a channel group"
+            description="Search for a category in the sidebar and pin it, or add channels to your favorites, to see their programmes here."
+          />
+        ) : !isLoading && channelCount === 0 ? (
           <EmptyState
             icon={CalendarClock}
             title="No Channels Here"
@@ -511,7 +626,7 @@ export function EpgPage() {
                 ))}
 
                 {rows.getVirtualItems().map((row) => {
-                  const channel = channels[row.index];
+                  const channel = channelAt(row.index);
                   if (!channel) return null;
                   return (
                     <EpgRow

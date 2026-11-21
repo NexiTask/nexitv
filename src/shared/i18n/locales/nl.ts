@@ -231,6 +231,17 @@ export const NL_MESSAGES: Record<string, string> = {
   Retrying: 'Opnieuw proberen',
   'Expand all categories': 'Vouw alle categorieën uit',
   'Collapse all categories': 'Vouw alle categorieën samen',
+  Selected: 'Geselecteerd',
+  'Nothing pinned yet': 'Nog niets vastgezet',
+  'Search for a category or country and pin it to keep it here.':
+    'Zoek een categorie of land en zet het vast om het hier te houden.',
+  'Browse all categories': 'Alle categorieën bekijken',
+  'Browse all categories, {count} available': 'Alle categorieën bekijken, {count} beschikbaar',
+  'Show fewer categories': 'Minder categorieën tonen',
+  'Recently Watched': 'Onlangs bekeken',
+  'Pick a channel group': 'Kies een zendergroep',
+  'Search for a category in the sidebar and pin it, or add channels to your favorites, to see their programmes here.':
+    'Zoek een categorie in de zijbalk en zet die vast, of voeg zenders toe aan je favorieten, om hier hun programma te zien.',
   'No categories found': 'Geen categorieën gevonden',
   'Matching categories are hidden.': 'Overeenkomende categorieën zijn verborgen.',
   'Try a different search term.': 'Probeer een andere zoekterm.',

@@ -1,7 +1,11 @@
 // @vitest-environment happy-dom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useLibraryStore, type WatchProgress } from '@/modules/library/store/useLibraryStore';
+import {
+  migrateLibraryState,
+  useLibraryStore,
+  type WatchProgress,
+} from '@/modules/library/store/useLibraryStore';
 import { useNotificationStore } from '@/shared/notifications/useNotificationStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 
@@ -120,5 +124,39 @@ describe('library store', () => {
 
     expect(useLibraryStore.getState().history).toHaveLength(200);
     expect(useLibraryStore.getState().history[0]!.id).toBe('movie-249');
+  });
+});
+
+describe('recently played channels', () => {
+  beforeEach(() => {
+    useLibraryStore.setState({ recentChannels: [] });
+  });
+
+  it('keeps the newest first, once each, and at most thirty', () => {
+    const { addRecentChannel } = useLibraryStore.getState();
+    addRecentChannel('a');
+    addRecentChannel('b');
+    addRecentChannel('a');
+    addRecentChannel('');
+    expect(useLibraryStore.getState().recentChannels).toEqual(['a', 'b']);
+    for (let index = 0; index < 40; index += 1) addRecentChannel(`c${index}`);
+    const recent = useLibraryStore.getState().recentChannels;
+    expect(recent).toHaveLength(30);
+    expect(recent[0]).toBe('c39');
+  });
+
+  it('is cleared with the watch history', () => {
+    useLibraryStore.getState().addRecentChannel('a');
+    useLibraryStore.getState().clearHistory();
+    expect(useLibraryStore.getState().recentChannels).toEqual([]);
+  });
+
+  it('migrates missing or malformed lists to a clean one', () => {
+    expect(migrateLibraryState({}).recentChannels).toEqual([]);
+    expect(migrateLibraryState({ recentChannels: 'x' }).recentChannels).toEqual([]);
+    expect(migrateLibraryState({ recentChannels: ['a', 3, '', 'b'] }).recentChannels).toEqual([
+      'a',
+      'b',
+    ]);
   });
 });

@@ -16,20 +16,13 @@ import {
 import { useNavigate } from 'react-router-dom';
 import type { MediaItem } from '@/modules/catalog/public/model/media';
 import { useSearchStore } from '../store/useSearchStore';
-import { smartSearch } from '../lib/search';
+import { useCatalogSearch } from '../data/useCatalogSearch';
 import styles from './HeaderSearch.module.css';
-import {
-  useLiveStreams,
-  useVodStreams,
-  useSeriesList,
-} from '@/modules/catalog/public/data/useCatalog';
-import { useWithoutHiddenCategories } from '@/modules/catalog/public/data/useCategories';
 import { getDisplayTitle, parseMediaDisplayTitle } from '@/modules/catalog/public/lib/titleParser';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 import { useI18n } from '@/shared/i18n/i18n';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
-import { getCombinedErrorMessage } from '@/shared/lib/error';
 import { IconButton } from '@/shared/ui/Button';
 
 /** How long after closing to ignore a `focus` event on the input.
@@ -181,35 +174,22 @@ export function HeaderSearch({
     };
   }, [isFocused]);
 
-  // Share cache with main catalog queries
   const searchEnabled = suggestionQuery.length >= MIN_SUGGESTION_QUERY_LENGTH;
-  const { data: movies = [], error: moviesError } = useVodStreams({ enabled: searchEnabled });
-
-  const { data: series = [], error: seriesError } = useSeriesList({ enabled: searchEnabled });
-
-  const { data: live = [], error: liveError } = useLiveStreams({
+  // Ranked by the catalogue index where it can; hidden categories stay out.
+  const search = useCatalogSearch(suggestionQuery, 'all', {
     enabled: searchEnabled,
+    limit: 5,
   });
-  const suggestionError = getCombinedErrorMessage([moviesError, seriesError, liveError], '');
-
-  // Hidden categories and countries stay out of search, as they do on Home.
-  const visibleMovies = useWithoutHiddenCategories('vod', movies, { enabled: searchEnabled });
-  const visibleSeries = useWithoutHiddenCategories('series', series, { enabled: searchEnabled });
-  const visibleLive = useWithoutHiddenCategories('live', live, { enabled: searchEnabled });
-  const isHiddenFilterPending =
-    searchEnabled && (visibleMovies.isPending || visibleSeries.isPending || visibleLive.isPending);
-
-  const searchableItems = useMemo(
-    () =>
-      searchEnabled ? [...visibleMovies.data, ...visibleSeries.data, ...visibleLive.data] : [],
-    [searchEnabled, visibleMovies.data, visibleSeries.data, visibleLive.data],
-  );
-
-  // Calculate smart search suggestions
+  const suggestionError = search.error;
+  const isHiddenFilterPending = searchEnabled && search.isPending;
+  const searchGetItem = search.getItem;
+  const searchCount = search.count;
   const suggestions = useMemo(() => {
-    if (suggestionQuery.length < MIN_SUGGESTION_QUERY_LENGTH) return [];
-    return smartSearch(searchableItems, suggestionQuery).slice(0, 5);
-  }, [searchableItems, suggestionQuery]);
+    if (!searchEnabled) return [];
+    return Array.from({ length: searchCount }, (_, index) => searchGetItem(index)).filter(
+      (item): item is MediaItem => Boolean(item),
+    );
+  }, [searchCount, searchEnabled, searchGetItem]);
 
   const recentOptions = recentSearches.slice(0, 6);
   const showRecentDropdown = isFocused && !query.trim() && recentOptions.length > 0;

@@ -9,8 +9,9 @@ import {
   type CatalogPageResult,
   type CatalogPageSource,
   type CatalogPageStats,
+  type CatalogSearchResult,
 } from '@/platform/tauri';
-import { perfSync } from '@/platform/perf';
+import { perfAsync, perfSync } from '@/platform/perf';
 import {
   useEnabledSources,
   type EnabledSourcesSnapshot,
@@ -32,6 +33,7 @@ import type { RatingHeadSource } from './useTmdbRatingChecks';
 const STATUS_ROOT = 'catalog_index_page_status';
 const PAGE_ROOT = 'catalog_index_page';
 const STATS_ROOT = 'catalog_index_page_stats';
+const SEARCH_ROOT = 'catalog_index_search';
 /** Waiting on a build this close to done beats loading the whole catalogue. */
 const WAIT_FOR_BUILD_FRACTION = 0.1;
 const WAIT_FOR_BUILD_MS = 15_000;
@@ -70,7 +72,7 @@ function useIndexInvalidation(kind: CatalogPageKind | null) {
     if (!kind || !desktopApi.isDesktop()) return;
     const invalidate = (changed: string) => {
       if (changed !== kind) return;
-      for (const root of [STATUS_ROOT, PAGE_ROOT, STATS_ROOT]) {
+      for (const root of [STATUS_ROOT, PAGE_ROOT, STATS_ROOT, SEARCH_ROOT]) {
         void client.invalidateQueries({ queryKey: [root, kind] });
       }
     };
@@ -221,6 +223,10 @@ export interface IndexedPageParams {
   sort: string;
   /** Live TV with stream folding on. */
   fold: boolean;
+  /** Instead of a category: exactly these titles, in this order. */
+  orderedIds?: readonly string[] | null | undefined;
+  /** Keep titles whose (accent-folded, lower-case) title contains this text. */
+  titleFilter?: string | null | undefined;
 }
 
 export interface IndexedPage {
@@ -245,7 +251,6 @@ export function useIndexedCatalogPage(
   const kind = isPageKind(type) ? type : 'vod';
   const query = useMemo(() => buildCatalogPageQuery(params), [params]);
   const signature = useMemo(() => catalogQuerySignature(query), [query]);
-  const xtream = sources.availableXtreamSources;
   const requestSources = useMemo(() => pageSources(sources), [sources]);
 
   const page = useQuery({
@@ -261,15 +266,51 @@ export function useIndexedCatalogPage(
     retry: false,
   });
 
-  // Rows by key, per index generation; a page's keys only mean something
-  // under the generation they were made for.
+  const result = page.data;
+  const rows = useIndexedKeyRows(kind, query.fold, result);
+  return {
+    result,
+    isLoading: enabled && !result && page.isPending,
+    isError: page.isError && !result,
+    ...rows,
+  };
+}
+
+/** An ordered list of index keys, and the rows for whichever part is shown. */
+interface IndexedKeyList {
+  generation: string;
+  keys: Uint32Array;
+  head: readonly CatalogKeyRow[];
+}
+
+interface IndexedKeyRows {
+  /** The item at a list position, once its row has been loaded. */
+  getItem: (index: number) => CatalogItem | undefined;
+  /** Load the rows of a visible window (plus some runway). */
+  requestRange: (start: number, end: number) => void;
+  /** Changes whenever more rows have arrived. */
+  rowsVersion: number;
+}
+
+/**
+ * Rows for a list of index keys, loaded as they come into view and mapped
+ * with the catalogue's own mapping (folded channels folded). Keys only mean
+ * something under the index generation they were made for.
+ */
+export function useIndexedKeyRows(
+  type: CatalogPageKind,
+  fold: boolean,
+  list: IndexedKeyList | undefined,
+): IndexedKeyRows {
+  const sources = useEnabledSources();
+  const xtream = sources.availableXtreamSources;
+  const requestSources = useMemo(() => pageSources(sources), [sources]);
   const rowsRef = useRef<{ generation: string; items: Map<number, CatalogItem> }>({
     generation: '',
     items: new Map(),
   });
   const inFlight = useRef(new Set<number>());
   const [rowsVersion, setRowsVersion] = useState(0);
-  const result = page.data;
 
   const rowsFor = useCallback((generation: string) => {
     if (rowsRef.current.generation !== generation) {
@@ -280,39 +321,41 @@ export function useIndexedCatalogPage(
   }, []);
 
   const headItems = useMemo(() => {
-    if (!result) return null;
-    return perfSync(`index:page_head:${kind}`, () => mapKeyRows(kind, xtream, result.head));
-  }, [kind, result, xtream]);
+    if (!list) return null;
+    return perfSync(`index:page_head:${type}`, () => mapKeyRows(type, xtream, list.head));
+  }, [list, type, xtream]);
 
-  if (result && headItems) {
-    const items = rowsFor(result.generation);
+  if (list && headItems) {
+    const items = rowsFor(list.generation);
     for (const [key, item] of headItems) if (!items.has(key)) items.set(key, item);
   }
 
   const client = useQueryClient();
   const requestRange = useCallback(
     (start: number, end: number) => {
-      if (!result) return;
-      const items = rowsFor(result.generation);
+      if (!list) return;
+      const items = rowsFor(list.generation);
       const from = Math.max(0, start - ROW_PREFETCH);
-      const to = Math.min(result.keys.length, end + ROW_PREFETCH);
+      const to = Math.min(list.keys.length, end + ROW_PREFETCH);
       const missing: number[] = [];
       for (let index = from; index < to; index += 1) {
-        const key = result.keys[index]!;
+        const key = list.keys[index]!;
         if (!items.has(key) && !inFlight.current.has(key)) missing.push(key);
       }
       if (missing.length === 0) return;
       for (const key of missing) inFlight.current.add(key);
-      const generation = result.generation;
+      const generation = list.generation;
       void tauriApi
-        .catalogIndexPageRows(kind, requestSources, generation, missing, query.fold)
+        .catalogIndexPageRows(type, requestSources, generation, missing, fold)
         .then((answer) => {
           if (rowsRef.current.generation !== generation) return;
           if (answer.stale) {
-            void client.invalidateQueries({ queryKey: [PAGE_ROOT, kind] });
+            for (const root of [PAGE_ROOT, SEARCH_ROOT]) {
+              void client.invalidateQueries({ queryKey: [root, type] });
+            }
             return;
           }
-          for (const [key, item] of mapKeyRows(kind, xtream, answer.rows)) items.set(key, item);
+          for (const [key, item] of mapKeyRows(type, xtream, answer.rows)) items.set(key, item);
           setRowsVersion((version) => version + 1);
         })
         .catch(() => undefined)
@@ -320,28 +363,21 @@ export function useIndexedCatalogPage(
           for (const key of missing) inFlight.current.delete(key);
         });
     },
-    [client, kind, query.fold, requestSources, result, rowsFor, xtream],
+    [client, fold, list, requestSources, rowsFor, type, xtream],
   );
 
   const getItem = useCallback(
     (index: number) => {
-      if (!result) return undefined;
-      const key = result.keys[index];
-      return key === undefined ? undefined : rowsFor(result.generation).get(key);
+      if (!list) return undefined;
+      const key = list.keys[index];
+      return key === undefined ? undefined : rowsFor(list.generation).get(key);
     },
     // rowsVersion: a new identity tells the grid that more rows arrived.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [result, rowsFor, rowsVersion],
+    [list, rowsFor, rowsVersion],
   );
 
-  return {
-    result,
-    isLoading: enabled && !result && page.isPending,
-    isError: page.isError && !result,
-    getItem,
-    requestRange,
-    rowsVersion,
-  };
+  return { getItem, requestRange, rowsVersion };
 }
 
 /** The category sidebar's counts from the index. */
@@ -498,4 +534,79 @@ export function useCatalogFacetBuilds(delayMs = 3_000): void {
       unlisten?.();
     };
   }, [buildSources, client, delayMs, eligible, queryScope]);
+}
+
+export interface IndexedSearch {
+  result: CatalogSearchResult | undefined;
+  isLoading: boolean;
+  /** The index could not answer (not built yet); search the full list instead. */
+  isError: boolean;
+  rows: IndexedKeyRows;
+}
+
+/**
+ * `smartSearch` over one catalogue, run by the index: every match, best
+ * first, with the score the in-memory search would give it.
+ */
+export function useIndexedSearch(
+  type: CatalogPageKind,
+  text: string,
+  options: {
+    enabled: boolean;
+    fold: boolean;
+    hiddenCategoryIds: ReadonlySet<string>;
+    head?: number | undefined;
+  },
+): IndexedSearch {
+  const sources = useEnabledSources();
+  const requestSources = useMemo(() => pageSources(sources), [sources]);
+  const hiddenKey = useMemo(
+    () => [...options.hiddenCategoryIds].sort(),
+    [options.hiddenCategoryIds],
+  );
+  const trimmed = text.trim();
+  const search = useQuery({
+    queryKey: [SEARCH_ROOT, type, sources.queryScope, trimmed, options.fold, hiddenKey.join('|')],
+    queryFn: async () => {
+      const answer = await perfAsync(`index:search:${type}`, () =>
+        tauriApi.catalogIndexSearch(
+          type,
+          requestSources,
+          {
+            hiddenCategoryIds: hiddenKey,
+            category: null,
+            targetCategoryIds: null,
+            favoriteIds: [],
+            ultraHd: {},
+            ratings: {},
+            tmdbGenres: {},
+            categoryGenres: {},
+            genre: null,
+            sort: 'default',
+            fold: options.fold,
+          },
+          trimmed,
+          options.head ?? 40,
+        ),
+      );
+      if (!answer.ready) throw new Error('The catalogue index is being updated.');
+      return answer;
+    },
+    enabled: options.enabled && trimmed.length > 0,
+    staleTime: Infinity,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+  const rows = useIndexedKeyRows(type, options.fold, search.data);
+  return {
+    result: options.enabled && trimmed.length > 0 ? search.data : undefined,
+    isLoading: search.isFetching,
+    isError: search.isError,
+    rows,
+  };
+}
+
+/** Whether the index serves live channels for these sources (no M3U, desktop). */
+export function useLiveIndexAvailable(): boolean {
+  return indexCandidate('live', useEnabledSources());
 }

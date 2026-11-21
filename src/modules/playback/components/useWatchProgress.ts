@@ -26,6 +26,13 @@ export function useWatchProgress() {
   const queryClient = useQueryClient();
   const authScope = getXtreamQueryScope(activeStream?.sourceId, credentials);
   const lastSaveTimeRef = useRef(0);
+  const addRecentChannel = useLibraryStore((state) => state.addRecentChannel);
+  const liveChannelId = activeStream?.type === 'live' ? activeStream.id.toString() : null;
+
+  // The guide and the channel list offer the channels played lately.
+  useEffect(() => {
+    if (liveChannelId) addRecentChannel(liveChannelId);
+  }, [addRecentChannel, liveChannelId]);
 
   const saveCurrentProgress = useCallback(() => {
     const state = usePlayerStore.getState();

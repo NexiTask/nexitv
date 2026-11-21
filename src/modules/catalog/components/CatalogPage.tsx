@@ -115,6 +115,7 @@ export function CatalogPage({
 
   const hiddenCategoryIds = useHiddenCategoryIds(type);
   const favorites = useLibraryStore((s) => s.favorites);
+  const recentChannelIds = useLibraryStore((s) => s.recentChannels);
 
   const categoryNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -175,6 +176,7 @@ export function CatalogPage({
       genre: selectedGenre,
       sort: currentSortMode,
       fold: type === 'live' && streamFoldingEnabled,
+      recentChannelIds,
     }),
     [
       activeCategoryId,
@@ -187,6 +189,7 @@ export function CatalogPage({
       currentSortMode,
       type,
       streamFoldingEnabled,
+      recentChannelIds,
     ],
   );
   const headParams = useMemo<IndexedPageParams>(
@@ -229,8 +232,10 @@ export function CatalogPage({
       categories,
       verifiedResolutions,
       ratingLookups,
+      recentChannelIds,
     );
   }, [
+    recentChannelIds,
     allItems,
     activeCategoryId,
     hiddenCategoryIds,

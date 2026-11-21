@@ -32,6 +32,7 @@ use super::catalog_cache;
 use super::catalog_query::{
     self, CatalogQuery, CatalogStats, FacetRow, SourceFacets, MAX_SOURCES, ORD_BITS,
 };
+use super::catalog_search::normalize_text;
 use crate::credentials::source::validate_source_id;
 
 const SCHEMA_VERSION: i64 = 4;
@@ -664,7 +665,7 @@ fn read_source_facets(
     }
     let mut statement = transaction.prepare(
         "SELECT ord, f_id, f_category, f_added, f_has_added, f_year, f_rating, f_flags,
-            f_genres, f_rank, f_fold_key, f_fold_rank
+            f_genres, f_rank, f_fold_key, f_fold_rank, f_title
          FROM items WHERE source_id = ?1 AND kind = ?2 ORDER BY ord",
     )?;
     let mut categories: Vec<Box<str>> = Vec::new();
@@ -698,6 +699,8 @@ fn read_source_facets(
                 .get::<_, Option<String>>(10)?
                 .map(String::into_boxed_str),
             fold_rank: row.get::<_, Option<i64>>(11)?.unwrap_or(0) as u8,
+            search_title: normalize_text(&row.get::<_, Option<String>>(12)?.unwrap_or_default())
+                .into(),
         });
     }
     drop(query);
@@ -1316,6 +1319,68 @@ pub fn catalog_index_store_ranks(
         &format!("kind={kind} ranks={} stored={stored}", ranks.len()),
     );
     Ok(stored)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SearchHeader<'a> {
+    ready: bool,
+    generation: &'a str,
+    total: usize,
+    head: Vec<KeyRow>,
+}
+
+/// `smartSearch` over one catalogue (hidden categories left out): the keys
+/// of every match, best first, then their scores, both as u32 arrays after
+/// the header (see `encode_with_keys`), with the rows of the first `head`.
+#[tauri::command(async)]
+pub fn catalog_index_search(
+    app: tauri::AppHandle,
+    kind: String,
+    sources: Vec<PageSource>,
+    query: CatalogQuery,
+    text: String,
+    head: u32,
+) -> Result<tauri::ipc::Response, String> {
+    let start = Instant::now();
+    let facets = match page_sources(&app, &kind, &sources)? {
+        Ok(facets) => facets,
+        Err(_) => {
+            let header = SearchHeader {
+                ready: false,
+                generation: "",
+                total: 0,
+                head: Vec::new(),
+            };
+            return Ok(tauri::ipc::Response::new(encode_with_keys(&header, &[])?));
+        }
+    };
+    let refs: Vec<&SourceFacets> = facets.iter().map(|f| f.as_ref()).collect();
+    let found = catalog_query::search(&refs, &query, &text, &kind);
+    let keys: Vec<u32> = found.iter().map(|(key, _)| *key).collect();
+    let token = generation_token(&facets);
+    let head_keys = &keys[..keys.len().min(head.min(PAGE_HEAD_ROWS as u32) as usize)];
+    let groups = catalog_query::fold_groups(&refs, &query, head_keys);
+    let rows = rows_for_keys(&app, &kind, &sources, &token, head_keys, &groups)?;
+    let ready = rows.is_some();
+    let header = SearchHeader {
+        ready,
+        generation: &token,
+        total: if ready { keys.len() } else { 0 },
+        head: rows.unwrap_or_default(),
+    };
+    let mut values = Vec::with_capacity(found.len() * 2);
+    if ready {
+        values.extend(found.iter().map(|(key, _)| *key));
+        values.extend(found.iter().map(|(_, score)| *score));
+    }
+    let bytes = encode_with_keys(&header, &values)?;
+    crate::perf::log(
+        "rust:index_search",
+        Some(start.elapsed().as_millis()),
+        &format!("kind={kind} found={}", found.len()),
+    );
+    Ok(tauri::ipc::Response::new(bytes))
 }
 
 /// Tell the frontend a list in the index changed, so views built on it reload.

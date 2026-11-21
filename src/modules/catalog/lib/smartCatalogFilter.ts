@@ -329,7 +329,11 @@ export const SMART_TITLE_PATTERNS = {
 
 type SmartTitleCategory = keyof typeof SMART_TITLE_PATTERNS;
 
+/** Live channels played lately (`recentChannels` in the library), newest first. */
+export const RECENT_CHANNELS_CATEGORY = 'smart:recent-channels';
+
 const SMART_FILTERS = new Set<string>([
+  RECENT_CHANNELS_CATEGORY,
   'smart:favorites',
   'smart:recent',
   'smart:top-rated',
@@ -386,6 +390,7 @@ export function filterItemsBySmartCategory<T extends SmartCatalogItem>(
   categories: CategoryLike[] = [],
   verifiedResolutions?: ReadonlyMap<string, string>,
   ratingLookups?: RatingLookups,
+  recentChannelIds: readonly string[] = [],
 ): T[] {
   const isVisible = (s: T) => !s.categoryId || !hiddenCategoryIds.has(s.categoryId);
   if (!activeCategoryId) return items.filter(isVisible);
@@ -396,6 +401,18 @@ export function filterItemsBySmartCategory<T extends SmartCatalogItem>(
       (s) =>
         s.categoryId && targetCategoryIds.has(s.categoryId) && !hiddenCategoryIds.has(s.categoryId),
     );
+  }
+
+  if (activeCategoryId === RECENT_CHANNELS_CATEGORY) {
+    const byId = new Map<string, T>();
+    for (const item of items) if (!byId.has(item.id)) byId.set(item.id, item);
+    const listed = new Set<string>();
+    return recentChannelIds.flatMap((id) => {
+      const item = byId.get(id);
+      if (!item || listed.has(id) || !isVisible(item)) return [];
+      listed.add(id);
+      return [item];
+    });
   }
 
   if (activeCategoryId === 'smart:favorites') {

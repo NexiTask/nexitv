@@ -284,3 +284,44 @@ describe('catalogue page index IPC', () => {
     });
   });
 });
+
+describe('catalogue index search IPC', () => {
+  it('sends the search and decodes keys followed by scores', async () => {
+    const header = new TextEncoder().encode(
+      JSON.stringify({ ready: true, generation: '2', total: 2, head: [] }),
+    );
+    const offset = Math.ceil((4 + header.length) / 4) * 4;
+    const buffer = new ArrayBuffer(offset + 16);
+    const view = new DataView(buffer);
+    view.setUint32(0, header.length, true);
+    new Uint8Array(buffer, 4, header.length).set(header);
+    [7, 3, 1350, 600].forEach((value, index) => view.setUint32(offset + index * 4, value, true));
+    invokeMock.mockResolvedValueOnce(buffer);
+    const query = {
+      hiddenCategoryIds: [],
+      category: null,
+      targetCategoryIds: null,
+      favoriteIds: [],
+      ultraHd: {},
+      ratings: {},
+      tmdbGenres: {},
+      categoryGenres: {},
+      genre: null,
+      sort: 'default',
+      fold: true,
+    };
+    const sources = [{ sourceId: 'xtream-one', scope: 'scope' }];
+
+    const result = await tauriApi.catalogIndexSearch('live', sources, query, 'bbc', 5);
+
+    expect(invokeMock).toHaveBeenCalledWith('catalog_index_search', {
+      kind: 'live',
+      sources,
+      query,
+      text: 'bbc',
+      head: 5,
+    });
+    expect([...result.keys]).toEqual([7, 3]);
+    expect([...result.scores]).toEqual([1350, 600]);
+  });
+});

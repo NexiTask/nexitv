@@ -14,6 +14,8 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
+use super::catalog_search::{normalize_text, prepare, prepare_query, score, ItemMeta};
+
 /// Declared 4K or 8K in the title, quality or tags.
 pub(crate) const FLAG_ULTRA_HD: u8 = 1;
 pub(crate) const FLAG_SPORTS: u8 = 2;
@@ -49,6 +51,8 @@ pub(crate) struct FacetRow {
     /// Live channels: the stream-folding group and quality rank.
     pub fold_key: Option<Box<str>>,
     pub fold_rank: u8,
+    /// The title as search compares it (`normalizeText`).
+    pub search_title: Box<str>,
 }
 
 /// One source's titles in provider order.
@@ -92,6 +96,11 @@ pub struct CatalogQuery {
     pub sort: String,
     /// Fold each live channel's variants into one, like `foldLiveChannels`.
     pub fold: bool,
+    /// Instead of a category: exactly these titles, in this order (matched by
+    /// the id the list shows, like favourites).
+    pub ordered_ids: Option<Vec<String>>,
+    /// Keep only titles whose normalized title contains this text.
+    pub title_filter: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize, PartialEq)]
@@ -331,8 +340,43 @@ impl<'a> Context<'a> {
         )
     }
 
-    /// `filterItemsBySmartCategory`.
+    /// The category, then the title filter.
     fn smart_filter(&self) -> Vec<Entry> {
+        let entries = self.category_filter();
+        match self
+            .query
+            .title_filter
+            .as_deref()
+            .map(normalize_text)
+            .filter(|text| !text.trim().is_empty())
+        {
+            Some(text) => entries
+                .into_iter()
+                .filter(|&entry| self.row(entry).search_title.contains(text.as_str()))
+                .collect(),
+            None => entries,
+        }
+    }
+
+    /// `ordered_ids`: each id's title as listed (first one), once, hidden
+    /// ones left out.
+    fn ordered(&self, ids: &[String]) -> Vec<Entry> {
+        let mut by_id: HashMap<&str, Entry> = HashMap::new();
+        for entry in self.all() {
+            by_id.entry(&*self.row(entry).id).or_insert(entry);
+        }
+        let mut seen = HashSet::new();
+        ids.iter()
+            .filter_map(|id| by_id.get(id.as_str()).copied())
+            .filter(|entry| seen.insert((entry.source, entry.row)) && !self.is_hidden(*entry))
+            .collect()
+    }
+
+    /// `filterItemsBySmartCategory`.
+    fn category_filter(&self) -> Vec<Entry> {
+        if let Some(ids) = &self.query.ordered_ids {
+            return self.ordered(ids);
+        }
         let visible = |entry: &Entry| !self.is_hidden(*entry);
         let Some(category) = self.query.category.as_deref() else {
             return self.all().filter(visible).collect();
@@ -543,6 +587,37 @@ pub(crate) fn stats(sources: &[&SourceFacets], query: &CatalogQuery) -> CatalogS
     stats
 }
 
+/// `smartSearch` over the visible titles (folded when folding is on): keys
+/// and scores, best first, ties in list order.
+pub(crate) fn search(
+    sources: &[&SourceFacets],
+    query: &CatalogQuery,
+    text: &str,
+    kind: &str,
+) -> Vec<(u32, u32)> {
+    let Some(prepared) = prepare_query(text) else {
+        return Vec::new();
+    };
+    let context = Context::new(sources, query, false);
+    let mut found: Vec<(u32, u32)> = context
+        .all()
+        .filter(|&entry| !context.is_hidden(entry))
+        .filter_map(|entry| {
+            let row = context.row(entry);
+            let year = row.year.map(|year| year.to_string());
+            let meta = ItemMeta {
+                year: year.as_deref(),
+                kind,
+            };
+            let title = prepare(&row.search_title);
+            let points = score(&prepared, &title, &meta);
+            (points > 0).then(|| (context.key(entry), points))
+        })
+        .collect();
+    found.sort_by(|a, b| b.1.cmp(&a.1));
+    found
+}
+
 /// For folded channels among `keys`: every variant's key, in provider order,
 /// so the frontend can fold them with `foldLiveChannels` itself.
 pub(crate) fn fold_groups(
@@ -635,6 +710,7 @@ mod tests {
                     rank: t.rank,
                     fold_key: t.fold_key.map(Into::into),
                     fold_rank: t.fold_rank,
+                    search_title: normalize_text(t.id).into(),
                 }
             })
             .collect();
@@ -989,6 +1065,64 @@ mod tests {
         assert!(fold_groups(&[&facets], &q, &[2]).is_empty());
         q.category = None;
         assert_eq!(keys(&page(&[&facets], &q)), vec![0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn ordered_ids_keep_their_order_and_match_the_listed_titles() {
+        let facets = source(vec![
+            Title {
+                fold_key: Some("g::one"),
+                ..title("one-hd")
+            },
+            Title {
+                fold_key: Some("g::two"),
+                ..title("two")
+            },
+            Title {
+                fold_key: Some("g::one"),
+                fold_rank: 9,
+                ..title("one-4k")
+            },
+            Title {
+                category: Some("s:category:2"),
+                fold_key: Some("g::three"),
+                ..title("three")
+            },
+        ]);
+        let mut q = query("default");
+        q.fold = true;
+        q.hidden_category_ids = vec!["s:category:2".into()];
+        q.ordered_ids = Some(vec![
+            "two".into(),
+            "one-hd".into(),
+            "one-4k".into(),
+            "missing".into(),
+            "three".into(),
+        ]);
+        // "one-hd" is folded into "one-4k", so like a favourite it is not listed;
+        // hidden "three" stays out.
+        assert_eq!(keys(&page(&[&facets], &q)), vec![1, 2]);
+        q.fold = false;
+        assert_eq!(keys(&page(&[&facets], &q)), vec![1, 0, 2]);
+    }
+
+    #[test]
+    fn filters_and_searches_titles() {
+        let facets = source(vec![title("Café Noir"), title("BBC One"), title("BBC")]);
+        let mut q = query("default");
+        q.title_filter = Some("CAFE".into());
+        assert_eq!(keys(&page(&[&facets], &q)), vec![0]);
+        q.title_filter = Some("  ".into());
+        assert_eq!(keys(&page(&[&facets], &q)).len(), 3);
+        q.title_filter = None;
+        // Exact match first, then the prefix match; no match is left out.
+        assert_eq!(
+            search(&[&facets], &q, "bbc", "live"),
+            vec![(2, 1350), (1, 950)]
+        );
+        assert!(search(&[&facets], &q, "  ", "live").is_empty());
+        q.hidden_category_ids = vec!["s:category:1".into()];
+        assert!(search(&[&facets], &q, "bbc", "live").is_empty());
     }
 
     #[test]

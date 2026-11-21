@@ -231,6 +231,17 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   Retrying: 'Tentando novamente',
   'Expand all categories': 'Expandir todas as categorias',
   'Collapse all categories': 'Recolher todas as categorias',
+  Selected: 'Selecionada',
+  'Nothing pinned yet': 'Nada fixado ainda',
+  'Search for a category or country and pin it to keep it here.':
+    'Pesquise uma categoria ou um país e fixe-o para mantê-lo aqui.',
+  'Browse all categories': 'Ver todas as categorias',
+  'Browse all categories, {count} available': 'Ver todas as categorias, {count} disponíveis',
+  'Show fewer categories': 'Mostrar menos categorias',
+  'Recently Watched': 'Assistidos recentemente',
+  'Pick a channel group': 'Escolha um grupo de canais',
+  'Search for a category in the sidebar and pin it, or add channels to your favorites, to see their programmes here.':
+    'Pesquise uma categoria na barra lateral e fixe-a, ou adicione canais aos favoritos, para ver a programação aqui.',
   'No categories found': 'Nenhuma categoria encontrada',
   'Matching categories are hidden.': 'As categorias correspondentes estão ocultas.',
   'Try a different search term.': 'Experimente um termo de pesquisa diferente.',

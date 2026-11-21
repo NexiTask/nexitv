@@ -63,6 +63,7 @@ pub fn run() {
             sources::catalog_index::catalog_index_store_facets,
             sources::catalog_index::catalog_index_titles,
             sources::catalog_index::catalog_index_store_ranks,
+            sources::catalog_index::catalog_index_search,
             app_data::app_data_clear,
             app_data::files::settings_config_read,
             app_data::files::settings_config_write,

@@ -84,6 +84,37 @@ export interface CatalogPageQuery {
   sort: string;
   /** Live TV: fold each channel's variants into one (the stream folding setting). */
   fold: boolean;
+  /** Instead of a category: exactly these titles, in this order. */
+  orderedIds?: string[] | null | undefined;
+  /** Keep titles whose normalized title contains this text. */
+  titleFilter?: string | null | undefined;
+}
+
+export interface CatalogSearchResult {
+  ready: boolean;
+  generation: string;
+  total: number;
+  head: CatalogKeyRow[];
+  /** Matches, best first. */
+  keys: Uint32Array;
+  /** `smartSearch` score of each match. */
+  scores: Uint32Array;
+}
+
+/** Decodes a search answer: the page layout with keys followed by scores. */
+export function decodeCatalogSearch(buffer: ArrayBuffer): CatalogSearchResult {
+  const page = decodeCatalogPage(buffer) as unknown as Omit<
+    CatalogSearchResult,
+    'keys' | 'scores'
+  > & {
+    keys: Uint32Array;
+  };
+  const total = page.ready ? page.total : 0;
+  return {
+    ...page,
+    keys: page.keys.subarray(0, total),
+    scores: page.keys.subarray(total, total * 2),
+  };
 }
 
 export interface CatalogKeyRow {
@@ -369,6 +400,18 @@ export const tauriApi = {
       checkedIds,
       limit,
     }),
+
+  /** `smartSearch` over one catalogue in the index: matches best first, with scores. */
+  catalogIndexSearch: async (
+    kind: CatalogPageKind,
+    sources: CatalogPageSource[],
+    query: CatalogPageQuery,
+    text: string,
+    head: number,
+  ) =>
+    decodeCatalogSearch(
+      await invoke<ArrayBuffer>('catalog_index_search', { kind, sources, query, text, head }),
+    ),
 
   /** Rows still waiting for facets, as JSON bytes for the facet worker. */
   catalogIndexFacetBatch: (sourceId: string, kind: CatalogPageKind, scope: string, limit: number) =>
