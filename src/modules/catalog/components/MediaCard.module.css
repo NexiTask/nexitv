@@ -170,8 +170,8 @@
 }
 
 .actionBtn:hover {
-  outline: 3px solid var(--accent-color);
-  outline-offset: 2px;
+  background: var(--accent-color);
+  color: var(--text-on-accent);
 }
 
 .progressBar {
