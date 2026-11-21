@@ -136,6 +136,11 @@
   gap: var(--space-2);
 }
 
+/* The quick-remove X sits alone on the left of the top actions. */
+.removeBtn {
+  margin-right: auto;
+}
+
 .iconBtn {
   background: var(--surface-media-control);
   border: 1px solid rgba(var(--neutral-white-rgb), var(--alpha-15));

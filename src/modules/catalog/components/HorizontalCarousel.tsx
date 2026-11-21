@@ -13,6 +13,9 @@ interface HorizontalCarouselProps {
   seeAllLabel?: string | undefined;
   /** Square, compact cards instead of movie-poster proportions — channel logos are small and square, not tall portraits. */
   isLiveTv?: boolean | undefined;
+  /** A quick-remove X on each card (Continue Watching), with its label. */
+  onRemoveItem?: ((item: MediaItem) => void) | undefined;
+  removeLabel?: string | undefined;
 }
 
 export function HorizontalCarousel({
@@ -21,6 +24,8 @@ export function HorizontalCarousel({
   onItemClick,
   onSeeAll,
   seeAllLabel = 'See all',
+  onRemoveItem,
+  removeLabel,
   isLiveTv = false,
 }: HorizontalCarouselProps) {
   const { t } = useI18n();
@@ -126,6 +131,8 @@ export function HorizontalCarousel({
                   onClick={() => onItemClick(item)}
                   style={{ transformOrigin }}
                   isLiveTv={isLiveTv}
+                  onRemove={onRemoveItem}
+                  removeLabel={removeLabel}
                 />
               </div>
             );

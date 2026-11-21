@@ -39,6 +39,9 @@ interface VirtualizedGridProps {
   gap?: number | undefined;
   isLiveTv?: boolean | undefined;
   showTypeInList?: boolean | undefined;
+  /** A quick-remove X on each card (Continue Watching), with its label. */
+  onRemoveItem?: ((item: MediaItem) => void) | undefined;
+  removeLabel?: string | undefined;
 }
 
 export function VirtualizedGrid({
@@ -52,6 +55,8 @@ export function VirtualizedGrid({
   gap = 16,
   isLiveTv = false,
   showTypeInList = true,
+  onRemoveItem,
+  removeLabel,
 }: VirtualizedGridProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
@@ -219,6 +224,8 @@ export function VirtualizedGrid({
                       viewMode={viewMode}
                       isLiveTv={isLiveTv}
                       showTypeInList={showTypeInList}
+                      onRemove={onRemoveItem}
+                      removeLabel={removeLabel}
                       style={TRANSFORM_ORIGIN_STYLES[transformOrigin]}
                     />
                   </div>

@@ -164,3 +164,31 @@ describe('MediaCard IMDb rating', () => {
     expect(screen.queryByText('IMDb')).toBeNull();
   });
 });
+
+describe('MediaCard quick remove', () => {
+  it('offers the X only when asked, and removing does not open the title', () => {
+    const onRemove = vi.fn();
+    const onClick = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <MediaCard
+            item={{ ...movieItem, progress: 0.4 }}
+            onClick={onClick}
+            onRemove={onRemove}
+            removeLabel="Remove from Continue Watching"
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from Continue Watching' }));
+    expect(onRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 'movie-1' }));
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('has no X on an ordinary card', () => {
+    renderCard(movieItem);
+    expect(screen.queryByRole('button', { name: 'Remove from Continue Watching' })).toBeNull();
+  });
+});

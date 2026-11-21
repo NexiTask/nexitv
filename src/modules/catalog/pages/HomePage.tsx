@@ -1,5 +1,5 @@
 import { perfLog, perfSync } from '@/platform/perf';
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { PageTransition } from '@/app/shell/PageTransition';
 import { HorizontalCarousel } from '@/modules/catalog/components/HorizontalCarousel';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
@@ -8,6 +8,7 @@ import {
   type HomeSectionId,
 } from '@/modules/settings/public/store/useSettingsStore';
 import { historyCardSubtitle } from '@/shared/lib/time';
+import type { MediaItem } from '../model/media';
 import { MediaDetailsDialogs } from '../details/MediaDetailsDialogs';
 import { useMediaDetailState } from '../hooks/useMediaDetailsState';
 import { CarouselSkeleton } from '@/shared/ui/Skeleton';
@@ -42,6 +43,11 @@ export function HomePage() {
   const { t, language } = useI18n();
   const sources = useEnabledSources();
   const history = useLibraryStore((state) => state.history);
+  const removeFromHistoryById = useLibraryStore((state) => state.removeFromHistory);
+  const removeFromHistory = useCallback(
+    (item: MediaItem) => removeFromHistoryById(item.id),
+    [removeFromHistoryById],
+  );
   const upcomingEnabled = useSettingsStore((state) => state.upcomingEnabled);
   const upcomingHomeEnabled = useSettingsStore((state) => state.upcomingHomeEnabled);
   const homeSections = useSettingsStore((state) => state.homeSections);
@@ -184,6 +190,8 @@ export function HomePage() {
             items={continueWatchingItems}
             onItemClick={handleItemClick}
             onSeeAll={() => navigate('/continue')}
+            onRemoveItem={removeFromHistory}
+            removeLabel="Remove from Continue Watching"
           />
         );
       case 'recentMovies':

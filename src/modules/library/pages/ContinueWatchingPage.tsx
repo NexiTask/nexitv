@@ -18,6 +18,7 @@ export function ContinueWatchingPage() {
   const { t, tn, number, language } = useI18n();
   const history = useLibraryStore((state) => state.history);
   const clearHistory = useLibraryStore((state) => state.clearHistory);
+  const removeFromHistory = useLibraryStore((state) => state.removeFromHistory);
 
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
 
@@ -72,6 +73,8 @@ export function ContinueWatchingPage() {
               }))}
               showTypeInList={false}
               onItemClick={handleItemClick}
+              onRemoveItem={(item) => removeFromHistory(item.id)}
+              removeLabel="Remove from Continue Watching"
             />
           </div>
         )}

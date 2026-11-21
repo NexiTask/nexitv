@@ -1,4 +1,4 @@
-import { Play, Heart, Check, Film, Tv, Radio, HardDriveDownload } from 'lucide-react';
+import { Play, Heart, Check, Film, Tv, Radio, HardDriveDownload, X } from 'lucide-react';
 import styles from './MediaCard.module.css';
 import { memo, useState, useEffect } from 'react';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
@@ -46,6 +46,9 @@ interface MediaCardProps {
   isLiveTv?: boolean | undefined;
   /** Show Movie/Series in mixed list contexts such as Favorites and Search. */
   showTypeInList?: boolean | undefined;
+  /** A quick X in the card's corner (Continue Watching), with its label. */
+  onRemove?: ((item: MediaItem) => void) | undefined;
+  removeLabel?: string | undefined;
 }
 
 function formatChannelNumber(value: string | number | undefined): string {
@@ -94,6 +97,8 @@ function MediaCardComponent({
   viewMode = 'grid',
   isLiveTv = false,
   showTypeInList = true,
+  onRemove,
+  removeLabel = 'Remove',
 }: MediaCardProps) {
   const { t, tn, language, number } = useI18n();
   const { handleMediaCardContextMenu } = useMediaContextMenus();
@@ -369,6 +374,20 @@ function MediaCardComponent({
             </button>
 
             <div className={styles.topActions}>
+              {onRemove && (
+                <button
+                  type="button"
+                  className={`${styles.iconBtn} ${styles.removeBtn}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemove(item);
+                  }}
+                  title={t(removeLabel)}
+                  aria-label={t(removeLabel)}
+                >
+                  <X size={16} />
+                </button>
+              )}
               <button
                 type="button"
                 className={styles.iconBtn}
