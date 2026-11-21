@@ -298,6 +298,7 @@ const DEFAULT_SETTINGS = {
   showWindowControls: true,
   liveTvView: 'channels' as const,
   categorySidebarHidden: false,
+  interfaceZoom: 1,
   catalogSortModes: emptyCatalogSortModes(),
   catalogFilters: { vod: EMPTY_CATALOG_FILTERS, series: EMPTY_CATALOG_FILTERS },
   sidebarWidth: 260,
@@ -366,6 +367,16 @@ const normalizeChannelLogoAspectOverrides = (value: unknown): Record<string, Cha
   }
   return result;
 };
+
+export const INTERFACE_ZOOM_STEPS = [0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] as const;
+
+/** The nearest offered zoom step; anything unreadable is 100%. */
+export function normalizeInterfaceZoom(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 1;
+  return INTERFACE_ZOOM_STEPS.reduce((best, step) =>
+    Math.abs(step - value) < Math.abs(best - value) ? step : best,
+  );
+}
 
 /** Per-section card sizes: short section keys, sane scales only. */
 function normalizeCardScales(value: unknown): Record<string, number> {
@@ -572,6 +583,7 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
     viewModes: normalizeViewModes(state.viewModes),
     cardScales: normalizeCardScales(state.cardScales),
     categorySidebarHidden: state.categorySidebarHidden === true,
+    interfaceZoom: normalizeInterfaceZoom(state.interfaceZoom),
     catalogSortModes: normalizeCatalogSortModes(state.catalogSortModes),
     catalogFilters: normalizeCatalogFilterSet(state.catalogFilters),
     lastCollectionId:

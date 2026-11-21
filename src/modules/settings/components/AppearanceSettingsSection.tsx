@@ -8,7 +8,13 @@ import {
   RiSunFill,
   RiSunLine,
 } from '@/shared/ui/icons';
-import { useSettingsStore, type ThemePreference } from '../store/useSettingsStore';
+import {
+  INTERFACE_ZOOM_STEPS,
+  normalizeInterfaceZoom,
+  useSettingsStore,
+  type ThemePreference,
+} from '../store/useSettingsStore';
+import { Select } from '@/shared/ui/Select';
 import { DEFAULT_ACCENT_COLOR } from '@/shared/design/color';
 import { AccentColorPicker } from '@/shared/ui/AccentColorPicker';
 import { SegmentedControl } from '@/shared/ui/SegmentedControl';
@@ -69,6 +75,24 @@ export function AppearanceSettingsSection() {
               },
               { value: 'list', label: 'List', icon: RiLayoutRowLine, activeIcon: RiLayoutRowFill },
             ]}
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          title="Interface Zoom"
+          description="Scales the whole interface: text, cards and controls. Ctrl + and Ctrl − change it too, Ctrl 0 resets it."
+        >
+          <Select
+            ariaLabel="Interface zoom"
+            variant="settings"
+            width={120}
+            value={String(normalizeInterfaceZoom(settings.interfaceZoom))}
+            onChange={(value) => settings.updateSetting('interfaceZoom', Number(value))}
+            options={INTERFACE_ZOOM_STEPS.map((step) => ({
+              value: String(step),
+              label: `${Math.round(step * 100)}%`,
+              localize: false,
+            }))}
           />
         </SettingsRow>
 

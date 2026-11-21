@@ -420,6 +420,10 @@ export const ES_MESSAGES: Record<string, string> = {
   'Larger cards': 'Tarjetas más grandes',
   'Mark season watched': 'Marcar temporada como vista',
   'Mark season unwatched': 'Marcar temporada como no vista',
+  'Interface Zoom': 'Zoom de la interfaz',
+  'Interface zoom': 'Zoom de la interfaz',
+  'Scales the whole interface: text, cards and controls. Ctrl + and Ctrl − change it too, Ctrl 0 resets it.':
+    'Escala toda la interfaz: texto, tarjetas y controles. Ctrl + y Ctrl − también la cambian, Ctrl 0 la restablece.',
   'Content Filter': 'Filtro de contenido',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Excluye contenido de Películas y Series por defecto. Un título con una copia no filtrada sigue mostrando esa copia.',

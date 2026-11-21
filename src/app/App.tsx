@@ -1,3 +1,4 @@
+import { useInterfaceZoom } from './hooks/useInterfaceZoom';
 import { lazy, Suspense, type MouseEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
@@ -74,6 +75,7 @@ function AppShell() {
   useDownloadEvents();
   useCatalogFacetBuilds();
   useImdbRefreshEvents();
+  useInterfaceZoom();
   useAppearanceSynchronization();
   const navigate = useNavigate();
   useUpdateAnnouncements(navigate);

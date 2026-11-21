@@ -181,6 +181,8 @@ export interface SettingsState {
   liveTvView: 'channels' | 'guide';
   /** The category sidebar beside Live TV, Movies and Series is folded away. */
   categorySidebarHidden: boolean;
+  /** The whole interface's zoom, 1 = 100% (Ctrl +/−/0 change it too). */
+  interfaceZoom: number;
   catalogSortModes: CatalogSortModes;
   catalogFilters: Record<CatalogFilterKind, CatalogFilters>;
 
@@ -328,6 +330,7 @@ export const SETTINGS_SNAPSHOT_KEYS = [
   'catalogGroupTitles',
   'catalogHiddenKeywords',
   'showWindowControls',
+  'interfaceZoom',
   'smartLogoAspectMode',
   'imageSharpness',
   'imageBrightness',

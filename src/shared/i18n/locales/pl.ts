@@ -418,6 +418,10 @@ export const PL_MESSAGES: Record<string, string> = {
   'Larger cards': 'Większe karty',
   'Mark season watched': 'Oznacz sezon jako obejrzany',
   'Mark season unwatched': 'Oznacz sezon jako nieobejrzany',
+  'Interface Zoom': 'Powiększenie interfejsu',
+  'Interface zoom': 'Powiększenie interfejsu',
+  'Scales the whole interface: text, cards and controls. Ctrl + and Ctrl − change it too, Ctrl 0 resets it.':
+    'Skaluje cały interfejs: tekst, karty i kontrolki. Ctrl + i Ctrl − też go zmieniają, Ctrl 0 przywraca.',
   'Content Filter': 'Filtr treści',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Domyślnie pomija treści w Filmach i Serialach. Tytuł z kopią, która nie jest filtrowana, nadal pokazuje tę kopię.',
