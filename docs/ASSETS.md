@@ -27,8 +27,13 @@ Files covered include:
 ## README showcase artwork
 
 The product screenshots and social-preview image in
-`.github/assets/readme/` were created for this repository on 25 August 2026.
-They are browser captures of Movena's production React pages, shared
+`.github/assets/readme/` were created for this repository. The `app-*.webp` images (Movies, movie info,
+Series, series info) are screenshots of the NexiTV desktop app taken on
+21 November 2026 on a real catalogue, in the Catppuccin Mocha theme with 125%
+cards; they show TMDB poster artwork and provider titles, which are third-party
+content, and no account, source name, or credential. The other images were
+created on 25 August 2026 and regenerated for NexiTV on 21 November 2026. They are
+browser captures of NexiTV's production React pages, shared
 components, CSS modules, and app shell at a 1440×900 viewport. The gallery
 includes Discover, Live TV, timeline guide, VOD player, series player with
 episode drawer, movie and series details, upcoming release schedule, global
@@ -36,24 +41,25 @@ search, M3U visual and raw code workspace, downloads, sources, playback
 settings, and light appearance. The deterministic fixture in
 `tests/ui/harness/ReadmeHarness.tsx` supplies an in-memory M3U playlist, XMLTV guide, library history, download
 queue, player state, and track metadata. Movie and series surfaces use real
-titles, factual metadata, and TMDB poster/backdrop artwork. Live TV surfaces use
+titles, factual metadata, and TMDB poster artwork (the Filters view and the
+colour-theme captures use the same fixture). Live TV surfaces use
 the real channel identities and marks documented below; their schedule times
 are deterministic example XMLTV data. Provider names, stream URLs, downloads,
 and playback state use reserved `.test` identifiers and fixture data. The
 fixture does not contain provider accounts, private URLs, credentials, or
 commercial video.
 
-The VOD capture renders Movena's production `PlayerShell` and control
+The VOD capture renders NexiTV's production `PlayerShell` and control
 components over TMDB backdrop artwork. A Live Player screenshot is deliberately
 not included because the native libmpv video layer is a separate operating-
 system surface and is not present in a browser capture.
 
-Movena's UI, fixture code, and original portions of the
+NexiTV's UI, fixture code, and original portions of the
 captures are project work distributed under GPL-3.0-or-later. TMDB metadata and
 artwork embedded in the rendered PNG/WebP files are third-party content and are
 not offered under the project's GPL license. `social-preview.png` is a
-1280×640 branded composition made from the real Discover capture and checked-in
-Righteous wordmark font. Regenerate the production-UI captures and social image
+1280×640 branded composition made from the real Movies screenshot and the
+checked-in Unbounded wordmark font. Regenerate the production-UI captures and social image
 with `npm run readme:screenshots`; the WebP files are the README product tour.
 
 ### TMDB showcase content

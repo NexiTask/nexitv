@@ -51,7 +51,19 @@ import {
   type SettingsSectionId,
 } from '@/modules/settings/lib/settingsNavigation';
 import appStyles from '@/app/shell/AppLayout.module.css';
-import type { ReadmeSurface } from '../readmeSurfaces';
+import type { ReadmeFeatureSurface, ReadmeSurface } from '../readmeSurfaces';
+import { SlidersHorizontal } from 'lucide-react';
+import { CatalogFilterPanel } from '@/modules/catalog/components/CatalogFilterPanel';
+import { CatalogPageHeader } from '@/modules/catalog/components/CatalogPageHeader';
+import { CatalogSortSelect } from '@/modules/catalog/components/CatalogSortSelect';
+import { CatalogViewToggle } from '@/modules/catalog/components/CatalogViewToggle';
+import { CategorySidebarToggle } from '@/modules/catalog/components/CategorySidebarToggle';
+import { VirtualizedGrid } from '@/modules/catalog/components/VirtualizedGrid';
+import filterChipStyles from '@/modules/catalog/components/GenreFilterBar.module.css';
+import filterPanelStyles from '@/modules/catalog/components/CatalogFilterPanel.module.css';
+import { HeaderSearch } from '@/modules/search/components/HeaderSearch';
+import { EMPTY_CATALOG_FILTERS } from '@/modules/settings/store/useSettingsStore';
+import type { MediaItem } from '@/modules/catalog/model/media';
 import { NotFoundPage } from '@/app/router/AppRoutes';
 
 const SOURCE_ID = 'm3u-readme-fixture';
@@ -59,57 +71,86 @@ const XTREAM_SOURCE_ID = 'xtream-readme-fixture';
 const GUIDE_URL = 'https://guide.example.test/movena.xml';
 
 // Local data-URI artwork keeps visual QA independent of network availability.
+/** TMDB's poster images for the showcase titles, served by TMDB's image
+ * CDN. The catalogue keeps these as provider artwork; the README uses them
+ * descriptively, with TMDB's attribution below. */
+const tmdbPoster = (file: string) => `https://image.tmdb.org/t/p/w500/${file}`;
+const POSTERS = {
+  dunepartwo: tmdbPoster('1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg'),
+  parasite: tmdbPoster('7IiTTgloJzvGI1TAYymCfbfl3vT.jpg'),
+  spiritedaway: tmdbPoster('39wmItIWsg5sZMyRUHLkWBcuVCM.jpg'),
+  thematrix: tmdbPoster('f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg'),
+  arrival: tmdbPoster('pEzNVQfdzYDzVK0XqxERIw2x2se.jpg'),
+  thegrandbudapesthotel: tmdbPoster('eWdyYQreja6JGCzqHWXpWHDrrPo.jpg'),
+  madmaxfuryroad: tmdbPoster('oLy2V6AWSEfdPgKOtrSGnwB3Q2R.jpg'),
+  thegodfather: tmdbPoster('3bhkrj58Vtu7enYsRolD1fZdja1.jpg'),
+  severance: tmdbPoster('lFf6LLrQjYldcZItzOkGmMMigP7.jpg'),
+  inception: tmdbPoster('oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg'),
+  interstellar: tmdbPoster('gEU2QniE6E77NI6lCU6MxlNBvIx.jpg'),
+  theempirestrikesback: tmdbPoster('nNAeTmF4CtdSgMDplXTDPOpYzsX.jpg'),
+  terminator2judgmentday: tmdbPoster('weVXMD5QBGeQil4HEATZqAkXeEc.jpg'),
+  theprestige: tmdbPoster('37Fr7lY4QBHsuxlLJIfTNxW6nGW.jpg'),
+  backtothefuture: tmdbPoster('7lyBcpYB0Qt8gYhXYaEZUNlNQAv.jpg'),
+  spidermanintothespiderverse: tmdbPoster('iiZZdoQBEYBv6id8su7ImL0oCbD.jpg'),
+  aliens: tmdbPoster('r1x5JGpyqZU8PYhbs4UcrO1Xb6x.jpg'),
+  her: tmdbPoster('n1sY9uAsQKOus91A4FtvN3JdHYH.jpg'),
+  thebear: tmdbPoster('6FVNnVk0SZFdzb9dkvOr13XyyM4.jpg'),
+  dark: tmdbPoster('5LoHuHWA4H8jElFlZDvsmU2n63b.jpg'),
+  arcane: tmdbPoster('fqldf2t8ztc9aiwn3k6mlX3tvRT.jpg'),
+  shogun: tmdbPoster('7O4iVfOMQmdCSxhOg1WnzG1AgYT.jpg'),
+} as const;
+
 const TMDB_ARTWORK = {
   dunePartTwo: {
-    poster: artwork(0),
+    poster: POSTERS.dunepartwo,
     backdrop: artwork(0, true),
   },
   parasite: {
-    poster: artwork(1),
+    poster: POSTERS.parasite,
     backdrop: artwork(1, true),
   },
   spiritedAway: {
-    poster: artwork(2),
+    poster: POSTERS.spiritedaway,
     backdrop: artwork(2, true),
   },
   theMatrix: {
-    poster: artwork(3),
+    poster: POSTERS.thematrix,
     backdrop: artwork(3, true),
   },
   arrival: {
-    poster: artwork(4),
+    poster: POSTERS.arrival,
     backdrop: artwork(4, true),
   },
   grandBudapestHotel: {
-    poster: artwork(5),
+    poster: POSTERS.thegrandbudapesthotel,
     backdrop: artwork(5, true),
   },
   madMaxFuryRoad: {
-    poster: artwork(6),
+    poster: POSTERS.madmaxfuryroad,
     backdrop: artwork(6, true),
   },
   theGodfather: {
-    poster: artwork(7),
+    poster: POSTERS.thegodfather,
     backdrop: artwork(7, true),
   },
   severance: {
-    poster: artwork(8),
+    poster: POSTERS.severance,
     backdrop: artwork(8, true),
   },
   theBear: {
-    poster: artwork(9),
+    poster: POSTERS.thebear,
     backdrop: artwork(9, true),
   },
   dark: {
-    poster: artwork(10),
+    poster: POSTERS.dark,
     backdrop: artwork(10, true),
   },
   arcane: {
-    poster: artwork(11),
+    poster: POSTERS.arcane,
     backdrop: artwork(11, true),
   },
   shogun: {
-    poster: artwork(12),
+    poster: POSTERS.shogun,
     backdrop: artwork(12, true),
   },
 } as const;
@@ -167,7 +208,7 @@ const XTREAM_PROFILE: XtreamSourceProfile = {
 const DUNE_DETAILS: XtreamVodInfo = {
   info: {
     movie_image: TMDB_ARTWORK.dunePartTwo.poster,
-    backdrop_path: [TMDB_ARTWORK.dunePartTwo.backdrop],
+    backdrop_path: [],
     name: 'Dune: Part Two',
     description:
       'Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family.',
@@ -237,7 +278,7 @@ const SEVERANCE_DETAILS: XtreamSeriesInfoResponse = {
   info: {
     name: 'Severance',
     cover: TMDB_ARTWORK.severance.poster,
-    backdrop_path: [TMDB_ARTWORK.severance.backdrop],
+    backdrop_path: [],
     plot: 'At Lumon Industries, employees in the severance programme have their work memories surgically separated from their personal lives. Mark Scout begins to question the system after a former colleague appears outside the office.',
     cast: 'Adam Scott, Britt Lower, Zach Cherry, Tramell Tillman, Jen Tullock, Dichen Lachman, Michael Chernus, John Turturro, Christopher Walken, Patricia Arquette',
     director: 'Ben Stiller, Aoife McArdle',
@@ -1192,7 +1233,8 @@ function PlayerFixture({ surface }: { surface: ReadmeSurface }) {
   );
 }
 
-function Surface({ surface }: { surface: ReadmeSurface }) {
+function Surface({ surface }: { surface: ReadmeSurface | ReadmeFeatureSurface }) {
+  if (surface === 'movies-filters') return <MoviesFiltersShowcase />;
   if (surface === 'hero' || surface === 'light-theme') return <HomePage />;
   if (surface === 'movies') return <MoviesPage />;
   if (surface === 'series') return <SeriesPage />;
@@ -1247,6 +1289,100 @@ function Surface({ surface }: { surface: ReadmeSurface }) {
   );
 }
 
+/** Titles with IMDb ratings, as the Movies page shows them with the index's
+ * IMDb match: here the filter panel's "IMDb 8.0+, 100K+ votes, Sci-Fi, no
+ * Horror" selection. Ratings and vote counts are IMDb's published figures. */
+const IMDB_SHOWCASE: readonly [string, string, number, number, boolean][] = [
+  ['Inception', '2010', 8.8, 2_600_000, true],
+  ['The Matrix', '1999', 8.7, 2_200_000, true],
+  ['Interstellar', '2014', 8.7, 2_300_000, true],
+  ['The Empire Strikes Back', '1980', 8.7, 1_500_000, false],
+  ['Terminator 2: Judgment Day', '1991', 8.6, 1_200_000, false],
+  ['Dune: Part Two', '2024', 8.5, 640_000, true],
+  ['The Prestige', '2006', 8.5, 1_500_000, false],
+  ['Back to the Future', '1985', 8.5, 1_400_000, false],
+  ['Spider-Man: Into the Spider-Verse', '2018', 8.4, 690_000, true],
+  ['Aliens', '1986', 8.4, 840_000, false],
+  ['Mad Max: Fury Road', '2015', 8.1, 1_100_000, true],
+  ['Her', '2013', 8.0, 660_000, false],
+];
+
+const SHOWCASE_POSTER_KEYS: Record<string, string> = {
+  Inception: 'inception',
+  'The Matrix': 'thematrix',
+  Interstellar: 'interstellar',
+  'The Empire Strikes Back': 'theempirestrikesback',
+  'Terminator 2: Judgment Day': 'terminator2judgmentday',
+  'Dune: Part Two': 'dunepartwo',
+  'The Prestige': 'theprestige',
+  'Back to the Future': 'backtothefuture',
+  'Spider-Man: Into the Spider-Verse': 'spidermanintothespiderverse',
+  Aliens: 'aliens',
+  'Mad Max: Fury Road': 'madmaxfuryroad',
+  Her: 'her',
+};
+
+const SHOWCASE_ITEMS: MediaItem[] = IMDB_SHOWCASE.map(
+  ([title, year, rating, votes, uhd], index) => ({
+    id: `showcase-${index}`,
+    title,
+    year,
+    posterUrl: POSTERS[SHOWCASE_POSTER_KEYS[title] as keyof typeof POSTERS],
+    type: 'vod',
+    imdbId: `tt${1000000 + index}`,
+    imdbRating: rating,
+    imdbVotes: votes,
+    tags: uhd ? ['4K'] : [],
+  }),
+);
+
+/** Movies with the filter panel open, the category sidebar folded away and
+ * IMDb ratings on the cards. */
+function MoviesFiltersShowcase() {
+  return (
+    <div className={`${appStyles.page} ${appStyles.catalogLayout}`}>
+      <div className={appStyles.catalogMain}>
+        <CatalogPageHeader
+          leading={<CategorySidebarToggle />}
+          title="Movies"
+          meta="12 of 126,358 movies"
+          actions={
+            <>
+              <HeaderSearch scope="movies" placeholder="Search movies..." />
+              <button
+                type="button"
+                className={`${filterChipStyles.chip} ${filterPanelStyles.filtersButton} ${filterChipStyles.activeChip}`}
+                aria-expanded="true"
+              >
+                <SlidersHorizontal size={14} />
+                Filters
+                <span className={filterPanelStyles.badge}>5</span>
+              </button>
+              <CatalogSortSelect value="imdb" onChange={() => undefined} isLiveTv={false} />
+              <CatalogViewToggle />
+            </>
+          }
+        />
+        <CatalogFilterPanel
+          type="vod"
+          filters={{
+            ...EMPTY_CATALOG_FILTERS,
+            minRating: 8,
+            minVotes: 100_000,
+            genres: ['Sci-Fi'],
+            excludeGenres: ['Horror'],
+            watch: 'unwatched',
+          }}
+          onChange={() => undefined}
+        />
+        <div className={appStyles.catalogContent}>
+          <VirtualizedGrid items={SHOWCASE_ITEMS} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const ROUTES: Record<ReadmeSurface, string> = {
   hero: '/',
   movies: '/movies',
@@ -1275,7 +1411,7 @@ export function ReadmeHarness({
   surface,
   settingsSection,
 }: {
-  surface: ReadmeSurface;
+  surface: ReadmeSurface | ReadmeFeatureSurface;
   settingsSection?: string | null | undefined;
 }) {
   const queryClient = new QueryClient({
@@ -1283,14 +1419,17 @@ export function ReadmeHarness({
       queries: { retry: false, staleTime: Number.POSITIVE_INFINITY, refetchOnWindowFocus: false },
     },
   });
-  seedFixture(queryClient, surface);
+  const fixtureSurface: ReadmeSurface = surface === 'movies-filters' ? 'movies' : surface;
+  seedFixture(queryClient, fixtureSurface);
   const isPlayerSurface = surface === 'player-vod' || surface === 'player-series';
 
   const resolvedSettingsSection: SettingsSectionId = resolveSettingsSectionId(
     settingsSection ?? null,
   );
   const initialRoute =
-    surface === 'settings' ? `/settings?section=${resolvedSettingsSection}` : ROUTES[surface];
+    surface === 'settings'
+      ? `/settings?section=${resolvedSettingsSection}`
+      : ROUTES[fixtureSurface];
   const scenarioId = surface === 'settings' ? `settings-${resolvedSettingsSection}` : surface;
 
   return (
@@ -1300,7 +1439,7 @@ export function ReadmeHarness({
           <div className={appStyles.appContainer} data-ui-qa-scenario={scenarioId}>
             <div className={appStyles.windowDragArea} data-tauri-drag-region aria-hidden="true" />
             {isPlayerSurface ? (
-              <PlayerFixture surface={surface} />
+              <PlayerFixture surface={fixtureSurface} />
             ) : (
               <div className={appStyles.appUi}>
                 <Sidebar />

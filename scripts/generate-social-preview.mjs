@@ -13,8 +13,8 @@ const asDataUrl = async (filePath, mimeType) => {
 };
 
 const [heroUrl, wordmarkFontUrl] = await Promise.all([
-  asDataUrl(path.join(assetDir, 'hero.webp'), 'image/webp'),
-  asDataUrl(path.join(projectRoot, 'public', 'fonts', 'righteous-latin-400.woff2'), 'font/woff2'),
+  asDataUrl(path.join(assetDir, 'app-movies.webp'), 'image/webp'),
+  asDataUrl(path.join(projectRoot, 'public', 'fonts', 'unbounded-latin-800.woff2'), 'font/woff2'),
 ]);
 
 const html = String.raw`<!doctype html>
@@ -23,9 +23,9 @@ const html = String.raw`<!doctype html>
     <meta charset="utf-8" />
     <style>
       @font-face {
-        font-family: "Righteous";
+        font-family: "Unbounded";
         src: url("${wordmarkFontUrl}") format("woff2");
-        font-weight: 400;
+        font-weight: 800;
       }
 
       * { box-sizing: border-box; }
@@ -83,10 +83,10 @@ const html = String.raw`<!doctype html>
 
       .wordmark {
         margin-top: 14px;
-        font-family: "Righteous", sans-serif;
-        font-size: 49px;
-        font-weight: 400;
-        letter-spacing: 8px;
+        font-family: "Unbounded", sans-serif;
+        font-size: 44px;
+        font-weight: 800;
+        letter-spacing: 5px;
         line-height: 1;
       }
 
@@ -159,6 +159,7 @@ const html = String.raw`<!doctype html>
         width: 100%;
         height: 100%;
         object-fit: cover;
+        object-position: left top;
       }
 
       .preview::after {
@@ -188,17 +189,20 @@ const html = String.raw`<!doctype html>
       <div class="preview"><img src="${heroUrl}" alt="" /></div>
       <section class="content">
         <div class="eyebrow">Open-source desktop IPTV</div>
-        <div class="wordmark">MOVENA</div>
+        <div class="wordmark">NEXITV</div>
         <h1>A proper<br />home for<br /><span>your IPTV.</span></h1>
         <p class="description">Live TV, movies and series from Xtream or M3U—without an account or telemetry.</p>
-        <div class="features"><span>Xtream</span><span>M3U</span><span>XMLTV</span><span>libmpv</span></div>
+        <div class="features"><span>Xtream</span><span>M3U</span><span>IMDb</span><span>XMLTV</span><span>libmpv</span></div>
       </section>
-      <div class="footer">movena.frtx.cc · Windows · macOS · Linux</div>
+      <div class="footer">Windows · macOS · Linux</div>
     </main>
   </body>
 </html>`;
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
+});
 try {
   const page = await browser.newPage({
     viewport: { width: 1280, height: 640 },

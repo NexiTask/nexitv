@@ -20,16 +20,12 @@
 <p align="center">
   <a href="https://github.com/NexiTask/nexitv/releases/latest"><img src="https://img.shields.io/github/v/release/NexiTask/nexitv?display_name=tag&sort=semver&style=flat-square" alt="Latest release"></a>
   <a href="https://github.com/NexiTask/nexitv/actions/workflows/compliance.yml"><img src="https://img.shields.io/github/actions/workflow/status/NexiTask/nexitv/compliance.yml?branch=main&label=verify&style=flat-square" alt="Verify workflow status"></a>
-  <a href="https://discord.gg/hRHpwVPjBN"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord community"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-3b82f6?style=flat-square" alt="GPL-3.0-or-later license"></a>
   <img src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-58677d?style=flat-square" alt="Windows, macOS, and Linux">
 </p>
 
 <p align="center">
   <strong><a href="https://github.com/NexiTask/nexitv/releases/latest">Download</a></strong>
-  · <a href="https://apps.microsoft.com/detail/9P2T0QGGHQGQ">Microsoft Store</a>
-  · <a href="https://movena.frtx.cc/">Website</a>
-  · <a href="https://discord.gg/hRHpwVPjBN">Discord</a>
   · <a href="https://github.com/NexiTask/nexitv/issues">Report an issue</a>
   · <a href=".github/SUPPORT.md">Support</a>
   · <a href=".github/CONTRIBUTING.md">Contribute</a>
@@ -44,7 +40,7 @@
 > Bring your own authorized content. NexiTV does not bypass DRM; use recording,
 > catch-up, and download features only where you have permission.
 
-![NexiTV Discover workspace showcasing Dark and Light themes side-by-side with real metadata and TMDB artwork](.github/assets/readme/hero.webp)
+![NexiTV Movies page in the Catppuccin theme: IMDb ratings on every card, 125% cards, and a real catalogue](.github/assets/readme/app-movies.webp)
 
 ## Get started
 
@@ -76,9 +72,23 @@ enabled channels, catalogues, categories, and guides in one workspace.
 **Movies, series, and discovery**
 
 - Browse VOD catalogues, seasons, episodes, recently added media, and upcoming releases.
-- Search across Live TV, movies, and series, then filter and sort large catalogues.
-- Enable optional TMDB enrichment for localized posters, backdrops, and descriptions.
+- Search across Live TV, movies, and series; a catalogue page's search box finds only its own kind.
+- Enable optional TMDB enrichment for localized posters, backdrops, and descriptions. A provider cover that is only a thumbnail or screenshot is replaced by TMDB's real poster.
 - Track upcoming movie premieres and TV broadcasts with a monthly release calendar and live second-by-second countdowns backed by TMDB and TVmaze.
+
+**IMDb ratings and filters**
+
+- Match IMDb ratings and vote counts onto every movie and series from IMDb's free datasets, shown on the cards and the info page, with an IMDb sort. The data refreshes automatically about once a week, or on demand from Settings.
+- Cut the noise with quality presets (IMDb 7.0+ with 1k votes, 6.5+ with 5k, 6.0+ with 10k) and a switch that hides titles the provider flags as adult.
+- Use the **Filters** panel on Movies and Series: year range, runtime (episode length for series), IMDb rating and votes, genres (include or exclude, using IMDb's genres too), recently added, watch state, 4K only, and IMDb-rated only. Each page remembers its own filters.
+- Group the provider's duplicate entries of one title into a single card with the best copy, and switch between the other versions (labelled by quality and country) from the info page. If one version fails to load, the next one opens automatically.
+- Set a **Content Filter** in Settings: hide whole countries and keywords from Movies and Series, including cross-listed categories such as "Indian films" filed under another market.
+
+**Playing and tracking**
+
+- Press a card's play button to resume a movie where you stopped, or a series at your current episode or the next unwatched one, without opening the info page.
+- Remove a title from Continue Watching with the X on its card, and mark a whole season watched or unwatched from the info page.
+- Open a cinematic info page with a full-width backdrop, a poster, facts, genres, plot, version picker, and compact episode rows.
 
 **Native playback**
 
@@ -102,6 +112,13 @@ enabled channels, catalogues, categories, and guides in one workspace.
 - Validate playlist syntax and probe stream health in the background without exposing connection secrets.
 - Undo and redo edits, recover local drafts, review changes, export copies, and restore saved versions.
 
+**Look and feel**
+
+- Pick a colour theme: Catppuccin (Mocha, Macchiato, Frappé, and Latte for light), Dracula, Nord, Gruvbox, Tokyo Night, Rosé Pine, or Solarized, each with its own accent.
+- Choose a grid or list view and a card size from 80% to 200% separately for every section; cards start at 125%.
+- Scale the whole interface from 75% to 200% in Settings or with <kbd>Ctrl</kbd> + <kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd>.
+- Fold the category sidebar away, hide the window buttons on a tiling desktop, and switch Live TV between the channel grid and the programme guide with one toggle.
+
 **Privacy and personalization**
 
 - Keep passwords and connection secrets in the operating-system credential vault.
@@ -113,13 +130,23 @@ enabled channels, catalogues, categories, and guides in one workspace.
 
 ## Product tour
 
-These are browser captures of NexiTV's production React pages, shared
-components, CSS modules, and application shell at 1440×900—not recreated
-mockups. The movie and series surfaces use real titles, factual TMDB metadata,
-and TMDB poster/backdrop artwork. Live TV uses real channel identities and
-official channel marks; programme times remain deterministic example XMLTV
-data. Provider accounts, stream URLs, downloads, and playback state use
-reserved `.test` fixture data. No commercial video is included.
+The first screenshots are the NexiTV desktop app running on a real catalogue
+(the Catppuccin Mocha theme, 125% cards). Posters are artwork from TMDB, shown
+here only to illustrate the app. The captures further down are browser captures
+of NexiTV's production React pages, shared components, CSS modules, and
+application shell at 1440×900—not recreated mockups. They use real titles,
+factual TMDB metadata, and TMDB poster artwork; Live TV uses real channel
+identities and official channel marks; programme times remain deterministic
+example XMLTV data. Provider accounts, stream URLs, downloads, and playback
+state use reserved `.test` fixture data. No commercial video is included.
+
+|                                                         Movies with IMDb ratings                                                          |                                                                                                                                                                        Movie info page                                                                                                                                                                         |
+| :---------------------------------------------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+|        ![NexiTV Movies page with IMDb ratings, vote counts, and 4K badges on real posters](.github/assets/readme/app-movies.webp)         |                                                                                                              ![NexiTV movie info page with IMDb rating, genres, version picker, director, and cast](.github/assets/readme/app-movie-details.webp)                                                                                                              |
+|                                                                  Series                                                                   |                                                                                                                                                                        Series info page                                                                                                                                                                        |
+|                      ![NexiTV Series page with IMDb ratings on real posters](.github/assets/readme/app-series.webp)                       |                                                                                                             ![NexiTV series info page with seasons, compact episode rows, and Mark season watched](.github/assets/readme/app-series-details.webp)                                                                                                              |
+|                                                               Filters panel                                                               |                                                                                                                                                                         Colour themes                                                                                                                                                                          |
+| ![NexiTV Filters panel with IMDb rating, votes, genres to include or exclude, and watch state](.github/assets/readme/movies-filters.webp) | <img src=".github/assets/readme/theme-catppuccin-mocha.webp" width="49%" alt="Catppuccin Mocha"> <img src=".github/assets/readme/theme-tokyo-night.webp" width="49%" alt="Tokyo Night"><br><img src=".github/assets/readme/theme-nord.webp" width="49%" alt="Nord"> <img src=".github/assets/readme/theme-gruvbox-light.webp" width="49%" alt="Gruvbox light"> |
 
 |                                                                Live TV catalogue                                                                |                                                          Timeline programme guide                                                           |
 | :---------------------------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------: |
@@ -139,19 +166,19 @@ reserved `.test` fixture data. No commercial video is included.
 
 ## Download and platform support
 
-Download the current packages from the
-[latest release](https://github.com/NexiTask/nexitv/releases/latest). Release
-assets also include a
-[SHA-256 checksum file](https://github.com/NexiTask/nexitv/releases/latest/download/SHA256SUMS.txt),
-an SPDX SBOM, GitHub build-provenance attestations, and updater signatures where
-applicable. Platform trust status remains explicitly disclosed below.
+NexiTV has no published release yet. Until the first one appears on the
+[releases page](https://github.com/NexiTask/nexitv/releases), build it from
+source (see [Build from source](#build-from-source)). The build produces the
+packages below; a release will also carry a SHA-256 checksum file, an SPDX SBOM,
+and build-provenance attestations. Platform trust status remains explicitly
+disclosed below.
 
-| Platform            | Published packages                                                                                              | Important notes                                                                                                                          |
-| ------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Windows x64         | [Microsoft Store](https://apps.microsoft.com/detail/9P2T0QGGHQGQ), WinGet, NSIS `.exe`, `.msi`, portable `.zip` | Microsoft Store / WinGet (`winget install movena`). Standalone NSIS and portable packages bundle libmpv.                                 |
-| macOS Apple Silicon | `.dmg` (`aarch64`)                                                                                              | Bundles its own mpv runtime, nothing else to install. Current builds are ad-hoc signed rather than Developer ID notarized.               |
-| macOS Intel         | `.dmg` (`x86_64`)                                                                                               | Bundles its own mpv runtime, nothing else to install. Current builds are ad-hoc signed rather than Developer ID notarized.               |
-| Linux x64           | `.deb`, `.AppImage`                                                                                             | A compatible system libmpv and normal Tauri/WebKit desktop libraries are required. Install `mpv` through your distribution if necessary. |
+| Platform            | Packages the build produces          | Important notes                                                                                                                          |
+| ------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows x64         | NSIS `.exe`, `.msi`, portable `.zip` | Standalone NSIS and portable packages bundle libmpv.                                                                                     |
+| macOS Apple Silicon | `.dmg` (`aarch64`)                   | Bundles its own mpv runtime, nothing else to install. Current builds are ad-hoc signed rather than Developer ID notarized.               |
+| macOS Intel         | `.dmg` (`x86_64`)                    | Bundles its own mpv runtime, nothing else to install. Current builds are ad-hoc signed rather than Developer ID notarized.               |
+| Linux x64           | `.deb`, `.AppImage`                  | A compatible system libmpv and normal Tauri/WebKit desktop libraries are required. Install `mpv` through your distribution if necessary. |
 
 If installation or playback fails, search the
 [existing issues](https://github.com/NexiTask/nexitv/issues) before opening a
@@ -161,18 +188,19 @@ real viewing data in an issue.
 <details>
 <summary><strong>Keyboard shortcuts</strong></summary>
 
-| Area       | Shortcut                             | Action                                                         |
-| ---------- | ------------------------------------ | -------------------------------------------------------------- |
-| Navigation | <kbd>Ctrl/Cmd</kbd> + <kbd>1–5</kbd> | Open Home, Live TV, TV Guide, Movies, or Series                |
-| Navigation | <kbd>Ctrl/Cmd</kbd> + <kbd>K</kbd>   | Open Search                                                    |
-| Navigation | <kbd>Ctrl/Cmd</kbd> + <kbd>\</kbd>   | Collapse or expand the sidebar                                 |
-| Help       | <kbd>?</kbd>                         | Show or hide the in-app shortcut guide                         |
-| Playback   | <kbd>Space</kbd> or <kbd>K</kbd>     | Play or pause                                                  |
-| Playback   | <kbd>F</kbd>                         | Toggle fullscreen                                              |
-| Playback   | <kbd>M</kbd>                         | Mute or restore volume                                         |
-| Playback   | <kbd>←</kbd> / <kbd>→</kbd>          | Seek backward or forward during VOD playback                   |
-| Playback   | <kbd>↑</kbd> / <kbd>↓</kbd>          | Adjust volume, or change channels when the live drawer is open |
-| Playback   | <kbd>Esc</kbd>                       | Close the active player menu, drawer, or player                |
+| Area       | Shortcut                                                         | Action                                                         |
+| ---------- | ---------------------------------------------------------------- | -------------------------------------------------------------- |
+| Navigation | <kbd>Ctrl/Cmd</kbd> + <kbd>1–5</kbd>                             | Open Home, Live TV, TV Guide, Movies, or Series                |
+| Navigation | <kbd>Ctrl/Cmd</kbd> + <kbd>K</kbd>                               | Open Search                                                    |
+| Navigation | <kbd>Ctrl/Cmd</kbd> + <kbd>\</kbd>                               | Collapse or expand the sidebar                                 |
+| Interface  | <kbd>Ctrl/Cmd</kbd> + <kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd> | Zoom the interface in, out, or back to 100%                    |
+| Help       | <kbd>?</kbd>                                                     | Show or hide the in-app shortcut guide                         |
+| Playback   | <kbd>Space</kbd> or <kbd>K</kbd>                                 | Play or pause                                                  |
+| Playback   | <kbd>F</kbd>                                                     | Toggle fullscreen                                              |
+| Playback   | <kbd>M</kbd>                                                     | Mute or restore volume                                         |
+| Playback   | <kbd>←</kbd> / <kbd>→</kbd>                                      | Seek backward or forward during VOD playback                   |
+| Playback   | <kbd>↑</kbd> / <kbd>↓</kbd>                                      | Adjust volume, or change channels when the live drawer is open |
+| Playback   | <kbd>Esc</kbd>                                                   | Close the active player menu, drawer, or player                |
 
 </details>
 

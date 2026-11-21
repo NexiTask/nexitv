@@ -16,11 +16,14 @@ const asDataUrl = async (filePath, mimeType) => {
 
 const [iconSrc, wordmarkFontUrl, heroSrc] = await Promise.all([
   asDataUrl(path.join(projectRoot, 'src-tauri', 'icons', 'icon.png'), 'image/png'),
-  asDataUrl(path.join(projectRoot, 'public', 'fonts', 'righteous-latin-400.woff2'), 'font/woff2'),
+  asDataUrl(path.join(projectRoot, 'public', 'fonts', 'unbounded-latin-800.woff2'), 'font/woff2'),
   asDataUrl(path.join(readmeAssetDir, 'hero.webp'), 'image/webp').catch(() => ''),
 ]);
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined,
+});
 
 async function renderHtmlToImage(fileName, width, height, html) {
   const page = await browser.newPage({
@@ -39,9 +42,9 @@ async function renderHtmlToImage(fileName, width, height, html) {
 
 const baseFontCss = `
   @font-face {
-    font-family: "Righteous";
+    font-family: "Unbounded";
     src: url("${wordmarkFontUrl}") format("woff2");
-    font-weight: 400;
+    font-weight: 800;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -109,7 +112,7 @@ const boxArtHtml = `<!doctype html>
       margin-top: 40px;
     }
     .wordmark {
-      font-family: "Righteous", sans-serif;
+      font-family: "Unbounded", sans-serif;
       font-size: 72px;
       letter-spacing: 12px;
       line-height: 1;
@@ -130,10 +133,10 @@ const boxArtHtml = `<!doctype html>
   <div class="top-rule"></div>
   <div class="icon-glow"></div>
   <div class="icon-wrapper">
-    <img src="${iconSrc}" class="app-icon" alt="Movena Icon" />
+    <img src="${iconSrc}" class="app-icon" alt="NexiTV Icon" />
   </div>
   <div class="brand-content">
-    <div class="wordmark">MOVENA</div>
+    <div class="wordmark">NEXITV</div>
     <div class="tagline">IPTV &amp; VOD Player</div>
   </div>
 </body>
@@ -182,7 +185,7 @@ const posterArtHtml = `<!doctype html>
       flex-direction: column;
     }
     .header-wordmark {
-      font-family: "Righteous", sans-serif;
+      font-family: "Unbounded", sans-serif;
       font-size: 38px;
       letter-spacing: 6px;
       line-height: 1;
@@ -237,7 +240,7 @@ const posterArtHtml = `<!doctype html>
   <div class="header">
     <img src="${iconSrc}" class="header-icon" alt="" />
     <div class="header-text">
-      <div class="header-wordmark">MOVENA</div>
+      <div class="header-wordmark">NEXITV</div>
       <div class="header-sub">IPTV &amp; VOD Player</div>
     </div>
   </div>
@@ -245,7 +248,7 @@ const posterArtHtml = `<!doctype html>
   <div class="preview-container">
     ${heroSrc ? `<img src="${heroSrc}" class="preview-img" alt="" />` : ''}
   </div>
-  <div class="footer-text">movena.frtx.cc · Windows · macOS · Linux</div>
+  <div class="footer-text">Windows · macOS · Linux</div>
 </body>
 </html>`;
 

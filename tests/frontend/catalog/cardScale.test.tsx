@@ -28,8 +28,10 @@ describe('grid card size', () => {
       </MemoryRouter>,
     );
     const larger = screen.getByRole('button', { name: 'Larger cards' });
+    // A section starts at 125%.
+    expect(screen.getByText('125%')).toBeTruthy();
     fireEvent.click(larger);
-    expect(useSettingsStore.getState().cardScales).toEqual({ movies: 1.25 });
+    expect(useSettingsStore.getState().cardScales).toEqual({ movies: 1.5 });
     for (let i = 0; i < 10; i += 1) fireEvent.click(larger);
     expect(useSettingsStore.getState().cardScales.movies).toBe(2);
     expect(larger.hasAttribute('disabled')).toBe(true);

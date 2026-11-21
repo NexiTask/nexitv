@@ -30,10 +30,13 @@ export function useViewMode(): [ViewMode, (mode: ViewMode) => void] {
 /** The card sizes the − / + buttons step through. */
 export const CARD_SCALES = [0.8, 1, 1.25, 1.5, 1.75, 2] as const;
 
-/** The grid card size of the section on screen (1 = standard). */
+/** What a section starts at until its card size is changed there. */
+export const DEFAULT_CARD_SCALE = 1.25;
+
+/** The grid card size of the section on screen (1 = the standard width). */
 export function useCardScale(): [number, (scale: number) => void] {
   const section = viewSection(useLocation().pathname);
-  const scale = useSettingsStore((state) => state.cardScales[section] ?? 1);
+  const scale = useSettingsStore((state) => state.cardScales[section] ?? DEFAULT_CARD_SCALE);
   const setScale = useCallback(
     (next: number) => {
       const { cardScales, updateSetting } = useSettingsStore.getState();
