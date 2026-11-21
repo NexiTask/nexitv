@@ -21,6 +21,7 @@ import { useSettingsStore } from '@/modules/settings/public/store/useSettingsSto
 import appStyles from '@/app/shell/AppLayout.module.css';
 import styles from './EpgPage.module.css';
 import { LiveTvViewToggle } from '@/modules/catalog/public/components/LiveTvViewToggle';
+import { CategorySidebarToggle } from '@/modules/catalog/public/components/CategorySidebarToggle';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { getCombinedErrorMessage, getErrorPresentation } from '@/shared/lib/error';
 import { playableFromMediaItem } from '@/modules/playback/public/lib/playback';
@@ -97,6 +98,7 @@ export function EpgPage() {
   const [activeCategoryId, setActiveCategoryId] = useCatalogCategorySelection('live');
   const zoomPercent = useSettingsStore((state) => state.epgZoomPercent ?? DEFAULT_ZOOM_PERCENT);
   const updateSetting = useSettingsStore((state) => state.updateSetting);
+  const categorySidebarHidden = useSettingsStore((state) => state.categorySidebarHidden);
   const customTitleRules = useSettingsStore((state) => state.customTitleRules);
   const badgeVisibility = useSettingsStore((state) => state.badgeVisibility);
   const verifiedResolutions = useVerifiedResolutionMap(badgeVisibility?.verified ?? true);
@@ -457,16 +459,19 @@ export function EpgPage() {
 
   return (
     <div className={`${appStyles.page} ${appStyles.catalogLayout}`}>
-      <CategorySidebar
-        type="live"
-        activeCategoryId={guideCategory}
-        onSelectCategory={selectCategory}
-        indexStats={isLegacy ? undefined : (indexStats ?? null)}
-        allowAllCategories={isLegacy}
-      />
+      {!categorySidebarHidden && (
+        <CategorySidebar
+          type="live"
+          activeCategoryId={guideCategory}
+          onSelectCategory={selectCategory}
+          indexStats={isLegacy ? undefined : (indexStats ?? null)}
+          allowAllCategories={isLegacy}
+        />
+      )}
 
       <div className={appStyles.catalogMain}>
         <CatalogPageHeader
+          leading={<CategorySidebarToggle />}
           title="Live TV"
           titleActions={<LiveTvViewToggle view="guide" />}
           meta={

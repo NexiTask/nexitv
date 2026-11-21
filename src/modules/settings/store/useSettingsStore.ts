@@ -297,6 +297,7 @@ const DEFAULT_SETTINGS = {
   catalogHiddenKeywords: [] as string[],
   showWindowControls: true,
   liveTvView: 'channels' as const,
+  categorySidebarHidden: false,
   catalogSortModes: emptyCatalogSortModes(),
   catalogFilters: { vod: EMPTY_CATALOG_FILTERS, series: EMPTY_CATALOG_FILTERS },
   sidebarWidth: 260,
@@ -556,6 +557,7 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
       typeof state.showWindowControls === 'boolean' ? state.showWindowControls : true,
     liveTvView: state.liveTvView === 'guide' ? 'guide' : 'channels',
     viewModes: normalizeViewModes(state.viewModes),
+    categorySidebarHidden: state.categorySidebarHidden === true,
     catalogSortModes: normalizeCatalogSortModes(state.catalogSortModes),
     catalogFilters: normalizeCatalogFilterSet(state.catalogFilters),
     lastCollectionId:

@@ -412,6 +412,8 @@ export const IT_MESSAGES: Record<string, string> = {
   'IMDb-rated only': 'Solo con voto IMDb',
   'Clear filters': 'Cancella filtri',
   'Live TV view': 'Vista TV in diretta',
+  'Show categories': 'Mostra categorie',
+  'Hide categories': 'Nascondi categorie',
   'Content Filter': 'Filtro contenuti',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Esclude contenuti da Film e Serie per impostazione predefinita. Un titolo con una copia non filtrata mostra comunque quella copia.',

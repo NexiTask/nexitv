@@ -179,6 +179,8 @@ export interface SettingsState {
   showWindowControls: boolean;
   /** Live TV's view: the channel grid or the programme guide. */
   liveTvView: 'channels' | 'guide';
+  /** The category sidebar beside Live TV, Movies and Series is folded away. */
+  categorySidebarHidden: boolean;
   catalogSortModes: CatalogSortModes;
   catalogFilters: Record<CatalogFilterKind, CatalogFilters>;
 

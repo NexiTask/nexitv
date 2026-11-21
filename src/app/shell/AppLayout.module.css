@@ -218,6 +218,15 @@
   margin-bottom: 0;
 }
 
+/* The sidebar toggle and the title travel together on the left. */
+.catalogLead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
 /* The title keeps its room; when the actions do not fit beside it they
    move to a line of their own instead of squeezing the title. */
 .catalogTitleGroup {

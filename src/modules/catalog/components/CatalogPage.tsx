@@ -10,6 +10,7 @@ import { CatalogSortSelect } from './CatalogSortSelect';
 import { GenreFilterBar } from './GenreFilterBar';
 import filterBarStyles from './GenreFilterBar.module.css';
 import { CatalogFilterPanel } from './CatalogFilterPanel';
+import { CategorySidebarToggle } from './CategorySidebarToggle';
 import filterPanelStyles from './CatalogFilterPanel.module.css';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { HeaderSearch } from '@/modules/search/public/components/HeaderSearch';
@@ -119,6 +120,7 @@ export function CatalogPage({
         : settingsSortMode;
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const categorySidebarHidden = useSettingsStore((state) => state.categorySidebarHidden);
   const allCatalogFilters = useSettingsStore((state) => state.catalogFilters);
   const setCatalogFilters = useSettingsStore((state) => state.setCatalogFilters);
   const watchedIds = useLibraryStore((state) => state.watched);
@@ -383,15 +385,18 @@ export function CatalogPage({
 
   return (
     <div className={`${styles.page} ${styles.catalogLayout}`}>
-      <CategorySidebar
-        type={type}
-        activeCategoryId={activeCategoryId}
-        onSelectCategory={setActiveCategoryId}
-        indexStats={isLegacy ? undefined : (indexStats ?? null)}
-      />
+      {!categorySidebarHidden && (
+        <CategorySidebar
+          type={type}
+          activeCategoryId={activeCategoryId}
+          onSelectCategory={setActiveCategoryId}
+          indexStats={isLegacy ? undefined : (indexStats ?? null)}
+        />
+      )}
 
       <div className={styles.catalogMain}>
         <CatalogPageHeader
+          leading={<CategorySidebarToggle />}
           title={title}
           titleActions={titleActions}
           meta={getCountMeta()}

@@ -4,21 +4,32 @@ import styles from '@/app/shell/AppLayout.module.css';
 
 interface CatalogPageHeaderProps {
   title: string;
+  /** Before the title (the category sidebar's toggle). */
+  leading?: ReactNode | undefined;
   meta?: ReactNode | undefined;
   titleActions?: ReactNode | undefined;
   actions?: ReactNode | undefined;
 }
 
-export function CatalogPageHeader({ title, meta, titleActions, actions }: CatalogPageHeaderProps) {
+export function CatalogPageHeader({
+  title,
+  leading,
+  meta,
+  titleActions,
+  actions,
+}: CatalogPageHeaderProps) {
   const { t } = useI18n();
   return (
     <header className={styles.catalogHeader}>
-      <div className={styles.catalogTitleGroup}>
-        <div className={styles.catalogTitleRow}>
-          <h1 className={styles.pageTitle}>{t(title)}</h1>
-          {titleActions}
+      <div className={styles.catalogLead}>
+        {leading}
+        <div className={styles.catalogTitleGroup}>
+          <div className={styles.catalogTitleRow}>
+            <h1 className={styles.pageTitle}>{t(title)}</h1>
+            {titleActions}
+          </div>
+          {meta != null && <div className={styles.catalogMeta}>{meta}</div>}
         </div>
-        {meta != null && <div className={styles.catalogMeta}>{meta}</div>}
       </div>
       {actions != null && <div className={styles.headerActions}>{actions}</div>}
     </header>
