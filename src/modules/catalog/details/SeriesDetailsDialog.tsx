@@ -18,6 +18,7 @@ import {
 } from '@/modules/sources/public/store/useAuthStore';
 import type { XtreamEpisode } from '@/modules/sources/public/data/xtreamClient';
 import type { MediaItem } from '../model/media';
+import type { TitleVariant } from '../data/useTitleVariants';
 import { VersionSwitcher } from './VersionSwitcher';
 import { useSeriesInfo } from '../data/useDetails';
 import { usePlayerStore } from '@/modules/playback/public/store/usePlayerStore';
@@ -67,7 +68,7 @@ interface SeriesDetailsDialogProps {
   initialSeasonNumber?: number | undefined;
   initialEpisodeNumber?: number | undefined;
   /** The other provider variants behind the grouped card, when grouped. */
-  versions?: readonly MediaItem[] | undefined;
+  versions?: readonly TitleVariant[] | undefined;
   onSelectVersion?: ((item: MediaItem) => void) | undefined;
   onClose: () => void;
 }

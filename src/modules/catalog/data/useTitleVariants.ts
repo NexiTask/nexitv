@@ -2,8 +2,17 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { tauriApi } from '@/platform/tauri';
 import { useEnabledSources } from '@/modules/sources/hooks/useEnabledSources';
+import { parseProviderCategoryName } from '@/shared/lib/categoryName';
 import { mapXtreamList } from './useCatalog';
+import { useCategories } from './useCategories';
 import type { CatalogItem } from '../model/catalogItem';
+
+/** One provider variant behind a grouped card, with the country its title or
+ * category declares — the label's language when the tags say nothing. */
+export interface TitleVariant {
+  item: CatalogItem;
+  country: string | null;
+}
 
 /**
  * The provider variants behind one grouped card, mapped with the catalogue's
@@ -13,7 +22,7 @@ import type { CatalogItem } from '../model/catalogItem';
 export function useTitleVariants(
   type: 'vod' | 'series' | undefined,
   itemId: string | undefined,
-): CatalogItem[] {
+): TitleVariant[] {
   const { availableXtreamSources } = useEnabledSources();
   const sourcesById = useMemo(() => {
     const byId = new Map<string, (typeof availableXtreamSources)[number]>();
@@ -29,18 +38,35 @@ export function useTitleVariants(
     retry: false,
   });
 
+  // Category names carry what the titles often do not: which language a
+  // variant's copy is ("ES - Series", "Spanish", ...).
+  const categories = useCategories(type === 'vod' || type === 'series' ? type : 'vod', {
+    enabled: type === 'vod' || type === 'series',
+  });
+  const namesByCategory = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const category of categories.data ?? []) {
+      byId.set(category.category_id, category.category_name);
+    }
+    return byId;
+  }, [categories.data]);
+
   return useMemo(() => {
-    const variants: CatalogItem[] = [];
+    const variants: TitleVariant[] = [];
     for (const [sourceId, raw] of rows.data ?? []) {
       const source = sourcesById.get(sourceId);
       if (!source) continue;
       try {
         const item = mapXtreamList(type as 'vod' | 'series', source, [JSON.parse(raw)])[0];
-        if (item) variants.push(item);
+        if (!item) continue;
+        const categoryName = item.categoryId ? namesByCategory.get(item.categoryId) : undefined;
+        const country =
+          item.country ?? (categoryName ? parseProviderCategoryName(categoryName).country : null);
+        variants.push({ item, country });
       } catch {
         // A broken row just does not offer a version.
       }
     }
     return variants;
-  }, [rows.data, sourcesById, type]);
+  }, [rows.data, sourcesById, namesByCategory, type]);
 }

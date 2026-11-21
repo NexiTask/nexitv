@@ -25,6 +25,7 @@ import { DetailsDialogShell } from '../components/DetailsDialogShell';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { getErrorPresentation } from '@/shared/lib/error';
 import type { MediaItem } from '../model/media';
+import type { TitleVariant } from '../data/useTitleVariants';
 import { VersionSwitcher } from './VersionSwitcher';
 import styles from './MovieDetailsDialog.module.css';
 import { downloadMediaItem } from '@/modules/downloads/public/services/mediaDownload';
@@ -43,7 +44,7 @@ interface MovieDetailsDialogProps {
   sourceId?: string | undefined;
   sourceItemId?: string | undefined;
   /** The other provider variants behind the grouped card, when grouped. */
-  versions?: readonly MediaItem[] | undefined;
+  versions?: readonly TitleVariant[] | undefined;
   onSelectVersion?: ((item: MediaItem) => void) | undefined;
   onClose: () => void;
 }

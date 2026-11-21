@@ -1,30 +1,39 @@
 import { useI18n } from '@/shared/i18n/i18n';
+import { countryName } from '@/shared/lib/categoryName';
 import { Select } from '@/shared/ui/Select';
 import { parseMediaDisplayTitle } from '../lib/titleParser';
-import type { MediaItem } from '../model/media';
+import type { TitleVariant } from '../data/useTitleVariants';
 import styles from './VersionSwitcher.module.css';
 
 export interface VersionSwitcherProps {
-  variants: readonly MediaItem[];
+  variants: readonly TitleVariant[];
   activeId: string;
-  onSelect: (item: MediaItem) => void;
+  onSelect: (item: TitleVariant['item']) => void;
 }
 
 /** The "N versions" row on a detail sheet: the provider variants behind one
  * grouped card. Hidden when the title has no other variants. */
 export function VersionSwitcher({ variants, activeId, onSelect }: VersionSwitcherProps) {
-  const { t, tn, number } = useI18n();
+  const { t, tn, number, language } = useI18n();
   if (variants.length === 0) return null;
 
-  // "4K", "FHD", "EN" repeat across providers; a repeated label gets its
-  // position appended so every option stays distinguishable.
+  // Labels say what sets the copies apart: the title's own tags ("4K", "FHD")
+  // plus the country its title or category declares. "4K" and "EN" repeat
+  // across providers, so a repeated label gets its position appended.
   const seen = new Set<string>();
-  const options = variants.map((item, index) => {
-    const tags = parseMediaDisplayTitle(item.title).tags;
-    const base = tags.length > 0 ? tags.join(' · ') : t('Standard');
+  const options = variants.map((variant, index) => {
+    const tags = parseMediaDisplayTitle(variant.item.title).tags;
+    const parts = [...tags];
+    if (
+      variant.country &&
+      !parts.some((tag) => tag.toLowerCase() === variant.country?.toLowerCase())
+    ) {
+      parts.push(countryName(variant.country, language));
+    }
+    const base = parts.length > 0 ? parts.join(' · ') : t('Standard');
     const label = seen.has(base) ? `${base} (${number(index + 1)})` : base;
     seen.add(base);
-    return { value: item.id, label };
+    return { value: variant.item.id, label };
   });
 
   return (
@@ -39,8 +48,8 @@ export function VersionSwitcher({ variants, activeId, onSelect }: VersionSwitche
         width={220}
         value={activeId}
         onChange={(id) => {
-          const item = variants.find((candidate) => candidate.id === id);
-          if (item) onSelect(item);
+          const variant = variants.find((candidate) => candidate.item.id === id);
+          if (variant) onSelect(variant.item);
         }}
         options={options}
       />
