@@ -11,7 +11,7 @@
   position: relative;
   display: flex;
   align-items: flex-end;
-  min-height: 360px;
+  min-height: 420px;
   padding: var(--space-10) var(--space-8) var(--space-6);
   isolation: isolate;
 }
@@ -63,7 +63,7 @@
 
 .poster {
   flex: none;
-  width: 200px;
+  width: 240px;
   aspect-ratio: 2 / 3;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
