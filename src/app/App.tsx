@@ -8,6 +8,7 @@ import { ErrorState } from '@/shared/ui/ErrorState';
 import { ToastContainer } from '@/shared/ui/ToastContainer';
 import { useDownloadEvents } from '@/modules/downloads/hooks/useDownloadEvents';
 import { useCatalogFacetBuilds } from '@/modules/catalog/data/useIndexedCatalog';
+import { useImdbRefreshEvents } from '@/modules/metadata/public/hooks/useImdbRefreshEvents';
 import { usePlayerContextMenus } from '@/modules/playback/hooks/usePlayerContextMenus';
 import { usePlayerStore } from '@/modules/playback/store/usePlayerStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
@@ -72,6 +73,7 @@ function AppSurface({ children, motionPreference, onContextMenu }: AppSurfacePro
 function AppShell() {
   useDownloadEvents();
   useCatalogFacetBuilds();
+  useImdbRefreshEvents();
   useAppearanceSynchronization();
   const navigate = useNavigate();
   useUpdateAnnouncements(navigate);

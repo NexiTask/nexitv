@@ -87,9 +87,12 @@ function useIndexInvalidation(kind: CatalogPageKind | null) {
         else unlisten = stop;
       })
       .catch(() => undefined);
-    // An IMDb refresh or backfill changes what the pages filter and sort by.
+    // An IMDb refresh or backfill changes what the pages filter and sort by;
+    // only its completion matters here.
     void desktopApi
-      .onImdbRefreshed(() => invalidate(kind))
+      .onImdbRefreshed((stage) => {
+        if (stage === 'done') invalidate(kind);
+      })
       .then((stop) => {
         if (cancelled) stop();
         else unlistenImdb = stop;

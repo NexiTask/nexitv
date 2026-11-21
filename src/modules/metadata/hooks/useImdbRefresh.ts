@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { tauriApi, type ImdbRefreshStatus } from '@/platform/tauri';
+import { desktopApi } from '@/platform/desktop';
 import { notify } from '@/shared/notifications/useNotificationStore';
 import { getErrorMessage } from '@/shared/lib/error';
 
@@ -32,16 +33,38 @@ export function useImdbRefresh() {
     return () => clearInterval(interval);
   }, [running, reload]);
 
+  // A run can start anywhere (the schedule, the update button); the stage
+  // events are how a follower that did not start it learns it is running.
+  useEffect(() => {
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    desktopApi
+      .onImdbRefreshed((stage) => {
+        if (stage === 'done') {
+          void reload();
+          return;
+        }
+        setStatus((current) =>
+          current && !current.running ? { ...current, running: true } : current,
+        );
+      })
+      .then((unlisten) => {
+        if (disposed) unlisten();
+        else stop = unlisten;
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+      stop?.();
+    };
+  }, [reload]);
+
   const start = useCallback(() => {
     setIsStarting(true);
     tauriApi
       .imdbRefreshStart()
       .then((status) => {
         setStatus(status);
-        notify.success(
-          'IMDb Data Updated',
-          `${status.matched.toLocaleString()} of ${status.total.toLocaleString()} titles have an IMDb rating.`,
-        );
       })
       .catch((error: unknown) => {
         notify.error('IMDb Update Failed', getErrorMessage(error, 'The update could not run.'));

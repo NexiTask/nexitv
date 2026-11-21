@@ -29,7 +29,6 @@ import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { StateIcon } from '@/shared/ui/StateIcon';
 import { useEnabledSources } from '@/modules/sources/hooks/useEnabledSources';
-import { useImdbRefresh } from '@/modules/metadata/public/hooks/useImdbRefresh';
 import { prefetchNavigationData } from '../bootstrap/prefetch';
 import styles from './Sidebar.module.css';
 import { useI18n } from '@/shared/i18n/i18n';
@@ -52,7 +51,6 @@ export function Sidebar() {
   const collections = useLibraryStore((state) => state.collections);
   const downloads = useDownloadStore((state) => state.jobs);
   const sources = useEnabledSources();
-  const imdb = useImdbRefresh();
   const prefetch = (path: string) => void prefetchNavigationData(path, sources);
 
   const navItems = [
@@ -207,18 +205,6 @@ export function Sidebar() {
         <div className={styles.spacer} />
 
         {/* BOTTOM SETTINGS & COLLAPSE */}
-        {imdb.status && (imdb.status.running || imdb.isStarting) && (
-          <div
-            className={styles.imdbUpdateNotice}
-            role="status"
-            title={t(
-              'IMDb ratings are being updated — coverage and the quality view fill in as matches land.',
-            )}
-          >
-            <span className={styles.imdbUpdatePulse} aria-hidden="true" />
-            {!isCollapsed && <span className={styles.imdbUpdateLabel}>{t('IMDb updating…')}</span>}
-          </div>
-        )}
         <div
           className={styles.bottomBar}
           data-seasonal-decor={isCollapsed ? undefined : 'sidebar-footer'}

@@ -237,9 +237,6 @@ export const PL_MESSAGES: Record<string, string> = {
     'Wyszukaj kategorię lub kraj i przypnij, aby zostały tutaj.',
   'Browse all categories': 'Przeglądaj wszystkie kategorie',
   'IMDb quality': 'Jakość IMDb',
-  'IMDb ratings are being updated — coverage and the quality view fill in as matches land.':
-    'Oceny IMDb są aktualizowane — pokrycie i widok jakości uzupełniają się w miarę dopasowywania tytułów.',
-  'IMDb updating…': 'Aktualizowanie IMDb…',
   'Quality: All': 'Jakość: Wszystko',
   'IMDb ≥ 7.0 · 1k+ votes': 'IMDb ≥ 7,0 · 1 tys.+ głosów',
   'IMDb ≥ 6.5 · 5k+ votes': 'IMDb ≥ 6,5 · 5 tys.+ głosów',
