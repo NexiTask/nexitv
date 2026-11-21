@@ -36,6 +36,16 @@ export function LibraryMetadataSettingsSection() {
           />
         </SettingsRow>
         <SettingsRow
+          title="Group Identical Titles"
+          description="Collapse the provider's duplicate entries of one title (country copies, 4K/FHD variants) into a single card with the best stream. Needs the catalogue index."
+        >
+          <SettingsToggle
+            label="Group identical titles"
+            checked={settings.catalogGroupTitles}
+            onChange={(checked) => settings.updateSetting('catalogGroupTitles', checked)}
+          />
+        </SettingsRow>
+        <SettingsRow
           title="Quality & Format Badges"
           description="Display resolution, frame rate, audio format, and edition pills on posters and channel rows."
         >

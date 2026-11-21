@@ -84,6 +84,7 @@ export function CatalogPage({
   const setCatalogImdbQuality = useSettingsStore((state) => state.updateSetting);
   const catalogHideAdult = useSettingsStore((state) => state.catalogHideAdult);
   const setCatalogHideAdult = useSettingsStore((state) => state.updateSetting);
+  const catalogGroupTitles = useSettingsStore((state) => state.catalogGroupTitles);
   const verifiedResolutions = useVerifiedResolutionMap(badgeVisibility?.verified ?? true);
   const navigate = useNavigate();
   const [activeCategoryId, setActiveCategoryId] = useCatalogCategorySelection(type);
@@ -193,6 +194,9 @@ export function CatalogPage({
     return { imdbMinRating: preset.minRating, imdbMinVotes: preset.minVotes };
   }, [imdbQuality]);
   const excludeAdult = isIndexed && type !== 'live' && catalogHideAdult;
+  // Variant grouping is an index rule too: the legacy full-catalogue path
+  // has no IMDb identities to group by.
+  const groupTitles = isIndexed && type !== 'live' && catalogGroupTitles;
   const categoryGenres = useMemo(
     () => (isIndexed ? categoryGenreMasks(categories, categoryNameMap) : NO_OVERRIDES),
     [isIndexed, categories, categoryNameMap],
@@ -211,6 +215,7 @@ export function CatalogPage({
       recentChannelIds,
       ...imdbQualityParams,
       excludeAdult,
+      groupTitles,
     }),
     [
       activeCategoryId,
@@ -226,6 +231,7 @@ export function CatalogPage({
       recentChannelIds,
       imdbQualityParams,
       excludeAdult,
+      groupTitles,
     ],
   );
   const headParams = useMemo<IndexedPageParams>(
@@ -247,7 +253,7 @@ export function CatalogPage({
   const indexed = useIndexedCatalogPage(type, indexParams, isIndexed);
   const indexStats = useIndexedCatalogStats(
     type,
-    { hiddenCategoryIds, favorites, ultraHd, fold: baseIndexParams.fold },
+    { hiddenCategoryIds, favorites, ultraHd, fold: baseIndexParams.fold, groupTitles },
     isIndexed,
   );
   const pageGeneration = indexed.result?.generation ?? '';

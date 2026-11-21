@@ -147,6 +147,8 @@ export interface SettingsState {
   catalogImdbQuality: ImdbQualityPreset;
   /** Movies/Series leave out the titles the provider flags as adult. */
   catalogHideAdult: boolean;
+  /** Provider variants of one IMDb title collapse into a single card. */
+  catalogGroupTitles: boolean;
   catalogSortModes: CatalogSortModes;
 
   // UI & Desktop
@@ -283,6 +285,7 @@ export const SETTINGS_SNAPSHOT_KEYS = [
   'badgeVisibility',
   'catalogImdbQuality',
   'catalogHideAdult',
+  'catalogGroupTitles',
   'smartLogoAspectMode',
   'imageSharpness',
   'imageBrightness',

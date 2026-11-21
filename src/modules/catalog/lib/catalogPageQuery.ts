@@ -82,6 +82,8 @@ export interface CatalogPageQueryInput {
   imdbMinRating?: number | null | undefined;
   imdbMinVotes?: number | null | undefined;
   excludeAdult?: boolean | undefined;
+  /** Collapse provider variants sharing an IMDb id into one card. */
+  groupTitles?: boolean | undefined;
 }
 
 /** The index query for exactly what CatalogPage would compute in memory. */
@@ -110,6 +112,7 @@ export function buildCatalogPageQuery(input: CatalogPageQueryInput): CatalogPage
     ...(input.imdbMinRating != null ? { imdbMinRating: input.imdbMinRating } : {}),
     ...(input.imdbMinRating != null ? { imdbMinVotes: input.imdbMinVotes ?? 0 } : {}),
     ...(input.excludeAdult ? { excludeAdult: true } : {}),
+    ...(input.groupTitles ? { groupTitles: true } : {}),
     ...lookupOverrides(input.ratingLookups),
   };
 }

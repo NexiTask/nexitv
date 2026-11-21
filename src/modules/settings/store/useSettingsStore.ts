@@ -235,6 +235,7 @@ const DEFAULT_SETTINGS = {
   selectedCategoryIds: emptySelectedCategoryIds(),
   catalogImdbQuality: 'all' as ImdbQualityPreset,
   catalogHideAdult: true,
+  catalogGroupTitles: true,
   catalogSortModes: emptyCatalogSortModes(),
   sidebarWidth: 260,
   viewMode: 'grid' as const,
@@ -457,6 +458,8 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
         ? (state.catalogImdbQuality as ImdbQualityPreset)
         : 'all',
     catalogHideAdult: typeof state.catalogHideAdult === 'boolean' ? state.catalogHideAdult : true,
+    catalogGroupTitles:
+      typeof state.catalogGroupTitles === 'boolean' ? state.catalogGroupTitles : true,
     catalogSortModes: normalizeCatalogSortModes(state.catalogSortModes),
     lastCollectionId:
       typeof state.lastCollectionId === 'string' && state.lastCollectionId.length <= 512

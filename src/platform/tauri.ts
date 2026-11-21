@@ -106,6 +106,8 @@ export interface CatalogPageQuery {
   imdbMinVotes?: number | null | undefined;
   /** Leave out the titles the provider flags as adult. */
   excludeAdult?: boolean | undefined;
+  /** Collapse provider variants sharing an IMDb id into one card. */
+  groupTitles?: boolean | undefined;
 }
 
 export interface CatalogSearchResult {

@@ -717,7 +717,8 @@ fn read_source_facets(
     }
     let mut statement = transaction.prepare(
         "SELECT ord, f_id, f_category, f_added, f_has_added, f_year, f_rating, f_flags,
-            f_genres, f_rank, f_fold_key, f_fold_rank, f_title, imdb_rating, imdb_votes
+            f_genres, f_rank, f_fold_key, f_fold_rank, f_title, imdb_rating, imdb_votes,
+            imdb_tconst
          FROM items WHERE source_id = ?1 AND kind = ?2 ORDER BY ord",
     )?;
     let mut categories: Vec<Box<str>> = Vec::new();
@@ -755,6 +756,9 @@ fn read_source_facets(
                 .into(),
             imdb_rating: row.get(13)?,
             imdb_votes: row.get::<_, Option<i64>>(14)?.map(|votes| votes as f64),
+            imdb_tconst: row
+                .get::<_, Option<String>>(15)?
+                .map(String::into_boxed_str),
         });
     }
     drop(query);

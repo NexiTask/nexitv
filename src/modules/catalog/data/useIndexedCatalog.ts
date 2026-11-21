@@ -397,7 +397,9 @@ export function useIndexedKeyRows(
 /** The category sidebar's counts from the index. */
 export function useIndexedCatalogStats(
   type: 'live' | 'vod' | 'series',
-  params: Pick<IndexedPageParams, 'hiddenCategoryIds' | 'favorites' | 'ultraHd' | 'fold'>,
+  params: Pick<IndexedPageParams, 'hiddenCategoryIds' | 'favorites' | 'ultraHd' | 'fold'> & {
+    groupTitles?: boolean | undefined;
+  },
   enabled: boolean,
 ): CatalogPageStats | undefined {
   const sources = useEnabledSources();
@@ -415,8 +417,9 @@ export function useIndexedCatalogStats(
       genre: null,
       sort: 'default',
       fold: params.fold,
+      groupTitles: params.groupTitles ?? false,
     }),
-    [params.favorites, params.fold, params.hiddenCategoryIds, params.ultraHd],
+    [params.favorites, params.fold, params.hiddenCategoryIds, params.ultraHd, params.groupTitles],
   );
   const signature = useMemo(() => catalogQuerySignature(query), [query]);
   const stats = useQuery({
