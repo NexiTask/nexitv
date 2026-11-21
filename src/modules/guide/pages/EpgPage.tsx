@@ -497,15 +497,7 @@ export function EpgPage() {
             title="Pick a channel group"
             description="Search for a category in the sidebar and pin it, or add channels to your favorites, to see their programmes here."
           />
-        ) : !isLoading && channelCount === 0 && channelSearchQuery.trim() ? (
-          <EmptyState
-            icon={CalendarClock}
-            title="No Results Found"
-            description="No channels match your search."
-            actionLabel="Clear search"
-            onAction={() => setChannelSearchQuery('')}
-          />
-        ) : !isLoading && channelCount === 0 ? (
+        ) : !isLoading && channelCount === 0 && !channelSearchQuery.trim() ? (
           <EmptyState
             icon={CalendarClock}
             title="No Channels Here"
