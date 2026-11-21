@@ -55,8 +55,8 @@ export interface CatalogIndexRows {
   rows: { sourceId: string; raw: unknown }[];
 }
 
-/** The catalogue kinds the Movies and Series pages are served for. */
-export type CatalogPageKind = 'vod' | 'series';
+/** The catalogue kinds the Movies, Series and Live TV pages are served for. */
+export type CatalogPageKind = 'live' | 'vod' | 'series';
 
 export interface CatalogPageSource {
   sourceId: string;
@@ -82,11 +82,15 @@ export interface CatalogPageQuery {
   categoryGenres: Record<string, number>;
   genre: number | null;
   sort: string;
+  /** Live TV: fold each channel's variants into one (the stream folding setting). */
+  fold: boolean;
 }
 
 export interface CatalogKeyRow {
   key: number;
   raw: unknown;
+  /** A folded channel's variants (itself included), in provider order. */
+  group?: CatalogKeyRow[] | undefined;
 }
 
 export interface CatalogPageResult {
@@ -333,12 +337,14 @@ export const tauriApi = {
     sources: CatalogPageSource[],
     generation: string,
     keys: number[],
+    fold: boolean,
   ) =>
     invoke<{ stale: boolean; rows: CatalogKeyRow[] }>('catalog_index_page_rows', {
       kind,
       sources,
       generation,
       keys,
+      fold,
     }),
 
   /** The category sidebar's counts, or null while the index cannot serve the page. */

@@ -26,14 +26,13 @@ import {
   type M3uEntry,
   type M3uPlaylist,
 } from '@/modules/sources/public/data/m3uClient';
-import { xtreamCategoryId, xtreamItemId } from '@/modules/sources/public/lib/sourceIdentity';
 import { foldLiveChannels } from '../lib/streamFolding';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import { notify } from '@/shared/notifications/useNotificationStore';
 import { getErrorMessage } from '@/shared/lib/error';
 
 import type { CatalogItem } from '../model/catalogItem';
-import { xtreamSeriesItem, xtreamVodFields } from '../lib/xtreamItemFields';
+import { xtreamLiveFields, xtreamSeriesItem, xtreamVodFields } from '../lib/xtreamItemFields';
 
 export type { CatalogItem } from '../model/catalogItem';
 
@@ -137,16 +136,22 @@ async function fetchXtreamList(
   return Array.isArray(response) ? response : [];
 }
 
+/**
+ * Maps a provider list. `indexes` gives each row's position in the full
+ * provider list when `list` is only part of it (rows served by the index),
+ * so positional fallbacks such as channel numbers come out the same.
+ */
 export function mapXtreamList(
   type: 'live' | 'vod' | 'series',
   source: EnabledXtreamSource,
   list: unknown[],
+  indexes?: readonly number[],
 ): CatalogItem[] {
   return type === 'live'
-    ? mapXtreamLive(source, list as XtreamLiveStream[])
+    ? mapXtreamLive(source, list as XtreamLiveStream[], indexes)
     : type === 'vod'
-      ? mapXtreamVod(source, list as XtreamVodStream[])
-      : mapXtreamSeries(source, list as XtreamSeries[]);
+      ? mapXtreamVod(source, list as XtreamVodStream[], indexes)
+      : mapXtreamSeries(source, list as XtreamSeries[], indexes);
 }
 
 /** Saved copies older than this are still shown, but flagged as outdated. */
@@ -329,53 +334,43 @@ function successful<T>(results: PromiseSettledResult<T[]>[]): T[] {
   return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
 }
 
-function mapXtreamLive(source: EnabledXtreamSource, response: XtreamLiveStream[]): CatalogItem[] {
+function mapXtreamLive(
+  source: EnabledXtreamSource,
+  response: XtreamLiveStream[],
+  indexes?: readonly number[],
+): CatalogItem[] {
   const credentials = source.credentials!;
-  return response.map((stream, index) => {
-    const title = stream.name || 'Unknown Channel';
-    const metadata = parseLiveChannelTitle(title);
-    const providerId = (
-      stream.stream_id ??
-      stream.epg_channel_id ??
-      stream.num ??
-      `live-${index}`
-    ).toString();
+  return response.map((stream, position) => {
+    const fields = xtreamLiveFields(
+      source.id,
+      source.profile.name,
+      stream,
+      indexes?.[position] ?? position,
+    );
+    const providerId = fields.sourceItemId;
     return {
-      id: xtreamItemId(source.id, 'live', providerId),
-      sourceItemId: providerId,
-      title,
-      posterUrl: stream.stream_icon || '',
-      type: 'live',
-      channelNum: stream.num ?? index + 1,
-      added: stream.added,
-      categoryId: xtreamCategoryId(source.id, stream.category_id),
-      epgChannelId: stream.epg_channel_id || undefined,
-      tags: metadata.qualityBadges,
-      country: metadata.country,
+      ...fields,
       streamUrl: stream.direct_source || getStreamUrl(credentials, 'live', providerId),
       fallbacks: stream.direct_source
         ? [{ streamUrl: getStreamUrl(credentials, 'live', providerId) }]
         : undefined,
-      catchup: stream.tv_archive === 1 ? 'xtream' : undefined,
-      catchupDays: stream.tv_archive_duration,
-      sourceId: source.id,
-      subtitle: source.profile.name,
-      radio:
-        stream.stream_type?.toLowerCase() === 'audio' ||
-        stream.stream_type?.toLowerCase() === 'radio',
-      radioMetadata:
-        stream.stream_type?.toLowerCase() === 'audio' ||
-        stream.stream_type?.toLowerCase() === 'radio'
-          ? { title }
-          : undefined,
     };
   });
 }
 
-function mapXtreamVod(source: EnabledXtreamSource, streams: XtreamVodStream[]): CatalogItem[] {
+function mapXtreamVod(
+  source: EnabledXtreamSource,
+  streams: XtreamVodStream[],
+  indexes?: readonly number[],
+): CatalogItem[] {
   const credentials = source.credentials!;
-  return streams.map((stream, index) => {
-    const fields = xtreamVodFields(source.id, source.profile.name, stream, index);
+  return streams.map((stream, position) => {
+    const fields = xtreamVodFields(
+      source.id,
+      source.profile.name,
+      stream,
+      indexes?.[position] ?? position,
+    );
     return {
       ...fields,
       streamUrl:
@@ -386,9 +381,13 @@ function mapXtreamVod(source: EnabledXtreamSource, streams: XtreamVodStream[]): 
   });
 }
 
-function mapXtreamSeries(source: EnabledXtreamSource, streams: XtreamSeries[]): CatalogItem[] {
-  return streams.map((stream, index) =>
-    xtreamSeriesItem(source.id, source.profile.name, stream, index),
+function mapXtreamSeries(
+  source: EnabledXtreamSource,
+  streams: XtreamSeries[],
+  indexes?: readonly number[],
+): CatalogItem[] {
+  return streams.map((stream, position) =>
+    xtreamSeriesItem(source.id, source.profile.name, stream, indexes?.[position] ?? position),
   );
 }
 

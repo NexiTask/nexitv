@@ -2,7 +2,7 @@ import { rankTitles, xtreamFacetRows, type CatalogFacetRow } from './catalogFace
 
 /** Work the facet worker does on the index's raw JSON, off the webview thread. */
 export type CatalogFacetTask =
-  | { op: 'facets'; kind: 'vod' | 'series'; sourceId: string; payload: ArrayBuffer }
+  | { op: 'facets'; kind: 'live' | 'vod' | 'series'; sourceId: string; payload: ArrayBuffer }
   | { op: 'ranks'; payload: ArrayBuffer };
 
 export type CatalogFacetTaskResult =

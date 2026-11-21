@@ -57,6 +57,11 @@ import { getErrorMessage } from '@/shared/lib/error';
 import { providerRatingValue, TOP_RATED_MIN_RATING } from '@/shared/lib/rating';
 import type { CatalogPageStats } from '@/platform/tauri';
 
+/** Category rows built with the page; enough to fill a tall window. */
+const INITIAL_SIDEBAR_ROWS = 150;
+/** Rows added per frame after that, a few milliseconds of work each. */
+const SIDEBAR_ROWS_PER_FRAME = 150;
+
 interface CategorySidebarProps {
   type: 'vod' | 'series' | 'live';
   activeCategoryId: string | null;
@@ -426,6 +431,37 @@ export function CategorySidebar({
     pinnedRows.length +
     groups.reduce((total, group) => total + Math.max(1, countryChildRows(group).length), 0);
 
+  // Live TV can list hundreds of categories. Building every row in one go
+  // held the page back by well over 100 ms, so the rows that fit on screen
+  // come first and the rest follow a chunk per frame. The finished list is
+  // exactly the same.
+  const [rowBudget, setRowBudget] = useState(INITIAL_SIDEBAR_ROWS);
+  const groupRowCounts = useMemo(
+    () =>
+      groups.map((group) =>
+        hasSearch || !collapsed.includes(group.key) ? 1 + countryChildRows(group).length : 1,
+      ),
+    [collapsed, groups, hasSearch],
+  );
+  const totalGroupRows = groupRowCounts.reduce((total, count) => total + count, 0);
+  const renderedGroupCount = useMemo(() => {
+    let budget = rowBudget - pinnedRows.length;
+    let count = 0;
+    for (const rows of groupRowCounts) {
+      if (budget <= 0) break;
+      budget -= rows;
+      count += 1;
+    }
+    return count;
+  }, [groupRowCounts, pinnedRows.length, rowBudget]);
+  useEffect(() => {
+    if (rowBudget >= totalGroupRows + pinnedRows.length) return;
+    const frame = requestAnimationFrame(() =>
+      setRowBudget((budget) => budget + SIDEBAR_ROWS_PER_FRAME),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [pinnedRows.length, rowBudget, totalGroupRows]);
+
   const openActions = (event: React.MouseEvent<HTMLElement>, items: ContextMenuItem[]) => {
     event.preventDefault();
     event.stopPropagation();
@@ -759,7 +795,7 @@ export function CategorySidebar({
             )}
 
             {/* Country groups */}
-            {groups.map((group) => {
+            {groups.slice(0, renderedGroupCount).map((group) => {
               const key = group.key;
               const childRows = countryChildRows(group);
               const isDirectCountry = isDirectCountryGroup(group);

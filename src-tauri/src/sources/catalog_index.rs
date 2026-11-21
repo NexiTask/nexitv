@@ -34,7 +34,7 @@ use super::catalog_query::{
 };
 use crate::credentials::source::validate_source_id;
 
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 4;
 /// Rows returned with a page so its first screen needs no second request.
 const PAGE_HEAD_ROWS: usize = 120;
 const MAX_ROWS_PER_REQUEST: usize = 2_000;
@@ -103,6 +103,8 @@ fn open(path: &PathBuf) -> rusqlite::Result<Connection> {
             f_flags INTEGER,
             f_genres INTEGER,
             f_rank INTEGER,
+            f_fold_key TEXT,
+            f_fold_rank INTEGER,
             PRIMARY KEY (source_id, kind, ord)
          );
          CREATE INDEX IF NOT EXISTS items_added ON items (source_id, kind, added DESC, ord);
@@ -288,9 +290,9 @@ fn ingest_into(
             let mut insert = transaction.prepare(
                 "INSERT INTO items (source_id, kind, ord, added, rating, category_id, raw,
                     raw_hash, f_id, f_title, f_category, f_added, f_has_added, f_year,
-                    f_rating, f_flags, f_genres, f_rank)
+                    f_rating, f_flags, f_genres, f_rank, f_fold_key, f_fold_rank)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-                    ?16, ?17, ?18)",
+                    ?16, ?17, ?18, ?19, ?20)",
             )?;
             for (ord, raw) in list.iter().enumerate() {
                 let Ok(item) = serde_json::from_str::<Value>(raw.get()) else {
@@ -323,6 +325,8 @@ fn ingest_into(
                     facets.map(|f| f.flags),
                     facets.map(|f| f.genres),
                     facets.and_then(|f| f.rank),
+                    facets.and_then(|f| f.fold_key.as_ref()),
+                    facets.map(|f| f.fold_rank),
                 ])?;
                 inserted += 1;
             }
@@ -352,6 +356,8 @@ struct StoredFacets {
     flags: i64,
     genres: i64,
     rank: Option<i64>,
+    fold_key: Option<String>,
+    fold_rank: i64,
 }
 
 fn raw_hash(raw: &str) -> i64 {
@@ -367,7 +373,7 @@ fn carried_facets(
 ) -> rusqlite::Result<HashMap<i64, StoredFacets>> {
     let mut statement = connection.prepare(
         "SELECT raw_hash, f_id, f_title, f_category, f_added, f_has_added, f_year, f_rating,
-            f_flags, f_genres, f_rank
+            f_flags, f_genres, f_rank, f_fold_key, f_fold_rank
          FROM items WHERE source_id = ?1 AND kind = ?2 AND f_id IS NOT NULL",
     )?;
     let rows = statement.query_map(params![source_id, kind], |row| {
@@ -384,6 +390,8 @@ fn carried_facets(
                 flags: row.get(8)?,
                 genres: row.get(9)?,
                 rank: row.get(10)?,
+                fold_key: row.get(11)?,
+                fold_rank: row.get::<_, Option<i64>>(12)?.unwrap_or(0),
             },
         ))
     })?;
@@ -568,7 +576,7 @@ pub fn catalog_index_rows(
 
 fn validate_page_kind(kind: &str) -> Result<(), String> {
     match kind {
-        "vod" | "series" => Ok(()),
+        "live" | "vod" | "series" => Ok(()),
         _ => Err("Invalid catalog page kind".to_string()),
     }
 }
@@ -656,7 +664,7 @@ fn read_source_facets(
     }
     let mut statement = transaction.prepare(
         "SELECT ord, f_id, f_category, f_added, f_has_added, f_year, f_rating, f_flags,
-            f_genres, f_rank
+            f_genres, f_rank, f_fold_key, f_fold_rank
          FROM items WHERE source_id = ?1 AND kind = ?2 ORDER BY ord",
     )?;
     let mut categories: Vec<Box<str>> = Vec::new();
@@ -686,6 +694,10 @@ fn read_source_facets(
             flags: row.get::<_, i64>(7)? as u8,
             genres: row.get::<_, i64>(8)? as u16,
             rank: row.get::<_, i64>(9)? as u32,
+            fold_key: row
+                .get::<_, Option<String>>(10)?
+                .map(String::into_boxed_str),
+            fold_rank: row.get::<_, Option<i64>>(11)?.unwrap_or(0) as u8,
         });
     }
     drop(query);
@@ -768,6 +780,9 @@ fn generation_token(facets: &[Arc<SourceFacets>]) -> String {
 pub struct KeyRow {
     key: u32,
     raw: Box<RawValue>,
+    /// A folded channel's variants (itself included), in provider order.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    group: Vec<KeyRow>,
 }
 
 /// The raw rows for `keys`, or `None` when any source changed since `token`.
@@ -777,6 +792,7 @@ fn rows_for_keys(
     sources: &[PageSource],
     token: &str,
     keys: &[u32],
+    groups: &HashMap<u32, Vec<u32>>,
 ) -> Result<Option<Vec<KeyRow>>, String> {
     with_reader(app, |connection| {
         let transaction = connection.unchecked_transaction()?;
@@ -793,8 +809,7 @@ fn rows_for_keys(
         let mut statement = transaction.prepare_cached(
             "SELECT raw FROM items WHERE source_id = ?1 AND kind = ?2 AND ord = ?3",
         )?;
-        let mut rows = Vec::with_capacity(keys.len());
-        for &key in keys {
+        let mut fetch = |key: u32| -> rusqlite::Result<Option<Box<RawValue>>> {
             let position = (key >> ORD_BITS) as usize;
             let ord = key & ((1 << ORD_BITS) - 1);
             let Some(source) = sources.get(position) else {
@@ -803,10 +818,25 @@ fn rows_for_keys(
             let raw: Option<String> = statement
                 .query_row(params![source.source_id, kind, ord], |row| row.get(0))
                 .optional()?;
-            let Some(raw) = raw.and_then(|raw| RawValue::from_string(raw).ok()) else {
+            Ok(raw.and_then(|raw| RawValue::from_string(raw).ok()))
+        };
+        let mut rows = Vec::with_capacity(keys.len());
+        for &key in keys {
+            let Some(raw) = fetch(key)? else {
                 return Ok(None);
             };
-            rows.push(KeyRow { key, raw });
+            let mut group = Vec::new();
+            for &member in groups.get(&key).map(Vec::as_slice).unwrap_or_default() {
+                let Some(raw) = fetch(member)? else {
+                    return Ok(None);
+                };
+                group.push(KeyRow {
+                    key: member,
+                    raw,
+                    group: Vec::new(),
+                });
+            }
+            rows.push(KeyRow { key, raw, group });
         }
         drop(statement);
         transaction.finish()?;
@@ -900,7 +930,8 @@ pub fn catalog_index_page(
     let result = catalog_query::page(&refs, &query);
     let token = generation_token(&facets);
     let head_keys = &result.keys[..result.keys.len().min(PAGE_HEAD_ROWS)];
-    let head = rows_for_keys(&app, &kind, &sources, &token, head_keys)?;
+    let groups = catalog_query::fold_groups(&refs, &query, head_keys);
+    let head = rows_for_keys(&app, &kind, &sources, &token, head_keys, &groups)?;
     let ready = head.is_some();
     let header = PageHeader {
         ready,
@@ -941,6 +972,7 @@ pub fn catalog_index_page_rows(
     sources: Vec<PageSource>,
     generation: String,
     keys: Vec<u32>,
+    fold: bool,
 ) -> Result<PageRows, String> {
     validate_page_kind(&kind)?;
     if keys.len() > MAX_ROWS_PER_REQUEST {
@@ -949,8 +981,28 @@ pub fn catalog_index_page_rows(
     for source in &sources {
         validate_source_id(&source.source_id)?;
     }
+    let stale = PageRows {
+        stale: true,
+        rows: Vec::new(),
+    };
+    let groups = if fold {
+        let Ok(facets) = page_sources(&app, &kind, &sources)? else {
+            return Ok(stale);
+        };
+        if generation_token(&facets) != generation {
+            return Ok(stale);
+        }
+        let refs: Vec<&SourceFacets> = facets.iter().map(|f| f.as_ref()).collect();
+        let query = CatalogQuery {
+            fold: true,
+            ..CatalogQuery::default()
+        };
+        catalog_query::fold_groups(&refs, &query, &keys)
+    } else {
+        HashMap::new()
+    };
     Ok(
-        match rows_for_keys(&app, &kind, &sources, &generation, &keys)? {
+        match rows_for_keys(&app, &kind, &sources, &generation, &keys, &groups)? {
             Some(rows) => PageRows { stale: false, rows },
             None => PageRows {
                 stale: true,
@@ -1002,10 +1054,12 @@ pub fn catalog_index_rating_head(
     let refs: Vec<&SourceFacets> = facets.iter().map(|f| f.as_ref()).collect();
     let keys = catalog_query::rating_head(&refs, &query, &checked_ids, limit.min(500) as usize);
     let token = generation_token(&facets);
-    Ok(match rows_for_keys(&app, &kind, &sources, &token, &keys)? {
-        Some(rows) => RatingHead { ready: true, rows },
-        None => not_ready,
-    })
+    Ok(
+        match rows_for_keys(&app, &kind, &sources, &token, &keys, &HashMap::new())? {
+            Some(rows) => RatingHead { ready: true, rows },
+            None => not_ready,
+        },
+    )
 }
 
 #[derive(Serialize)]
@@ -1072,7 +1126,8 @@ pub fn catalog_index_facet_batch(
     Ok(tauri::ipc::Response::new(bytes))
 }
 
-/// `[ord, id, title, categoryId, added, hasAdded, year, rating, flags, genres]`
+/// `[ord, id, title, categoryId, added, hasAdded, year, rating, flags, genres,
+/// foldKey, foldRank]`
 type FacetIn = (
     u32,
     String,
@@ -1084,6 +1139,8 @@ type FacetIn = (
     Option<f64>,
     u8,
     u16,
+    Option<String>,
+    u8,
 );
 
 /// Store facets the worker derived; `false` when the list changed meanwhile.
@@ -1106,14 +1163,27 @@ pub fn catalog_index_store_facets(
             let mut update = transaction.prepare(
                 "UPDATE items SET f_id = ?4, f_title = ?5, f_category = ?6, f_added = ?7,
                     f_has_added = ?8, f_year = ?9, f_rating = ?10, f_flags = ?11,
-                    f_genres = ?12, f_rank = NULL
+                    f_genres = ?12, f_fold_key = ?13, f_fold_rank = ?14, f_rank = NULL
                  WHERE source_id = ?1 AND kind = ?2 AND ord = ?3",
             )?;
-            for (ord, id, title, category, added, has_added, year, rating, flags, genres) in &facets
+            for (
+                ord,
+                id,
+                title,
+                category,
+                added,
+                has_added,
+                year,
+                rating,
+                flags,
+                genres,
+                fold_key,
+                fold_rank,
+            ) in &facets
             {
                 update.execute(params![
                     source_id, kind, ord, id, title, category, added, has_added, year, rating,
-                    flags, genres
+                    flags, genres, fold_key, fold_rank
                 ])?;
             }
         }
@@ -1410,10 +1480,12 @@ mod tests {
     }
 
     #[test]
-    fn page_kinds_are_movies_and_series() {
+    fn page_kinds_are_the_three_catalogues() {
         assert!(validate_page_kind("vod").is_ok());
         assert!(validate_page_kind("series").is_ok());
-        assert!(validate_page_kind("live").is_err());
+        assert!(validate_page_kind("live").is_ok());
+        assert!(validate_page_kind("movies").is_err());
+        assert!(validate_page_kind("").is_err());
     }
 
     #[test]

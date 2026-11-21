@@ -128,13 +128,14 @@ describe('typed Tauri IPC wrapper', () => {
     ],
     [
       'catalogIndexPageRows',
-      ['series', [{ sourceId: 'xtream-one', scope: 'sources-abc' }], '3', [1, 8388609]],
+      ['live', [{ sourceId: 'xtream-one', scope: 'sources-abc' }], '3', [1, 8388609], true],
       'catalog_index_page_rows',
       {
-        kind: 'series',
+        kind: 'live',
         sources: [{ sourceId: 'xtream-one', scope: 'sources-abc' }],
         generation: '3',
         keys: [1, 8388609],
+        fold: true,
       },
     ],
     [
@@ -224,6 +225,7 @@ describe('catalogue page index IPC', () => {
     categoryGenres: {},
     genre: null,
     sort: 'name-asc',
+    fold: false,
   };
 
   function encodePage(header: object, keys: number[]): ArrayBuffer {

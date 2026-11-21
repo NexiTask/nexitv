@@ -30,6 +30,30 @@ function getItemQualityRank(item: MediaItem, qualityBadges: string[]): number {
 }
 
 /**
+ * What folding reads from one live channel: the group it folds into, the
+ * quality badges it brings to the folded channel, and its quality rank (the
+ * highest-ranked variant of a group becomes the channel shown).
+ */
+export function liveFoldFacts(item: MediaItem): {
+  parsedTitle: ReturnType<typeof parseLiveChannelTitle>;
+  groupKey: string;
+  qualityBadges: string[];
+  rank: number;
+} {
+  const parsed = parseLiveChannelTitle(item.title);
+  const baseName = parsed.cleanTitle.toLowerCase().replace(/\s+/g, ' ').trim();
+  const categoryKey = item.categoryId ?? 'default';
+  const countryKey = item.country ?? parsed.country ?? '';
+  const qualityBadges = mergeMediaTags(...parsed.qualityBadges, ...(item.tags ?? []), item.quality);
+  return {
+    parsedTitle: parsed,
+    groupKey: `${categoryKey}::${countryKey}::${baseName}`,
+    qualityBadges,
+    rank: getItemQualityRank(item, qualityBadges),
+  };
+}
+
+/**
  * Folds duplicate stream entries of the same channel (e.g. 4K, FHD, HD, RAW, Backup)
  * in the same category into a single representative channel with ordered fallbacks.
  */
@@ -59,18 +83,7 @@ export function foldLiveChannels(items: readonly MediaItem[]): MediaItem[] {
       continue;
     }
 
-    const parsed = parseLiveChannelTitle(item.title);
-    const baseName = parsed.cleanTitle.toLowerCase().replace(/\s+/g, ' ').trim();
-    const categoryKey = item.categoryId ?? 'default';
-    const countryKey = item.country ?? parsed.country ?? '';
-    const groupKey = `${categoryKey}::${countryKey}::${baseName}`;
-
-    const qualityBadges = mergeMediaTags(
-      ...parsed.qualityBadges,
-      ...(item.tags ?? []),
-      item.quality,
-    );
-    const rank = getItemQualityRank(item, qualityBadges);
+    const { parsedTitle: parsed, groupKey, qualityBadges, rank } = liveFoldFacts(item);
 
     const entry: GroupEntry = {
       item,

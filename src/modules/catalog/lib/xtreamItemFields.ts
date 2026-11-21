@@ -1,8 +1,12 @@
-import type { XtreamSeries, XtreamVodStream } from '@/modules/sources/public/data/xtreamClient';
+import type {
+  XtreamLiveStream,
+  XtreamSeries,
+  XtreamVodStream,
+} from '@/modules/sources/public/data/xtreamClient';
 import { xtreamCategoryId, xtreamItemId } from '@/modules/sources/public/lib/sourceIdentity';
 import { parseProviderRating } from '@/shared/lib/rating';
 import type { CatalogItem } from '../model/catalogItem';
-import { parseMediaDisplayTitle } from './titleParser';
+import { parseLiveChannelTitle, parseMediaDisplayTitle } from './titleParser';
 
 /**
  * Everything a movie's catalogue item holds except its stream URL, which
@@ -69,5 +73,43 @@ export function xtreamSeriesItem(
     sourceId,
     subtitle: sourceName,
     description: stream.plot,
+  };
+}
+
+/** A channel's catalogue item except its stream URL and fallbacks, which need credentials. */
+export function xtreamLiveFields(
+  sourceId: string,
+  sourceName: string,
+  stream: XtreamLiveStream,
+  index: number,
+): CatalogItem & { sourceItemId: string } {
+  const title = stream.name || 'Unknown Channel';
+  const metadata = parseLiveChannelTitle(title);
+  const providerId = (
+    stream.stream_id ??
+    stream.epg_channel_id ??
+    stream.num ??
+    `live-${index}`
+  ).toString();
+  const radio =
+    stream.stream_type?.toLowerCase() === 'audio' || stream.stream_type?.toLowerCase() === 'radio';
+  return {
+    id: xtreamItemId(sourceId, 'live', providerId),
+    sourceItemId: providerId,
+    title,
+    posterUrl: stream.stream_icon || '',
+    type: 'live',
+    channelNum: stream.num ?? index + 1,
+    added: stream.added,
+    categoryId: xtreamCategoryId(sourceId, stream.category_id),
+    epgChannelId: stream.epg_channel_id || undefined,
+    tags: metadata.qualityBadges,
+    country: metadata.country,
+    catchup: stream.tv_archive === 1 ? 'xtream' : undefined,
+    catchupDays: stream.tv_archive_duration,
+    sourceId,
+    subtitle: sourceName,
+    radio,
+    radioMetadata: radio ? { title } : undefined,
   };
 }

@@ -18,6 +18,7 @@ import { useCatalogByType } from '@/modules/catalog/data/useCatalog';
 import { useCategories, useHiddenCategoryIds } from '@/modules/catalog/data/useCategories';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { useContextMenuStore } from '@/shared/ui/context-menu/useContextMenuStore';
+import { COUNTRY_NAMES, parseProviderCategoryName } from '@/shared/lib/categoryName';
 
 const categoryResult = {
   data: [
@@ -359,5 +360,37 @@ describe('category sidebar counts from the catalogue index', () => {
 
     expect(vi.mocked(useCatalogByType)).toHaveBeenCalledWith('live', { enabled: false });
     expect(screen.queryByRole('button', { name: 'Argentina, 2 channels' })).toBeNull();
+  });
+});
+
+describe('category sidebar with many categories', () => {
+  it('builds the first rows at once and the rest over the next frames', async () => {
+    // Many countries, each with a few categories, like a large live line-up.
+    const codes = Object.keys(COUNTRY_NAMES)
+      .filter((code) => parseProviderCategoryName(`${code} | Group`).country !== null)
+      .slice(0, 100);
+    const categories = codes.flatMap((code, country) =>
+      [0, 1, 2, 3].map((index) => ({
+        category_id: `c-${country}-${index}`,
+        category_name: `${code} | Group ${String(country * 4 + index).padStart(3, '0')}`,
+        parent_id: 0,
+      })),
+    );
+    vi.mocked(useCategories).mockReturnValue({
+      ...categoryResult,
+      data: categories,
+    } as unknown as ReturnType<typeof useCategories>);
+    vi.mocked(useCatalogByType).mockReturnValue({ data: [] } as unknown as ReturnType<
+      typeof useCatalogByType
+    >);
+
+    render(<CategorySidebar type="vod" activeCategoryId={null} onSelectCategory={vi.fn()} />);
+
+    expect(screen.getByText('Group 000')).toBeTruthy();
+    expect(screen.queryByText('Group 399')).toBeNull();
+    expect(await screen.findByText('Group 399', undefined, { timeout: 5000 })).toBeTruthy();
+    expect(screen.getByText('Group 200')).toBeTruthy();
+    // The same rows the sidebar showed when it built them all at once.
+    expect(screen.getAllByText(/^Group \d{3}$/)).toHaveLength(396);
   });
 });

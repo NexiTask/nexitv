@@ -72,6 +72,7 @@ export interface CatalogPageQueryInput {
   ratingLookups: RatingLookups;
   genre: string | null;
   sort: string;
+  fold: boolean;
 }
 
 /** The index query for exactly what CatalogPage would compute in memory. */
@@ -90,6 +91,7 @@ export function buildCatalogPageQuery(input: CatalogPageQueryInput): CatalogPage
     categoryGenres: input.categoryGenres,
     genre: genreBit >= 0 ? genreBit : null,
     sort: input.sort,
+    fold: input.fold,
     ...lookupOverrides(input.ratingLookups),
   };
 }

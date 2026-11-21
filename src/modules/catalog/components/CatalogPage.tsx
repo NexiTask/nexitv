@@ -73,6 +73,7 @@ export function CatalogPage({
   const catalogSortModes = useSettingsStore((state) => state.catalogSortModes);
   const setCatalogSort = useSettingsStore((state) => state.setCatalogSort);
   const badgeVisibility = useSettingsStore((state) => state.badgeVisibility);
+  const streamFoldingEnabled = useSettingsStore((state) => state.streamFoldingEnabled);
   const verifiedResolutions = useVerifiedResolutionMap(badgeVisibility?.verified ?? true);
   const navigate = useNavigate();
   const [activeCategoryId, setActiveCategoryId] = useCatalogCategorySelection(type);
@@ -173,6 +174,7 @@ export function CatalogPage({
       ultraHd,
       genre: selectedGenre,
       sort: currentSortMode,
+      fold: type === 'live' && streamFoldingEnabled,
     }),
     [
       activeCategoryId,
@@ -183,6 +185,8 @@ export function CatalogPage({
       ultraHd,
       selectedGenre,
       currentSortMode,
+      type,
+      streamFoldingEnabled,
     ],
   );
   const headParams = useMemo<IndexedPageParams>(
@@ -204,7 +208,7 @@ export function CatalogPage({
   const indexed = useIndexedCatalogPage(type, indexParams, isIndexed);
   const indexStats = useIndexedCatalogStats(
     type,
-    { hiddenCategoryIds, favorites, ultraHd },
+    { hiddenCategoryIds, favorites, ultraHd, fold: baseIndexParams.fold },
     isIndexed,
   );
   const pageGeneration = indexed.result?.generation ?? '';

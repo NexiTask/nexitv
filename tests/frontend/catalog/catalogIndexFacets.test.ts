@@ -56,6 +56,8 @@ describe('catalogue index facets', () => {
       7.6,
       FACET_ULTRA_HD,
       bit('Horror'),
+      null,
+      0,
     ]);
   });
 
@@ -201,6 +203,7 @@ describe('catalogue page queries', () => {
       ratingLookups: new Map(),
       genre: 'Drama',
       sort: 'year-asc',
+      fold: false,
     });
     expect(query).toMatchObject({
       hiddenCategoryIds: ['c3', 'c9'],
@@ -209,6 +212,7 @@ describe('catalogue page queries', () => {
       favoriteIds: ['f'],
       genre: CATALOG_GENRES.indexOf('Drama'),
       sort: 'year-asc',
+      fold: false,
     });
     const smart = buildCatalogPageQuery({
       activeCategoryId: 'smart:4k',
@@ -220,6 +224,7 @@ describe('catalogue page queries', () => {
       ratingLookups: new Map(),
       genre: 'All',
       sort: 'default',
+      fold: true,
     });
     expect(smart.targetCategoryIds).toBeNull();
     expect(smart.genre).toBeNull();

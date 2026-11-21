@@ -25,6 +25,7 @@ import {
 } from '../lib/catalogPageQuery';
 import type { RatingLookups } from '../lib/smartCatalogFilter';
 import { mapXtreamList } from './useCatalog';
+import { foldLiveChannels } from '../lib/streamFolding';
 import { buildCatalogFacets, onCatalogFacetsBuilt } from './catalogFacetBuilder';
 import type { RatingHeadSource } from './useTmdbRatingChecks';
 
@@ -42,7 +43,7 @@ const KEY_SOURCE_SHIFT = 2 ** ORD_BITS;
 export type CatalogPageMode = 'pending' | 'index' | 'legacy';
 
 function isPageKind(type: 'live' | 'vod' | 'series'): type is CatalogPageKind {
-  return type === 'vod' || type === 'series';
+  return type === 'live' || type === 'vod' || type === 'series';
 }
 
 function pageSources(sources: EnabledSourcesSnapshot): CatalogPageSource[] {
@@ -157,20 +158,29 @@ function keySource(key: number): number {
   return Math.floor(key / KEY_SOURCE_SHIFT);
 }
 
-/** Maps raw index rows with the catalogue's own mapping, per source. */
-function mapKeyRows(
+function keyOrd(key: number): number {
+  return key % KEY_SOURCE_SHIFT;
+}
+
+/**
+ * Maps raw index rows with the catalogue's own mapping, per source, each at
+ * its provider-list position. A folded channel arrives with all its variants
+ * and is folded here with `foldLiveChannels`, exactly as the full catalogue is.
+ */
+export function mapKeyRows(
   type: CatalogPageKind,
   sources: readonly EnabledXtreamSource[],
   rows: readonly CatalogKeyRow[],
 ): Map<number, CatalogItem> {
+  const flat = rows.flatMap((row) => (row.group && row.group.length > 0 ? row.group : [row]));
   const bySource = new Map<number, CatalogKeyRow[]>();
-  for (const row of rows) {
+  for (const row of flat) {
     const position = keySource(row.key);
     const list = bySource.get(position) ?? [];
     list.push(row);
     bySource.set(position, list);
   }
-  const items = new Map<number, CatalogItem>();
+  const mappedByKey = new Map<number, CatalogItem>();
   for (const [position, list] of bySource) {
     const source = sources[position];
     if (!source) continue;
@@ -178,8 +188,23 @@ function mapKeyRows(
       type,
       source,
       list.map((row) => row.raw),
+      list.map((row) => keyOrd(row.key)),
     );
-    list.forEach((row, index) => items.set(row.key, mapped[index]!));
+    list.forEach((row, index) => mappedByKey.set(row.key, mapped[index]!));
+  }
+  const items = new Map<number, CatalogItem>();
+  for (const row of rows) {
+    if (row.group && row.group.length > 0) {
+      const variants = row.group.flatMap((member) => {
+        const item = mappedByKey.get(member.key);
+        return item ? [item] : [];
+      });
+      const folded = foldLiveChannels(variants);
+      if (folded.length === 1) items.set(row.key, folded[0] as CatalogItem);
+    } else {
+      const item = mappedByKey.get(row.key);
+      if (item) items.set(row.key, item);
+    }
   }
   return items;
 }
@@ -194,6 +219,8 @@ export interface IndexedPageParams {
   ratingLookups: RatingLookups;
   genre: string | null;
   sort: string;
+  /** Live TV with stream folding on. */
+  fold: boolean;
 }
 
 export interface IndexedPage {
@@ -278,7 +305,7 @@ export function useIndexedCatalogPage(
       for (const key of missing) inFlight.current.add(key);
       const generation = result.generation;
       void tauriApi
-        .catalogIndexPageRows(kind, requestSources, generation, missing)
+        .catalogIndexPageRows(kind, requestSources, generation, missing, query.fold)
         .then((answer) => {
           if (rowsRef.current.generation !== generation) return;
           if (answer.stale) {
@@ -293,7 +320,7 @@ export function useIndexedCatalogPage(
           for (const key of missing) inFlight.current.delete(key);
         });
     },
-    [client, kind, requestSources, result, rowsFor, xtream],
+    [client, kind, query.fold, requestSources, result, rowsFor, xtream],
   );
 
   const getItem = useCallback(
@@ -320,7 +347,7 @@ export function useIndexedCatalogPage(
 /** The category sidebar's counts from the index. */
 export function useIndexedCatalogStats(
   type: 'live' | 'vod' | 'series',
-  params: Pick<IndexedPageParams, 'hiddenCategoryIds' | 'favorites' | 'ultraHd'>,
+  params: Pick<IndexedPageParams, 'hiddenCategoryIds' | 'favorites' | 'ultraHd' | 'fold'>,
   enabled: boolean,
 ): CatalogPageStats | undefined {
   const sources = useEnabledSources();
@@ -337,8 +364,9 @@ export function useIndexedCatalogStats(
       categoryGenres: {},
       genre: null,
       sort: 'default',
+      fold: params.fold,
     }),
-    [params.favorites, params.hiddenCategoryIds, params.ultraHd],
+    [params.favorites, params.fold, params.hiddenCategoryIds, params.ultraHd],
   );
   const signature = useMemo(() => catalogQuerySignature(query), [query]);
   const stats = useQuery({
@@ -451,12 +479,13 @@ export function useCatalogFacetBuilds(delayMs = 3_000): void {
     const timer = window.setTimeout(() => {
       run('vod');
       run('series');
+      run('live');
     }, delayMs);
     let unlisten: (() => void) | undefined;
     let cancelled = false;
     void desktopApi
       .onCatalogIndexUpdated((kind) => {
-        if (kind === 'vod' || kind === 'series') run(kind);
+        if (kind === 'live' || kind === 'vod' || kind === 'series') run(kind);
       })
       .then((stop) => {
         if (cancelled) stop();

@@ -19,6 +19,10 @@ pub(crate) const FLAG_ULTRA_HD: u8 = 1;
 pub(crate) const FLAG_SPORTS: u8 = 2;
 pub(crate) const FLAG_NEWS: u8 = 4;
 pub(crate) const FLAG_KIDS: u8 = 8;
+/// A channel's own title declares 4K/8K.
+pub(crate) const FLAG_TITLE_UHD: u8 = 16;
+/// A channel variant's quality badges declare 4K/8K.
+pub(crate) const FLAG_BADGE_UHD: u8 = 32;
 /// `TOP_RATED_MIN_RATING` in rating.ts.
 const TOP_RATED_MIN_RATING: f64 = 7.0;
 /// `CATALOG_GENRES.length` in smartCatalogFilter.ts.
@@ -42,6 +46,9 @@ pub(crate) struct FacetRow {
     pub flags: u8,
     pub genres: u16,
     pub rank: u32,
+    /// Live channels: the stream-folding group and quality rank.
+    pub fold_key: Option<Box<str>>,
+    pub fold_rank: u8,
 }
 
 /// One source's titles in provider order.
@@ -83,6 +90,8 @@ pub struct CatalogQuery {
     /// Bit index of the selected genre.
     pub genre: Option<u8>,
     pub sort: String,
+    /// Fold each live channel's variants into one, like `foldLiveChannels`.
+    pub fold: bool,
 }
 
 #[derive(Debug, Default, Serialize, PartialEq)]
@@ -117,8 +126,65 @@ struct CategoryFacts {
     genres: Vec<u16>,
 }
 
+/// `foldLiveChannels`: rows sharing a group key become one channel, placed
+/// where the group first appears and shown as its best-ranked variant (the
+/// first one on a tie).
+struct Folding {
+    /// The channel each group shows, in group order.
+    order: Vec<Entry>,
+    /// Groups of more than one variant: shown entry -> (members in provider
+    /// order, whether the folded channel declares 4K).
+    groups: HashMap<(u32, u32), (Vec<Entry>, bool)>,
+}
+
+fn fold(sources: &[&SourceFacets]) -> Folding {
+    let mut index: HashMap<&str, usize> = HashMap::new();
+    let mut groups: Vec<Vec<Entry>> = Vec::new();
+    for (source, facets) in sources.iter().enumerate() {
+        for (row, facet) in facets.rows.iter().enumerate() {
+            let entry = Entry {
+                source: source as u32,
+                row: row as u32,
+            };
+            match facet.fold_key.as_deref() {
+                Some(key) => match index.get(key) {
+                    Some(&group) => groups[group].push(entry),
+                    None => {
+                        index.insert(key, groups.len());
+                        groups.push(vec![entry]);
+                    }
+                },
+                None => groups.push(vec![entry]),
+            }
+        }
+    }
+    let row = |entry: &Entry| &sources[entry.source as usize].rows[entry.row as usize];
+    let mut folding = Folding {
+        order: Vec::with_capacity(groups.len()),
+        groups: HashMap::new(),
+    };
+    for members in groups {
+        let mut primary = members[0];
+        for member in &members[1..] {
+            if row(member).fold_rank > row(&primary).fold_rank {
+                primary = *member;
+            }
+        }
+        folding.order.push(primary);
+        if members.len() > 1 {
+            let ultra_hd = row(&primary).flags & FLAG_TITLE_UHD != 0
+                || members.iter().any(|m| row(m).flags & FLAG_BADGE_UHD != 0);
+            folding
+                .groups
+                .insert((primary.source, primary.row), (members, ultra_hd));
+        }
+    }
+    folding
+}
+
 struct Context<'a> {
     sources: &'a [&'a SourceFacets],
+    folding: Option<Folding>,
     query: &'a CatalogQuery,
     categories: Vec<CategoryFacts>,
     favorites: HashSet<&'a str>,
@@ -186,6 +252,7 @@ impl<'a> Context<'a> {
             .collect();
         Context {
             sources,
+            folding: query.fold.then(|| fold(sources)),
             query,
             categories,
             favorites: query.favorite_ids.iter().map(String::as_str).collect(),
@@ -211,10 +278,17 @@ impl<'a> Context<'a> {
 
     fn is_ultra_hd(&self, entry: Entry) -> bool {
         let row = self.row(entry);
-        match self.query.ultra_hd.get(&*row.id) {
-            Some(verified) => *verified,
-            None => row.flags & FLAG_ULTRA_HD != 0,
+        if let Some(verified) = self.query.ultra_hd.get(&*row.id) {
+            return *verified;
         }
+        if let Some((_, ultra_hd)) = self
+            .folding
+            .as_ref()
+            .and_then(|folding| folding.groups.get(&(entry.source, entry.row)))
+        {
+            return *ultra_hd;
+        }
+        row.flags & FLAG_ULTRA_HD != 0
     }
 
     /// `effectiveItemRating`.
@@ -240,16 +314,21 @@ impl<'a> Context<'a> {
         mask
     }
 
-    fn all(&self) -> impl Iterator<Item = Entry> + '_ {
-        self.sources
-            .iter()
-            .enumerate()
-            .flat_map(|(source, facets)| {
-                (0..facets.rows.len() as u32).map(move |row| Entry {
-                    source: source as u32,
-                    row,
-                })
-            })
+    fn all(&self) -> Box<dyn Iterator<Item = Entry> + '_> {
+        if let Some(folding) = &self.folding {
+            return Box::new(folding.order.iter().copied());
+        }
+        Box::new(
+            self.sources
+                .iter()
+                .enumerate()
+                .flat_map(|(source, facets)| {
+                    (0..facets.rows.len() as u32).map(move |row| Entry {
+                        source: source as u32,
+                        row,
+                    })
+                }),
+        )
     }
 
     /// `filterItemsBySmartCategory`.
@@ -420,38 +499,39 @@ pub(crate) fn rating_head(
         .collect()
 }
 
-/// The category sidebar's counts.
+/// The category sidebar's counts, over the channels as shown (folded when
+/// folding is on).
 pub(crate) fn stats(sources: &[&SourceFacets], query: &CatalogQuery) -> CatalogStats {
     let context = Context::new(sources, query, false);
     let mut stats = CatalogStats::default();
-    for (position, source) in sources.iter().enumerate() {
-        let mut per_category = vec![0u32; source.categories.len()];
-        for (index, row) in source.rows.iter().enumerate() {
-            let entry = Entry {
-                source: position as u32,
-                row: index as u32,
-            };
-            if let Some(category) = row.category {
-                per_category[category as usize] += 1;
-            }
-            if context.is_hidden(entry) {
-                continue;
-            }
-            stats.visible_total += 1;
-            if context.favorites.contains(&*row.id) {
-                stats.favorites += 1;
-            }
-            if row.has_added {
-                stats.recent += 1;
-            }
-            if row.rating.unwrap_or(0.0) >= TOP_RATED_MIN_RATING {
-                stats.top_rated += 1;
-            }
-            if context.is_ultra_hd(entry) {
-                stats.four_k += 1;
-            }
+    let mut per_category: Vec<Vec<u32>> = sources
+        .iter()
+        .map(|source| vec![0u32; source.categories.len()])
+        .collect();
+    for entry in context.all() {
+        let row = context.row(entry);
+        if let Some(category) = row.category {
+            per_category[entry.source as usize][category as usize] += 1;
         }
-        for (category, count) in per_category.into_iter().enumerate() {
+        if context.is_hidden(entry) {
+            continue;
+        }
+        stats.visible_total += 1;
+        if context.favorites.contains(&*row.id) {
+            stats.favorites += 1;
+        }
+        if row.has_added {
+            stats.recent += 1;
+        }
+        if row.rating.unwrap_or(0.0) >= TOP_RATED_MIN_RATING {
+            stats.top_rated += 1;
+        }
+        if context.is_ultra_hd(entry) {
+            stats.four_k += 1;
+        }
+    }
+    for (source, counts) in sources.iter().zip(per_category) {
+        for (category, count) in counts.into_iter().enumerate() {
             if count > 0 {
                 *stats
                     .category_counts
@@ -461,6 +541,36 @@ pub(crate) fn stats(sources: &[&SourceFacets], query: &CatalogQuery) -> CatalogS
         }
     }
     stats
+}
+
+/// For folded channels among `keys`: every variant's key, in provider order,
+/// so the frontend can fold them with `foldLiveChannels` itself.
+pub(crate) fn fold_groups(
+    sources: &[&SourceFacets],
+    query: &CatalogQuery,
+    keys: &[u32],
+) -> HashMap<u32, Vec<u32>> {
+    if !query.fold {
+        return HashMap::new();
+    }
+    let context = Context::new(sources, query, false);
+    let Some(folding) = &context.folding else {
+        return HashMap::new();
+    };
+    let wanted: HashSet<u32> = keys.iter().copied().collect();
+    folding
+        .groups
+        .iter()
+        .filter_map(|(&(source, row), (members, _))| {
+            let key = context.key(Entry { source, row });
+            wanted.contains(&key).then(|| {
+                (
+                    key,
+                    members.iter().map(|&member| context.key(member)).collect(),
+                )
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -477,6 +587,8 @@ mod tests {
         flags: u8,
         genres: u16,
         rank: u32,
+        fold_key: Option<&'static str>,
+        fold_rank: u8,
     }
 
     fn title(id: &'static str) -> Title {
@@ -490,6 +602,8 @@ mod tests {
             flags: 0,
             genres: 0,
             rank: 0,
+            fold_key: None,
+            fold_rank: 0,
         }
     }
 
@@ -519,6 +633,8 @@ mod tests {
                     flags: t.flags,
                     genres: t.genres,
                     rank: t.rank,
+                    fold_key: t.fold_key.map(Into::into),
+                    fold_rank: t.fold_rank,
                 }
             })
             .collect();
@@ -819,6 +935,60 @@ mod tests {
         assert_eq!(counted.category_counts.get("s:category:1"), Some(&1));
         assert_eq!(counted.category_counts.get("s:category:2"), Some(&1));
         assert_eq!(counted.category_counts.len(), 2);
+    }
+
+    #[test]
+    fn folds_channel_variants_like_fold_live_channels() {
+        let facets = source(vec![
+            Title {
+                fold_key: Some("c::de::one"),
+                fold_rank: 50,
+                rank: 3,
+                ..title("one-hd")
+            },
+            Title {
+                fold_key: Some("c::de::two"),
+                rank: 1,
+                flags: FLAG_ULTRA_HD,
+                ..title("two")
+            },
+            Title {
+                fold_key: Some("c::de::one"),
+                fold_rank: 90,
+                rank: 2,
+                flags: FLAG_BADGE_UHD,
+                ..title("one-4k")
+            },
+            Title {
+                fold_key: Some("c::de::one"),
+                fold_rank: 90,
+                rank: 0,
+                ..title("one-4k-backup")
+            },
+        ]);
+        let mut q = query("default");
+        q.fold = true;
+        // The group sits where it first appears, shown as its first best variant.
+        assert_eq!(keys(&page(&[&facets], &q)), vec![2, 1]);
+        q.sort = "name-asc".into();
+        assert_eq!(keys(&page(&[&facets], &q)), vec![1, 2]);
+        q.sort = "default".into();
+        q.category = Some("smart:4k".into());
+        // A one-variant group keeps its own 4K claim; a folded one takes its variants'.
+        assert_eq!(keys(&page(&[&facets], &q)), vec![2, 1]);
+        q.ultra_hd.insert("one-4k".into(), false);
+        assert_eq!(keys(&page(&[&facets], &q)), vec![1]);
+        let counted = stats(&[&facets], &q);
+        assert_eq!(counted.visible_total, 2);
+        assert_eq!(counted.category_counts.get("s:category:1"), Some(&2));
+        assert_eq!(
+            fold_groups(&[&facets], &q, &[2, 1]),
+            HashMap::from([(2, vec![0, 2, 3])])
+        );
+        q.fold = false;
+        assert!(fold_groups(&[&facets], &q, &[2]).is_empty());
+        q.category = None;
+        assert_eq!(keys(&page(&[&facets], &q)), vec![0, 1, 2, 3]);
     }
 
     #[test]
