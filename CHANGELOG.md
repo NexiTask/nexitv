@@ -8,6 +8,22 @@ for tagged releases.
 
 ## [Unreleased]
 
+## [0.1.33] - 2026-11-22
+
+### Added
+
+- Filters panel: IMDb quality preset, typeable year dropdowns, and an optional quick genre bar
+- Settings: hide adult titles, quick genre filters, interface zoom, colour themes, Live TV guide toggle
+- layout and card size live behind a bordered "⋯" View options menu, remembered per section
+
+### Changed
+
+- Series has its own clapperboard icon instead of sharing the Live TV one
+
+### Fixed
+
+- IMDb rematch also runs when the catalogue lists change, and the quality floor stands aside until IMDb has matched something
+
 ## [0.1.32] - 2026-11-02
 
 ### Fixed

@@ -1,6 +1,6 @@
 [package]
 name = "nexitv"
-version = "0.1.32"
+version = "0.1.33"
 description = "NexiTV — a modified version of Movena, the cross-platform IPTV streaming app"
 authors = []
 license = "GPL-3.0-or-later"
