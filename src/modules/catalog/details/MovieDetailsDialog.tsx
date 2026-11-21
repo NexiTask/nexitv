@@ -27,6 +27,7 @@ import { getErrorPresentation } from '@/shared/lib/error';
 import type { MediaItem } from '../model/media';
 import type { TitleVariant } from '../data/useTitleVariants';
 import { VersionSwitcher } from './VersionSwitcher';
+import { useImdbFacts } from '../data/useImdbFacts';
 import styles from './MovieDetailsDialog.module.css';
 import { downloadMediaItem } from '@/modules/downloads/public/services/mediaDownload';
 import { M3uMovieDetailsDialog } from './M3uMovieDetailsDialog';
@@ -89,6 +90,7 @@ function XtreamMovieDetailsDialog({
   const removeFavorite = useLibraryStore((state) => state.removeFavorite);
 
   const { data, isLoading, error, isFetching, refetch } = useVodInfo(providerMovieId, sourceId);
+  const imdb = useImdbFacts('vod', movieId);
   const tmdb = useTmdbDetailEnrichment('movie', {
     ...tmdbLookupFor(data?.info.name || movieTitle, data?.info.releaseDate),
     tmdbId: normalizeTmdbId(data?.info.tmdb_id),
@@ -171,6 +173,7 @@ function XtreamMovieDetailsDialog({
   const rating = resolveMediaRating(
     tmdb.rating,
     parseProviderRating(data?.info.rating, data?.info.rating_5based),
+    imdb,
   );
   const duration = enriched?.runtimeMinutes
     ? t('{count} min', { count: number(enriched.runtimeMinutes) })
@@ -248,7 +251,7 @@ function XtreamMovieDetailsDialog({
     >
       {showErrorState ? (
         <div className={styles.errorColumn}>
-          {versions && onSelectVersion && versions.length > 0 && (
+          {versions && onSelectVersion && versions.length > 1 && (
             <VersionSwitcher variants={versions} activeId={movieId} onSelect={onSelectVersion} />
           )}
           <ErrorState

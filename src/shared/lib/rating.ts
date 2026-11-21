@@ -4,13 +4,13 @@
  * an average is worth.
  */
 
-type MediaRatingSource = 'tmdb' | 'provider';
+type MediaRatingSource = 'imdb' | 'tmdb' | 'provider';
 
 export interface MediaRating {
   /** 0–10, rounded to one decimal. */
   value: number;
   source: MediaRatingSource;
-  /** TMDB only: how many votes the average stands on. */
+  /** IMDb and TMDB: how many votes the average stands on. */
   voteCount?: number | undefined;
 }
 
@@ -114,7 +114,13 @@ function tmdbRating(voteAverage: number | null, voteCount: number): MediaRating 
 export function resolveMediaRating(
   tmdb: TmdbRatingLookup,
   providerRating: number | undefined,
+  imdb?: { rating: number | null; votes: number | null } | null | undefined,
 ): MediaRating | null {
+  // The catalogue's IMDb match is the rating every list sorts and filters by,
+  // so the details sheet says the same number.
+  if (imdb && imdb.rating !== null && imdb.rating > 0) {
+    return { value: roundToTenth(imdb.rating), source: 'imdb', voteCount: imdb.votes ?? 0 };
+  }
   if (tmdb.status === 'matched') return tmdbRating(tmdb.voteAverage, tmdb.voteCount) ?? null;
   if (tmdb.status === 'pending' || providerRating === undefined) return null;
   return { value: providerRating, source: 'provider' };

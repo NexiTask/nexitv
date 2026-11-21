@@ -8,6 +8,10 @@ export interface MediaItem {
   tags?: string[] | undefined;
   country?: string | null | undefined;
   rating?: number | undefined;
+  /** The IMDb pipeline's match (catalogue index pages only). */
+  imdbId?: string | undefined;
+  imdbRating?: number | undefined;
+  imdbVotes?: number | undefined;
   progress?: number | undefined;
   progressPercentage?: number | undefined;
   isFavorite?: boolean | undefined;

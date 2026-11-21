@@ -905,6 +905,22 @@ pub struct KeyRow {
     /// A folded channel's variants (itself included), in provider order.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     group: Vec<KeyRow>,
+    /// The IMDb pipeline's match, when the title has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    imdb: Option<ImdbFacts>,
+}
+
+/// What the cards and the details sheet show of a title's IMDb match.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImdbFacts {
+    id: String,
+    rating: Option<f64>,
+    votes: Option<i64>,
+}
+
+fn imdb_facts(id: Option<String>, rating: Option<f64>, votes: Option<i64>) -> Option<ImdbFacts> {
+    id.map(|id| ImdbFacts { id, rating, votes })
 }
 
 /// The raw rows for `keys`, or `None` when any source changed since `token`.
@@ -929,36 +945,51 @@ fn rows_for_keys(
             return Ok(None);
         }
         let mut statement = transaction.prepare_cached(
-            "SELECT raw FROM items WHERE source_id = ?1 AND kind = ?2 AND ord = ?3",
+            "SELECT raw, imdb_tconst, imdb_rating, imdb_votes FROM items
+             WHERE source_id = ?1 AND kind = ?2 AND ord = ?3",
         )?;
-        let mut fetch = |key: u32| -> rusqlite::Result<Option<Box<RawValue>>> {
-            let position = (key >> ORD_BITS) as usize;
-            let ord = key & ((1 << ORD_BITS) - 1);
-            let Some(source) = sources.get(position) else {
-                return Ok(None);
+        type Fetched = (Box<RawValue>, Option<ImdbFacts>);
+        let mut fetch =
+            |key: u32| -> rusqlite::Result<Option<Fetched>> {
+                let position = (key >> ORD_BITS) as usize;
+                let ord = key & ((1 << ORD_BITS) - 1);
+                let Some(source) = sources.get(position) else {
+                    return Ok(None);
+                };
+                let found = statement
+                    .query_row(params![source.source_id, kind, ord], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            imdb_facts(row.get(1)?, row.get(2)?, row.get(3)?),
+                        ))
+                    })
+                    .optional()?;
+                Ok(found
+                    .and_then(|(raw, imdb)| RawValue::from_string(raw).ok().map(|raw| (raw, imdb))))
             };
-            let raw: Option<String> = statement
-                .query_row(params![source.source_id, kind, ord], |row| row.get(0))
-                .optional()?;
-            Ok(raw.and_then(|raw| RawValue::from_string(raw).ok()))
-        };
         let mut rows = Vec::with_capacity(keys.len());
         for &key in keys {
-            let Some(raw) = fetch(key)? else {
+            let Some((raw, imdb)) = fetch(key)? else {
                 return Ok(None);
             };
             let mut group = Vec::new();
             for &member in groups.get(&key).map(Vec::as_slice).unwrap_or_default() {
-                let Some(raw) = fetch(member)? else {
+                let Some((raw, imdb)) = fetch(member)? else {
                     return Ok(None);
                 };
                 group.push(KeyRow {
                     key: member,
                     raw,
                     group: Vec::new(),
+                    imdb,
                 });
             }
-            rows.push(KeyRow { key, raw, group });
+            rows.push(KeyRow {
+                key,
+                raw,
+                group,
+                imdb,
+            });
         }
         drop(statement);
         transaction.finish()?;
@@ -1134,9 +1165,32 @@ pub fn catalog_index_page_rows(
     )
 }
 
+/// The IMDb match of one title, for the details sheet; `None` when the
+/// pipeline has not matched it.
+#[tauri::command(async)]
+pub fn catalog_index_imdb(
+    app: tauri::AppHandle,
+    kind: String,
+    item_id: String,
+) -> Result<Option<ImdbFacts>, String> {
+    validate_page_kind(&kind)?;
+    with_reader(&app, |connection| {
+        Ok(connection
+            .query_row(
+                "SELECT imdb_tconst, imdb_rating, imdb_votes FROM items
+                 WHERE kind = ?1 AND f_id = ?2 AND imdb_tconst IS NOT NULL",
+                params![kind, item_id],
+                |row| Ok(imdb_facts(row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?
+            .flatten())
+    })
+}
+
 /// The provider variants behind one grouped card: the rows sharing the title's
-/// IMDb identity, as (source id, raw JSON) pairs, without the row itself.
-/// Empty when the title has no IMDb identity.
+/// IMDb identity, as (source id, raw JSON) pairs, the row itself included so
+/// the version picker can always show and return to it. Empty when the title
+/// has no IMDb identity.
 #[tauri::command(async)]
 pub fn catalog_index_variants(
     app: tauri::AppHandle,
@@ -1157,11 +1211,11 @@ pub fn catalog_index_variants(
         };
         let mut statement = connection.prepare(
             "SELECT source_id, raw FROM items
-             WHERE kind = ?1 AND imdb_tconst = ?2 AND f_id IS NOT NULL AND f_id != ?3
+             WHERE kind = ?1 AND imdb_tconst = ?2 AND f_id IS NOT NULL
              ORDER BY source_id, ord",
         )?;
         let rows = statement
-            .query_map(params![kind, identity, item_id], |row| {
+            .query_map(params![kind, identity], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;

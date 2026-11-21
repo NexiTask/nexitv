@@ -12,10 +12,10 @@ export interface VersionSwitcherProps {
 }
 
 /** The "N versions" row on a detail sheet: the provider variants behind one
- * grouped card. Hidden when the title has no other variants. */
+ * grouped card, the open one included. Hidden when there is only one. */
 export function VersionSwitcher({ variants, activeId, onSelect }: VersionSwitcherProps) {
   const { t, tn, number, language } = useI18n();
-  if (variants.length === 0) return null;
+  if (variants.length < 2) return null;
 
   // Labels say what sets the copies apart: the title's own tags ("4K", "FHD")
   // plus the country its title or category declares. "4K" and "EN" repeat
@@ -39,8 +39,8 @@ export function VersionSwitcher({ variants, activeId, onSelect }: VersionSwitche
   return (
     <div className={styles.versionRow}>
       <span className={styles.versionLabel}>
-        {tn('{count} version', '{count} versions', variants.length + 1, {
-          count: number(variants.length + 1),
+        {tn('{count} version', '{count} versions', variants.length, {
+          count: number(variants.length),
         })}
       </span>
       <Select

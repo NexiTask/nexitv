@@ -369,6 +369,8 @@ export const PL_MESSAGES: Record<string, string> = {
   Rating: 'Ocena',
   'Rating {rating}': 'Ocena {rating}',
   Provider: 'Dostawca',
+  'IMDb rating {rating} out of 10 from {count} vote': 'Ocena IMDb {rating} na 10 z {count} głosu',
+  'IMDb rating {rating} out of 10 from {count} votes': 'Ocena IMDb {rating} na 10 z {count} głosów',
   'TMDB rating {rating} out of 10 from {count} vote': 'Ocena TMDB {rating} na 10 z {count} głosu',
   'TMDB rating {rating} out of 10 from {count} votes': 'Ocena TMDB {rating} na 10 z {count} głosów',
   'Provider rating {rating} out of 10, not checked against TMDB':

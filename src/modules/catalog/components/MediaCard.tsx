@@ -95,7 +95,7 @@ function MediaCardComponent({
   isLiveTv = false,
   showTypeInList = true,
 }: MediaCardProps) {
-  const { t, language, number } = useI18n();
+  const { t, tn, language, number } = useI18n();
   const { handleMediaCardContextMenu } = useMediaContextMenus();
   const [imgError, setImgError] = useState(() => isPosterHostDead(item.posterUrl));
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -214,6 +214,10 @@ function MediaCardComponent({
 
   const isLiveTvGrid = isLiveTv && viewMode === 'grid';
   const showPosterFooter = viewMode === 'grid';
+  const imdbRating =
+    !isLive && item.imdbRating !== undefined && item.imdbRating > 0
+      ? number(item.imdbRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+      : null;
   const numericRating =
     item.rating !== undefined && !isNaN(Number(item.rating)) && Number(item.rating) > 0
       ? number(Number(item.rating), { minimumFractionDigits: 1, maximumFractionDigits: 1 })
@@ -324,10 +328,30 @@ function MediaCardComponent({
               </h3>
             </div>
 
-            {isResumeItem && !isLive && (
+            {isResumeItem && !isLive ? (
               <div className={styles.posterMeta}>
                 <span className={styles.posterContext}>{cardContext}</span>
               </div>
+            ) : (
+              imdbRating && (
+                <div
+                  className={styles.posterMeta}
+                  title={tn(
+                    'IMDb rating {rating} out of 10 from {count} vote',
+                    'IMDb rating {rating} out of 10 from {count} votes',
+                    item.imdbVotes ?? 0,
+                    { rating: imdbRating, count: number(item.imdbVotes ?? 0) },
+                  )}
+                >
+                  <span className={styles.imdbBadge}>IMDb</span>
+                  <span className={styles.imdbRating}>{imdbRating}</span>
+                  {item.imdbVotes ? (
+                    <span className={styles.imdbVotes}>
+                      {number(item.imdbVotes, { notation: 'compact' })}
+                    </span>
+                  ) : null}
+                </div>
+              )
             )}
           </div>
         )}
@@ -433,10 +457,14 @@ function MediaCardComponent({
                     <span className={styles.listSecondaryItem}>
                       {t(item.type === 'series' ? 'Series' : 'Movie')}
                     </span>
-                    {numericRating && (
-                      <span className={styles.listSecondaryItem}>
-                        {t('Rating {rating}', { rating: numericRating })}
-                      </span>
+                    {imdbRating ? (
+                      <span className={styles.listSecondaryItem}>IMDb {imdbRating}</span>
+                    ) : (
+                      numericRating && (
+                        <span className={styles.listSecondaryItem}>
+                          {t('Rating {rating}', { rating: numericRating })}
+                        </span>
+                      )
                     )}
                   </>
                 )}

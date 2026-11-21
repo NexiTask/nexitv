@@ -20,6 +20,7 @@ import type { XtreamEpisode } from '@/modules/sources/public/data/xtreamClient';
 import type { MediaItem } from '../model/media';
 import type { TitleVariant } from '../data/useTitleVariants';
 import { VersionSwitcher } from './VersionSwitcher';
+import { useImdbFacts } from '../data/useImdbFacts';
 import { useSeriesInfo } from '../data/useDetails';
 import { usePlayerStore } from '@/modules/playback/public/store/usePlayerStore';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
@@ -127,6 +128,7 @@ function XtreamSeriesDetailsDialog({
   const positionedEpisodeRef = useRef(false);
 
   const { data, isLoading, error, isFetching, refetch } = useSeriesInfo(providerSeriesId, sourceId);
+  const imdb = useImdbFacts('series', seriesId);
   const tmdb = useTmdbDetailEnrichment('tv', {
     ...tmdbLookupFor(data?.info?.name || seriesTitle, data?.info?.releaseDate),
     tmdbId: normalizeTmdbId(data?.info?.tmdb ?? data?.info?.tmdb_id),
@@ -203,6 +205,7 @@ function XtreamSeriesDetailsDialog({
   const rating = resolveMediaRating(
     tmdb.rating,
     parseProviderRating(data?.info?.rating, data?.info?.rating_5based),
+    imdb,
   );
   const hasMoreDetails = plot.length > 280 || castList.length > 3;
   const resumeHint = [historyItem?.episodeTitle, remainingLabel].filter(Boolean).join(' · ');
@@ -396,7 +399,7 @@ function XtreamSeriesDetailsDialog({
     >
       {showErrorState ? (
         <div className={styles.errorColumn}>
-          {versions && onSelectVersion && versions.length > 0 && (
+          {versions && onSelectVersion && versions.length > 1 && (
             <VersionSwitcher variants={versions} activeId={seriesId} onSelect={onSelectVersion} />
           )}
           <ErrorState

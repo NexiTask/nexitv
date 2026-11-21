@@ -72,6 +72,17 @@ describe('resolveMediaRating', () => {
     ).toBeNull();
   });
 
+  it('prefers the catalogue IMDb match over TMDB and the provider', () => {
+    const tmdb = { status: 'matched' as const, voteAverage: 8.1, voteCount: 900 };
+    expect(resolveMediaRating(tmdb, 6, { rating: 9.24, votes: 2_100_000 })).toEqual({
+      value: 9.2,
+      source: 'imdb',
+      voteCount: 2_100_000,
+    });
+    // A match without a rating falls through to the usual rules.
+    expect(resolveMediaRating(tmdb, 6, { rating: null, votes: null })?.source).toBe('tmdb');
+  });
+
   it('holds back while TMDB is still answering', () => {
     expect(resolveMediaRating({ status: 'pending' }, 7.1)).toBeNull();
   });

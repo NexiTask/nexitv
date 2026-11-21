@@ -150,3 +150,17 @@ describe('MediaCard poster on a hanging host', () => {
     expect(slow.container.querySelector('img')).not.toBeNull();
   });
 });
+
+describe('MediaCard IMDb rating', () => {
+  it('shows the IMDb rating and votes under a movie title', () => {
+    renderCard({ ...movieItem, imdbRating: 8.8, imdbVotes: 2_600_000 });
+    expect(screen.getByText('IMDb')).toBeTruthy();
+    expect(screen.getByText('8.8')).toBeTruthy();
+    expect(screen.getByText('2.6M')).toBeTruthy();
+  });
+
+  it('shows no IMDb line for an unmatched title', () => {
+    renderCard(movieItem);
+    expect(screen.queryByText('IMDb')).toBeNull();
+  });
+});

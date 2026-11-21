@@ -373,6 +373,10 @@ export const FR_MESSAGES: Record<string, string> = {
   Rating: 'Note',
   'Rating {rating}': 'Notation {rating}',
   Provider: 'Fournisseur',
+  'IMDb rating {rating} out of 10 from {count} vote':
+    'Note IMDb {rating} sur 10 d’après {count} vote',
+  'IMDb rating {rating} out of 10 from {count} votes':
+    'Note IMDb {rating} sur 10 d’après {count} votes',
   'TMDB rating {rating} out of 10 from {count} vote':
     'Note TMDB {rating} sur 10 d’après {count} vote',
   'TMDB rating {rating} out of 10 from {count} votes':

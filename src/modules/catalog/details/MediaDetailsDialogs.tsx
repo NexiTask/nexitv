@@ -45,13 +45,15 @@ export function MediaDetailsDialogs({
       ? seriesVariant.item
       : selectedSeries;
 
+  // The list belongs to the clicked card, not to the copy on screen: picking
+  // a version must not reshuffle the picker it was picked from.
   const movieVersions = useTitleVariants(
-    activeMovie?.type === 'vod' ? 'vod' : undefined,
-    activeMovie?.id,
+    selectedMovie?.type === 'vod' ? 'vod' : undefined,
+    selectedMovie?.id,
   );
   const seriesVersions = useTitleVariants(
-    activeSeries?.type === 'series' ? 'series' : undefined,
-    activeSeries?.id,
+    selectedSeries?.type === 'series' ? 'series' : undefined,
+    selectedSeries?.id,
   );
 
   // When one variant's provider call fails, the next untried one takes over

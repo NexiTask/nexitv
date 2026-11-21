@@ -10,6 +10,7 @@ import {
   type CatalogPageSource,
   type CatalogPageStats,
   type CatalogSearchResult,
+  type ImdbFacts,
 } from '@/platform/tauri';
 import { perfAsync, perfSync } from '@/platform/perf';
 import {
@@ -183,6 +184,15 @@ function keyOrd(key: number): number {
  * its provider-list position. A folded channel arrives with all its variants
  * and is folded here with `foldLiveChannels`, exactly as the full catalogue is.
  */
+function withImdb(item: CatalogItem, imdb: ImdbFacts): CatalogItem {
+  return {
+    ...item,
+    imdbId: imdb.id,
+    ...(imdb.rating !== null ? { imdbRating: imdb.rating } : {}),
+    ...(imdb.votes !== null ? { imdbVotes: imdb.votes } : {}),
+  };
+}
+
 export function mapKeyRows(
   type: CatalogPageKind,
   sources: readonly EnabledXtreamSource[],
@@ -206,7 +216,10 @@ export function mapKeyRows(
       list.map((row) => row.raw),
       list.map((row) => keyOrd(row.key)),
     );
-    list.forEach((row, index) => mappedByKey.set(row.key, mapped[index]!));
+    list.forEach((row, index) => {
+      const item = mapped[index]!;
+      mappedByKey.set(row.key, row.imdb ? withImdb(item, row.imdb) : item);
+    });
   }
   const items = new Map<number, CatalogItem>();
   for (const row of rows) {

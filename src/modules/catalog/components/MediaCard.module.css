@@ -260,6 +260,28 @@
   flex-shrink: 1;
 }
 
+/* The IMDb rating under a movie/series title: the number the pages sort by. */
+.imdbBadge {
+  padding: 0 var(--space-0-75);
+  border-radius: var(--radius-xs);
+  background: #f5c518;
+  color: #000;
+  font-size: var(--font-size-micro);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.4;
+}
+
+.imdbRating {
+  color: var(--text-media-primary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.imdbVotes {
+  color: var(--text-media-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
 .posterContext {
   display: block;
   min-width: 0;

@@ -137,11 +137,19 @@ export function decodeCatalogSearch(buffer: ArrayBuffer): CatalogSearchResult {
   };
 }
 
+/** A title's IMDb match (metadata/imdb.rs). */
+export interface ImdbFacts {
+  id: string;
+  rating: number | null;
+  votes: number | null;
+}
+
 export interface CatalogKeyRow {
   key: number;
   raw: unknown;
   /** A folded channel's variants (itself included), in provider order. */
   group?: CatalogKeyRow[] | undefined;
+  imdb?: ImdbFacts | undefined;
 }
 
 export interface CatalogPageResult {
@@ -411,6 +419,10 @@ export const tauriApi = {
   /** The provider variants behind one grouped card, as (source id, raw JSON) pairs. */
   catalogIndexVariants: (kind: CatalogPageKind, itemId: string) =>
     invoke<[string, string][]>('catalog_index_variants', { kind, itemId }),
+
+  /** One title's IMDb match for the details sheet, or null when unmatched. */
+  catalogIndexImdb: (kind: CatalogPageKind, itemId: string) =>
+    invoke<ImdbFacts | null>('catalog_index_imdb', { kind, itemId }),
 
   /** The category sidebar's counts, or null while the index cannot serve the page. */
   catalogIndexPageStats: (

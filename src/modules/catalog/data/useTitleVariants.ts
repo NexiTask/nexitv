@@ -15,9 +15,9 @@ export interface TitleVariant {
 }
 
 /**
- * The provider variants behind one grouped card, mapped with the catalogue's
- * own mapping. Empty while the title has no IMDb identity, or none of the
- * variant sources is enabled.
+ * The provider variants behind one grouped card (the card's own copy
+ * included), mapped with the catalogue's own mapping. Empty while the title
+ * has no IMDb identity, or none of the variant sources is enabled.
  */
 export function useTitleVariants(
   type: 'vod' | 'series' | undefined,

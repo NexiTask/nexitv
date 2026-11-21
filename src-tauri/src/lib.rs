@@ -61,6 +61,7 @@ pub fn run() {
             sources::catalog_index::catalog_index_page,
             sources::catalog_index::catalog_index_page_rows,
             sources::catalog_index::catalog_index_variants,
+            sources::catalog_index::catalog_index_imdb,
             sources::catalog_index::catalog_index_page_stats,
             sources::catalog_index::catalog_index_rating_head,
             sources::catalog_index::catalog_index_facet_batch,

@@ -370,6 +370,10 @@ export const IT_MESSAGES: Record<string, string> = {
   Rating: 'Valutazione',
   'Rating {rating}': 'Valutazione {rating}',
   Provider: 'Fornitore',
+  'IMDb rating {rating} out of 10 from {count} vote':
+    'Valutazione IMDb {rating} su 10 da {count} voto',
+  'IMDb rating {rating} out of 10 from {count} votes':
+    'Valutazione IMDb {rating} su 10 da {count} voti',
   'TMDB rating {rating} out of 10 from {count} vote':
     'Valutazione TMDB {rating} su 10 da {count} voto',
   'TMDB rating {rating} out of 10 from {count} votes':

@@ -370,6 +370,10 @@ export const NL_MESSAGES: Record<string, string> = {
   Rating: 'Beoordeling',
   'Rating {rating}': 'Beoordeling {rating}',
   Provider: 'Aanbieder',
+  'IMDb rating {rating} out of 10 from {count} vote':
+    'IMDb-beoordeling {rating} van 10 op basis van {count} stem',
+  'IMDb rating {rating} out of 10 from {count} votes':
+    'IMDb-beoordeling {rating} van 10 op basis van {count} stemmen',
   'TMDB rating {rating} out of 10 from {count} vote':
     'TMDB-beoordeling {rating} van 10 op basis van {count} stem',
   'TMDB rating {rating} out of 10 from {count} votes':
