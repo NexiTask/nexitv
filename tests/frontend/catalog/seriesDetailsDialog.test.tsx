@@ -170,6 +170,47 @@ describe('SeriesDetailsDialog Component', () => {
     expect(screen.getByText("Cat's in the Bag...")).toBeTruthy();
   });
 
+  it('marks a whole season watched and moves Continue Watching on', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(useDetailsModule, 'useSeriesInfo').mockReturnValue({
+      data: mockSeriesData as any,
+      isLoading: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+    useLibraryStore.setState({
+      history: [
+        {
+          id: 'series-123',
+          title: 'Breaking Bad',
+          posterUrl: '',
+          type: 'series',
+          progressPercentage: 40,
+          lastWatchedAt: 1,
+          currentTime: 900,
+          duration: 2700,
+          episodeId: 'ep-101',
+          seasonNum: '1',
+          episodeNum: 1,
+        },
+      ],
+    });
+
+    renderWithRouter(<SeriesDetailsDialog {...defaultProps} />);
+    await user.click(screen.getByRole('button', { name: 'Mark season watched' }));
+
+    expect(useLibraryStore.getState().watched).toEqual(['ep-101', 'ep-102']);
+    expect(useLibraryStore.getState().history[0]).toMatchObject({
+      episodeId: 'ep-201',
+      seasonNum: '2',
+      currentTime: 0,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Mark season unwatched' }));
+    expect(useLibraryStore.getState().watched).toEqual([]);
+  });
+
   it('enriches a series with localized TMDB artwork and synopsis when enabled', async () => {
     useSettingsStore.getState().updateSetting('tmdbApiKey', 'test-key');
     tmdb.searchTmdbTitles.mockResolvedValue({ results: [breakingBadOnTmdb] });

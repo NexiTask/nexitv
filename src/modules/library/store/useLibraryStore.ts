@@ -165,6 +165,19 @@ interface LibraryState {
 
   toggleWatched: (id: string) => void;
   isWatched: (id: string) => boolean;
+  /** Marks many items (a season's episodes) at once, with one notice. */
+  setWatched: (ids: readonly string[], watched: boolean) => void;
+  /** Points a series' Continue Watching entry at the episode to watch next,
+   * or drops it when there is none (the show is finished). */
+  advanceSeriesHistory: (
+    seriesId: string,
+    next: {
+      id: string;
+      seasonNum: string | number;
+      episodeNum: string | number;
+      episodeTitle?: string | undefined;
+    } | null,
+  ) => void;
 
   createCollection: (name: string) => void;
   renameCollection: (id: string, newName: string) => void;
@@ -296,6 +309,54 @@ export const useLibraryStore = create<LibraryState>()(
       },
 
       isWatched: (id) => (get().watched || []).includes(id),
+
+      setWatched: (ids, watched) => {
+        const targets = new Set(ids);
+        if (targets.size === 0) return;
+        set((state) => {
+          const current = state.watched || [];
+          return {
+            watched: watched
+              ? [...current, ...[...targets].filter((id) => !current.includes(id))]
+              : current.filter((id) => !targets.has(id)),
+          };
+        });
+        notify.info(
+          watched ? 'Marked as Watched' : 'Marked as Unwatched',
+          undefined,
+          undefined,
+          undefined,
+          'library',
+        );
+        debugLog.info('library', `Set watched status`, { count: targets.size, watched });
+      },
+
+      advanceSeriesHistory: (seriesId, next) =>
+        set((state) => {
+          const entry = state.history.find((h) => h.id === seriesId);
+          if (!entry) return state;
+          const others = state.history.filter((h) => h.id !== seriesId);
+          if (!next) return { history: others };
+          return {
+            history: [
+              {
+                ...entry,
+                progressPercentage: 0,
+                lastWatchedAt: Date.now(),
+                currentTime: 0,
+                duration: 0,
+                seasonNum: next.seasonNum,
+                episodeNum: next.episodeNum,
+                episodeId: next.id,
+                episodeTitle: next.episodeTitle,
+                // The stored stream was the old episode's: quick play and the
+                // sheet resolve the new one from the series' episode list.
+                streamUrl: undefined,
+              },
+              ...others,
+            ],
+          };
+        }),
 
       createCollection: (name) => {
         const newCol = { id: crypto.randomUUID(), name, items: [] };

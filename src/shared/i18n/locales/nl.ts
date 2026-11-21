@@ -417,6 +417,8 @@ export const NL_MESSAGES: Record<string, string> = {
   'Card size': 'Kaartgrootte',
   'Smaller cards': 'Kleinere kaarten',
   'Larger cards': 'Grotere kaarten',
+  'Mark season watched': 'Seizoen als bekeken markeren',
+  'Mark season unwatched': 'Seizoen als niet bekeken markeren',
   'Content Filter': 'Inhoudsfilter',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Laat standaard inhoud weg uit Films en Series. Een titel met een niet-gefilterde kopie toont nog steeds die kopie.',

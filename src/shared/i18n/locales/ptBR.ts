@@ -417,6 +417,8 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   'Card size': 'Tamanho dos cartões',
   'Smaller cards': 'Cartões menores',
   'Larger cards': 'Cartões maiores',
+  'Mark season watched': 'Marcar temporada como assistida',
+  'Mark season unwatched': 'Marcar temporada como não assistida',
   'Content Filter': 'Filtro de conteúdo',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Deixa conteúdo de fora de Filmes e Séries por padrão. Um título com uma cópia não filtrada ainda mostra essa cópia.',

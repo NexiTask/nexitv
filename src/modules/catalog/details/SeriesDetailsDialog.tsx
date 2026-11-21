@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, useMemo, useRef } from 'react';
 import {
   CheckCircle2,
+  CircleOff,
   Clock,
   Download,
   Heart,
@@ -386,6 +387,52 @@ function XtreamSeriesDetailsDialog({
     downloadSeriesSeason(`Season ${selectedSeason}`, episodesToDownload);
   };
 
+  // The selected season's episodes as the library knows them (watched ids).
+  const seasonEpisodeIds = useMemo(
+    () =>
+      currentEpisodes.map((episode) =>
+        resolvedSourceId
+          ? xtreamItemId(resolvedSourceId, 'episode', episode.id)
+          : episode.id.toString(),
+      ),
+    [currentEpisodes, resolvedSourceId],
+  );
+  const seasonWatched =
+    seasonEpisodeIds.length > 0 && seasonEpisodeIds.every((id) => watchedIds.includes(id));
+
+  const handleToggleSeasonWatched = () => {
+    const library = useLibraryStore.getState();
+    library.setWatched(seasonEpisodeIds, !seasonWatched);
+    if (seasonWatched || !historyItem || !data?.episodes) return;
+    // Continue Watching pointed into this season: move it on to the first
+    // episode of the next season, or let the show go when this was the last.
+    if (historyItem.seasonNum?.toString() !== selectedSeason) return;
+    const nextSeason = seasons.find(
+      (season) =>
+        Number(season) > Number(selectedSeason) && (data.episodes[season]?.length ?? 0) > 0,
+    );
+    const nextEpisode = nextSeason
+      ? [...(data.episodes[nextSeason] ?? [])].sort(
+          (left, right) => Number(left.episode_num) - Number(right.episode_num),
+        )[0]
+      : undefined;
+    library.advanceSeriesHistory(
+      seriesId,
+      nextSeason && nextEpisode
+        ? {
+            id: nextEpisode.id.toString(),
+            seasonNum: nextSeason,
+            episodeNum: nextEpisode.episode_num,
+            episodeTitle: parseEpisodeTitle(nextEpisode.title, {
+              seriesTitle: cleanSeriesTitle,
+              seasonNum: nextSeason,
+              episodeNum: nextEpisode.episode_num,
+            }).cleanTitle,
+          }
+        : null,
+    );
+  };
+
   const handleResumeClick = () => {
     if (!data?.episodes || !historyItem) return;
     const seasonKey = historyItem.seasonNum?.toString() || selectedSeason;
@@ -571,14 +618,27 @@ function XtreamSeriesDetailsDialog({
                   ) : null}
 
                   {currentEpisodes.length > 0 && (
-                    <button
-                      type="button"
-                      className={styles.downloadSeasonBtn}
-                      onClick={handleDownloadSeason}
-                    >
-                      <Download size={14} />
-                      <span>{t('Download Season')}</span>
-                    </button>
+                    <div className={styles.seasonActions}>
+                      <button
+                        type="button"
+                        className={styles.downloadSeasonBtn}
+                        onClick={handleToggleSeasonWatched}
+                        aria-pressed={seasonWatched}
+                      >
+                        {seasonWatched ? <CircleOff size={14} /> : <CheckCircle2 size={14} />}
+                        <span>
+                          {t(seasonWatched ? 'Mark season unwatched' : 'Mark season watched')}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.downloadSeasonBtn}
+                        onClick={handleDownloadSeason}
+                      >
+                        <Download size={14} />
+                        <span>{t('Download Season')}</span>
+                      </button>
+                    </div>
                   )}
                 </div>
 
