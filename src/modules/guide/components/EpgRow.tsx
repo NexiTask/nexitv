@@ -5,7 +5,6 @@ import {
   parseLiveChannelTitle,
   type CustomTitleRule,
 } from '@/modules/catalog/public/lib/titleParser';
-import { getErrorMessage } from '@/shared/lib/error';
 import { useI18n } from '@/shared/i18n/i18n';
 import { useChannelEpg, type EpgProgramme } from '../data/useEpg';
 import { lookupXmltvChannel, type XmltvGuide } from '../data/xmltvClient';
@@ -28,6 +27,7 @@ interface EpgRowProps {
   onSelect: (programme: EpgProgramme) => void;
   onPlay: (channel: CatalogItem) => void;
   onProgrammeEnd: (end: number) => void;
+  onGuideError: (channelId: string, retry: (() => Promise<unknown>) | null) => void;
   requestEnabled: boolean;
   customTitleRules: readonly CustomTitleRule[];
   timelineScrollLeft: number;
@@ -49,6 +49,7 @@ export const EpgRow = memo(function EpgRow({
   onSelect,
   onPlay,
   onProgrammeEnd,
+  onGuideError,
   requestEnabled,
   customTitleRules,
   timelineScrollLeft,
@@ -63,15 +64,22 @@ export const EpgRow = memo(function EpgRow({
     data: fromProvider = [],
     isLoading: providerLoading,
     isError,
-    error,
+    refetch,
     isSuccess: providerResolved,
     canFetch: canFetchProvider,
   } = useChannelEpg(
     channel.sourceItemId || channel.id,
-    requestEnabled && !fromXmltv?.length,
+    requestEnabled && !xmltvLoading && !fromXmltv?.length,
     channel.sourceId,
   );
   const programmes = fromXmltv?.length ? fromXmltv : fromProvider;
+  const guideFailed = isError && programmes.length === 0 && !xmltvLoading;
+
+  useEffect(() => {
+    if (!guideFailed) return;
+    onGuideError(channel.id, refetch);
+    return () => onGuideError(channel.id, null);
+  }, [channel.id, guideFailed, onGuideError, refetch]);
   const isLoading =
     programmes.length === 0 &&
     (providerLoading || xmltvLoading || (canFetchProvider && !providerResolved && !isError));
@@ -121,17 +129,7 @@ export const EpgRow = memo(function EpgRow({
         {isLoading ? (
           <div className={styles.lanePlaceholder} />
         ) : visible.length === 0 ? (
-          <div
-            className={styles.laneEmptyRow}
-            role="status"
-            aria-label={t(isError ? 'Guide unavailable' : 'No guide data')}
-          >
-            {isError && (
-              <span>
-                {getErrorMessage(error, 'Channel guide query failed without an error message.')}
-              </span>
-            )}
-          </div>
+          !guideFailed && <div role="status" aria-label={t('No guide data')} />
         ) : (
           visible.map((programme) => {
             const from = Math.max(programme.start, windowStart);

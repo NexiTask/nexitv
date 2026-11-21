@@ -67,6 +67,12 @@ describe('typed Tauri IPC wrapper', () => {
       { options: { url: 'https://list.test/a.m3u' } },
     ],
     [
+      'xtreamChannelEpgFetch',
+      ['https://guide.test/player_api.php?action=get_simple_data_table', 4000],
+      'xtream_channel_epg_fetch',
+      { url: 'https://guide.test/player_api.php?action=get_simple_data_table', timeoutMs: 4000 },
+    ],
+    [
       'm3uProbeStream',
       [{ url: 'https://stream.test/live', timeoutMs: 5000 }],
       'm3u_probe_stream',

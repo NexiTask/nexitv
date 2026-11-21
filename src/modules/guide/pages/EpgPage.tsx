@@ -107,6 +107,21 @@ export function EpgPage() {
     programme: EpgProgramme;
   } | null>(null);
   const [channelSearchQuery, setChannelSearchQuery] = useState('');
+  const [guideRetries, setGuideRetries] = useState<ReadonlyMap<string, () => Promise<unknown>>>(
+    () => new Map(),
+  );
+  const reportGuideError = useCallback(
+    (channelId: string, retry: (() => Promise<unknown>) | null) => {
+      setGuideRetries((current) => {
+        if (retry ? current.get(channelId) === retry : !current.has(channelId)) return current;
+        const next = new Map(current);
+        if (retry) next.set(channelId, retry);
+        else next.delete(channelId);
+        return next;
+      });
+    },
+    [],
+  );
 
   // Channels come from the catalogue index (folded like the Live page), one
   // group at a time; M3U sources keep the full list in memory.
@@ -579,6 +594,22 @@ export function EpgPage() {
               </div>
             </div>
 
+            {guideRetries.size > 0 && (
+              <div className={styles.guideError}>
+                <span role="status">{t('Guide unavailable')}</span>
+                <button
+                  type="button"
+                  className="uiButton"
+                  data-size="sm"
+                  onClick={() =>
+                    void Promise.allSettled([...guideRetries.values()].map((retry) => retry()))
+                  }
+                >
+                  {t('Retry')}
+                </button>
+              </div>
+            )}
+
             <div
               className={`${styles.scroller} subtle-scrollbar`}
               ref={scrollerRef}
@@ -653,6 +684,7 @@ export function EpgPage() {
                       onSelect={(programme) => setSelected({ channel, programme })}
                       onPlay={playChannel}
                       onProgrammeEnd={reportProgrammeEnd}
+                      onGuideError={reportGuideError}
                       requestEnabled={!rows.isScrolling}
                       customTitleRules={customTitleRules}
                       timelineScrollLeft={timelineViewport.scrollLeft}

@@ -333,6 +333,8 @@ export const tauriApi = {
 
   /** Download a remote M3U outside the webview's CORS boundary. */
   m3uFetch: (options: M3uFetchOptions) => invoke<M3uDocument>('m3u_fetch', { options }),
+  xtreamChannelEpgFetch: (url: string, timeoutMs: number) =>
+    invoke<string>('xtream_channel_epg_fetch', { url, timeoutMs }),
 
   /** Probe a stream outside the webview CORS boundary with its source headers. */
   m3uProbeStream: (options: M3uProbeOptions) =>

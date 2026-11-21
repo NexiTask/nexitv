@@ -169,10 +169,11 @@ pub(crate) async fn download_remote(
     max_bytes: usize,
     resource: &str,
     validators: Option<&HttpValidators>,
+    timeout: Duration,
 ) -> Result<RemoteDownloadResult, String> {
     let url = validate_remote_url(&options.url)?;
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
+        .timeout(timeout)
         .redirect(same_origin_redirect_policy())
         .build()
         .map_err(|_| format!("Could not initialize the {resource} downloader"))?;
@@ -273,6 +274,7 @@ pub(crate) async fn m3u_fetch(
         MAX_M3U_BYTES,
         "playlist",
         cached.as_ref().map(|cache| &cache.validators),
+        Duration::from_secs(30),
     )
     .await?;
     match response {
@@ -298,6 +300,105 @@ pub(crate) async fn m3u_fetch(
             }
             Ok(document)
         }
+    }
+}
+
+fn validate_channel_guide_url(value: &str) -> Result<(), String> {
+    let url = validate_remote_url(value).map_err(|_| "Invalid channel guide URL".to_string())?;
+    let mut actions = url.query_pairs().filter(|(key, _)| key == "action");
+    if !url.path().ends_with("/player_api.php")
+        || !actions
+            .next()
+            .is_some_and(|(_, action)| action == "get_simple_data_table")
+        || actions.next().is_some()
+    {
+        return Err("Invalid channel guide URL".to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) async fn xtream_channel_epg_fetch(
+    url: String,
+    timeout_ms: u64,
+) -> Result<String, String> {
+    validate_channel_guide_url(&url)?;
+    let response = download_remote(
+        M3uFetchOptions {
+            url,
+            headers: HashMap::new(),
+            cache_key: None,
+        },
+        2 * 1024 * 1024,
+        "channel guide",
+        None,
+        Duration::from_millis(timeout_ms.clamp(1, 5_000)),
+    )
+    .await?;
+    match response {
+        RemoteDownloadResult::Modified(download) => Ok(decode_m3u(&download.bytes)),
+        RemoteDownloadResult::NotModified => Err("The channel guide response was empty".into()),
+    }
+}
+
+#[cfg(test)]
+mod guide_tests {
+    use super::{validate_channel_guide_url, xtream_channel_epg_fetch};
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
+    use std::time::Duration;
+
+    #[test]
+    fn only_accepts_http_xtream_guide_requests() {
+        assert!(validate_channel_guide_url(
+            "http://source.test/panel/player_api.php?action=get_simple_data_table&stream_id=42"
+        )
+        .is_ok());
+        assert!(validate_channel_guide_url(
+            "https://source.test/xmltv.php?action=get_simple_data_table"
+        )
+        .is_err());
+        assert!(validate_channel_guide_url(
+            "https://source.test/player_api.php?action=get_live_streams"
+        )
+        .is_err());
+        assert!(
+            validate_channel_guide_url("file:///player_api.php?action=get_simple_data_table")
+                .is_err()
+        );
+        assert!(validate_channel_guide_url(
+            "https://source.test/player_api.php?action=get_simple_data_table&action=get_live_streams"
+        )
+        .is_err());
+    }
+
+    #[tokio::test]
+    async fn fetches_guide_json_without_a_cors_header() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let body = r#"{"epg_listings":[{"id":"42"}]}"#;
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(1)))
+                .unwrap();
+            let mut request = String::new();
+            BufReader::new(&socket).read_line(&mut request).unwrap();
+            assert!(request
+                .starts_with("GET /player_api.php?action=get_simple_data_table&stream_id=42 "));
+            write!(
+                socket,
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .unwrap();
+        });
+
+        let url =
+            format!("http://{address}/player_api.php?action=get_simple_data_table&stream_id=42");
+        assert_eq!(xtream_channel_epg_fetch(url, 2_000).await.unwrap(), body);
+        server.join().unwrap();
     }
 }
 
