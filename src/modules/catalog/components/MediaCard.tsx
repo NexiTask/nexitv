@@ -24,6 +24,13 @@ import {
 import { useLogoAspect } from '../hooks/useLogoAspect';
 import { useTmdbPosterFallback } from '../data/useTmdbPosterFallback';
 import {
+  canTimeOutPosterHost,
+  isPosterHostDead,
+  markPosterHostDead,
+  markPosterHostLive,
+  POSTER_LOAD_TIMEOUT_MS,
+} from '../lib/posterHosts';
+import {
   streamProviderBrand,
   type StreamProviderBrand,
 } from '@/modules/sources/public/lib/streamProvider';
@@ -90,7 +97,8 @@ function MediaCardComponent({
 }: MediaCardProps) {
   const { t, language, number } = useI18n();
   const { handleMediaCardContextMenu } = useMediaContextMenus();
-  const [imgError, setImgError] = useState(false);
+  const [imgError, setImgError] = useState(() => isPosterHostDead(item.posterUrl));
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   // Fine-grained primitive selectors prevent card re-renders when unrelated store data changes
   const isFav =
@@ -101,8 +109,22 @@ function MediaCardComponent({
 
   // Reset imgError state when virtualized grid item changes
   useEffect(() => {
-    setImgError(false);
+    setImgError(isPosterHostDead(item.posterUrl));
+    setImgLoaded(false);
   }, [item.id, item.posterUrl]);
+
+  // A provider poster on a host that hangs never errors; give it a deadline
+  // (cards mount as they scroll into view, so the clock starts when visible).
+  const providerPoster = item.type !== 'live' ? item.posterUrl : undefined;
+  useEffect(() => {
+    if (!providerPoster || imgError || imgLoaded || !canTimeOutPosterHost(providerPoster)) return;
+    const timer = setTimeout(() => {
+      if (!canTimeOutPosterHost(providerPoster)) return;
+      markPosterHostDead(providerPoster);
+      setImgError(true);
+    }, POSTER_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [providerPoster, imgError, imgLoaded]);
 
   const providerBrand = item.type === 'live' ? streamProviderBrand(item.streamUrl) : null;
 
@@ -245,6 +267,10 @@ function MediaCardComponent({
             className={`${styles.poster} ${isLive ? styles.posterLive : ''} ${logoAspectClass}`}
             loading="lazy"
             decoding="async"
+            onLoad={(event) => {
+              setImgLoaded(true);
+              markPosterHostLive(event.currentTarget.src);
+            }}
             onError={() => setImgError(true)}
           />
         ) : (

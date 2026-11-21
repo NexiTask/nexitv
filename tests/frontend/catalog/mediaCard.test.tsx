@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MediaCard } from '@/modules/catalog/components/MediaCard';
 import type { MediaItem } from '@/modules/catalog/model/media';
+import { POSTER_LOAD_TIMEOUT_MS, resetPosterHosts } from '@/modules/catalog/lib/posterHosts';
 import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { useStreamVerificationStore } from '@/modules/sources/store/useStreamVerificationStore';
@@ -103,5 +104,49 @@ describe('MediaCard quality badge', () => {
     renderCard(channelItem);
     expect(screen.getAllByText('FHD').length).toBeGreaterThan(0);
     expect(screen.queryAllByText('4K')).toHaveLength(0);
+  });
+});
+
+describe('MediaCard poster on a hanging host', () => {
+  const hanging = (id: string): MediaItem => ({
+    id,
+    title: 'The Godfather',
+    posterUrl: `http://203.0.113.7/images/${id}.jpg`,
+    type: 'vod',
+  });
+
+  beforeEach(() => {
+    resetPosterHosts();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('gives up on a poster that never loads and skips the dead host afterwards', () => {
+    const { container, unmount } = renderCard(hanging('m1'));
+    expect(container.querySelector('img')).not.toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(POSTER_LOAD_TIMEOUT_MS);
+    });
+    expect(container.querySelector('img')).toBeNull();
+    unmount();
+
+    // Another poster on the same host goes straight to the fallback.
+    const second = renderCard(hanging('m2'));
+    expect(second.container.querySelector('img')).toBeNull();
+  });
+
+  it('never times out a host that has delivered a poster', () => {
+    const { container } = renderCard(hanging('m1'));
+    const image = container.querySelector('img');
+    expect(image).not.toBeNull();
+    fireEvent.load(image as HTMLImageElement);
+
+    const slow = renderCard(hanging('m2'));
+    act(() => {
+      vi.advanceTimersByTime(POSTER_LOAD_TIMEOUT_MS * 2);
+    });
+    expect(slow.container.querySelector('img')).not.toBeNull();
   });
 });
