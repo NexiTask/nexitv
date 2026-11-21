@@ -475,6 +475,8 @@ export const PL_MESSAGES: Record<string, string> = {
   Movie: 'Film',
   'No collections yet': 'Nie ma jeszcze żadnych kolekcji',
   'Remove from Continue Watching': 'Usuń z Kontynuuj oglądanie',
+  'Watch Next': 'Oglądaj dalej',
+  'Remove from Watch Next': 'Usuń z Oglądaj dalej',
   Overview: 'Przegląd',
   'No overview available.': 'Brak przeglądu.',
   'No description available.': 'Brak opisu.',

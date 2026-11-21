@@ -44,6 +44,7 @@ describe('Home layout settings', () => {
     expect(useSettingsStore.getState().homeSections.map((s) => s.id)).toEqual([
       'continueWatching',
       'upcoming',
+      'watchNext',
       'recentMovies',
       'recentSeries',
       'popularMovies',

@@ -91,6 +91,19 @@ export interface HistoryItem extends MediaItem {
   episodeTitle?: string | undefined;
 }
 
+/**
+ * A series the viewer has watched episodes of, with what a card needs to show
+ * it again. Watch Next draws on these when a new episode appears.
+ */
+export interface TrackedSeries {
+  item: MediaItem;
+  lastWatchedAt: number;
+  /** Dismissed from Watch Next until the show gets more episodes. */
+  muted?: boolean | undefined;
+  /** The episode count seen when it was dismissed. */
+  knownEpisodes?: number | undefined;
+}
+
 /** A playback position reported by the player. */
 export interface WatchProgress {
   /** The thing being played: a movie id, or an episode id for series. */
@@ -158,8 +171,12 @@ interface LibraryState {
    * filter reads this list instead.
    */
   startedSeries: string[];
-  /** Records (or clears) that a series has watched episodes. */
-  setSeriesStarted: (seriesId: string, started: boolean) => void;
+  /** Records (or clears) that a series has watched episodes; `item` is what
+   * a card needs to show it (kept the first time it is given). */
+  setSeriesStarted: (seriesId: string, started: boolean, item?: MediaItem) => void;
+  /** The started series by id, for Watch Next. */
+  trackedSeries: Record<string, TrackedSeries>;
+  updateTrackedSeries: (seriesId: string, patch: Partial<Omit<TrackedSeries, 'item'>>) => void;
   /**
    * Live channels played most recently, newest first (ids only). Live
    * playback never enters `history`, which needs a duration.
@@ -201,6 +218,21 @@ interface LibraryState {
   clearAllData: () => void;
 }
 
+/** What a card needs to show the series a progress report belongs to. */
+function trackedItem(progress: WatchProgress, seriesId: string): MediaItem {
+  return {
+    id: seriesId,
+    title: progress.title,
+    posterUrl: progress.posterUrl,
+    type: 'series',
+    sourceId: progress.sourceId,
+    sourceItemId: progress.seriesSourceItemId,
+    seriesSourceItemId: progress.seriesSourceItemId,
+    tags: progress.tags,
+    country: progress.country,
+  };
+}
+
 function withoutPlaybackTransport<T extends MediaItem>(item: T): T {
   const safe: MediaItem = { ...item };
   delete safe.streamUrl;
@@ -238,6 +270,12 @@ export function migrateLibraryState(persistedState: unknown): LibraryState {
     startedSeries: Array.isArray(state.startedSeries)
       ? state.startedSeries.filter((id): id is string => typeof id === 'string' && id.length > 0)
       : [],
+    trackedSeries:
+      state.trackedSeries &&
+      typeof state.trackedSeries === 'object' &&
+      !Array.isArray(state.trackedSeries)
+        ? state.trackedSeries
+        : {},
     recentChannels: Array.isArray(state.recentChannels)
       ? state.recentChannels
           .filter((id): id is string => typeof id === 'string' && id.length > 0)
@@ -258,15 +296,39 @@ export const useLibraryStore = create<LibraryState>()(
       history: [],
       watched: [],
       startedSeries: [],
+      trackedSeries: {},
       recentChannels: [],
 
-      setSeriesStarted: (seriesId, started) => {
+      setSeriesStarted: (seriesId, started, item) => {
         if (!seriesId) return;
         const current = get().startedSeries || [];
-        if (current.includes(seriesId) === started) return;
+        const tracked = get().trackedSeries || {};
+        if (!started) {
+          if (!current.includes(seriesId) && !tracked[seriesId]) return;
+          const rest = { ...tracked };
+          delete rest[seriesId];
+          set({ startedSeries: current.filter((id) => id !== seriesId), trackedSeries: rest });
+          return;
+        }
+        const needsItem = Boolean(item) && !tracked[seriesId];
+        if (current.includes(seriesId) && !needsItem) return;
         set({
-          startedSeries: started ? [...current, seriesId] : current.filter((id) => id !== seriesId),
+          startedSeries: current.includes(seriesId) ? current : [...current, seriesId],
+          trackedSeries:
+            item && !tracked[seriesId]
+              ? {
+                  ...tracked,
+                  [seriesId]: { item: withoutPlaybackTransport(item), lastWatchedAt: Date.now() },
+                }
+              : tracked,
         });
+      },
+
+      updateTrackedSeries: (seriesId, patch) => {
+        const tracked = get().trackedSeries || {};
+        const existing = tracked[seriesId];
+        if (!existing) return;
+        set({ trackedSeries: { ...tracked, [seriesId]: { ...existing, ...patch } } });
       },
 
       addRecentChannel: (id) => {
@@ -490,6 +552,16 @@ export const useLibraryStore = create<LibraryState>()(
               progress.type === 'series' && !started.includes(historyId)
                 ? [...started, historyId]
                 : started;
+            const nextTracked =
+              progress.type === 'series'
+                ? {
+                    ...state.trackedSeries,
+                    [historyId]: {
+                      item: trackedItem(progress, historyId),
+                      lastWatchedAt: Date.now(),
+                    },
+                  }
+                : state.trackedSeries;
 
             if (progress.type === 'series' && progress.nextEpisode) {
               const next = progress.nextEpisode;
@@ -522,10 +594,16 @@ export const useLibraryStore = create<LibraryState>()(
                 history: [nextEntry, ...others].slice(0, MAX_HISTORY_ITEMS),
                 watched: nextWatched,
                 startedSeries: nextStarted,
+                trackedSeries: nextTracked,
               };
             }
 
-            return { history: others, watched: nextWatched, startedSeries: nextStarted };
+            return {
+              history: others,
+              watched: nextWatched,
+              startedSeries: nextStarted,
+              trackedSeries: nextTracked,
+            };
           }
 
           // Too early to be worth resuming. Leave any existing entry untouched
@@ -618,6 +696,7 @@ export const useLibraryStore = create<LibraryState>()(
           history: [],
           watched: [],
           startedSeries: [],
+          trackedSeries: {},
           recentChannels: [],
         });
         notify.warning(

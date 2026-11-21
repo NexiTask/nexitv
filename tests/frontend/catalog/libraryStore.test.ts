@@ -192,4 +192,30 @@ describe('recently played channels', () => {
     expect(migrateLibraryState({}).startedSeries).toEqual([]);
     expect(migrateLibraryState({ startedSeries: ['a', 3] }).startedSeries).toEqual(['a']);
   });
+
+  it('keeps a series card for Watch Next once an episode is finished', () => {
+    useLibraryStore.getState().updateHistory(
+      progress({
+        id: 'episode-1',
+        title: 'Show',
+        type: 'series',
+        seriesId: 'series-1',
+        seriesSourceItemId: '55',
+        currentTime: 990,
+        duration: 1000,
+      }),
+    );
+    const tracked = useLibraryStore.getState().trackedSeries['series-1'];
+    expect(tracked?.item).toMatchObject({ id: 'series-1', title: 'Show', sourceItemId: '55' });
+  });
+
+  it('forgets a series when it is no longer started', () => {
+    const store = useLibraryStore.getState();
+    store.setSeriesStarted('series-1', true, { id: 'series-1', title: 'Show', posterUrl: '' });
+    expect(useLibraryStore.getState().trackedSeries['series-1']?.item.title).toBe('Show');
+    store.updateTrackedSeries('series-1', { muted: true });
+    expect(useLibraryStore.getState().trackedSeries['series-1']?.muted).toBe(true);
+    store.setSeriesStarted('series-1', false);
+    expect(useLibraryStore.getState().trackedSeries).toEqual({});
+  });
 });

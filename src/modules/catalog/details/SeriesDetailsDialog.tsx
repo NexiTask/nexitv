@@ -417,8 +417,26 @@ function XtreamSeriesDetailsDialog({
           ),
         ),
       );
-    setSeriesStarted(seriesId, anyWatched);
-  }, [data?.episodes, watchedIds, resolvedSourceId, seriesId, setSeriesStarted]);
+    setSeriesStarted(seriesId, anyWatched, {
+      id: seriesId,
+      title: seriesTitle,
+      posterUrl: seriesPoster,
+      type: 'series',
+      sourceId,
+      sourceItemId: providerSeriesId,
+      seriesSourceItemId: providerSeriesId,
+    });
+  }, [
+    data?.episodes,
+    watchedIds,
+    resolvedSourceId,
+    seriesId,
+    seriesTitle,
+    seriesPoster,
+    sourceId,
+    providerSeriesId,
+    setSeriesStarted,
+  ]);
 
   const handleToggleSeasonWatched = () => {
     const library = useLibraryStore.getState();

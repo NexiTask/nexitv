@@ -480,6 +480,8 @@ export const NL_MESSAGES: Record<string, string> = {
   Movie: 'Film',
   'No collections yet': 'Nog geen collecties',
   'Remove from Continue Watching': 'Verwijderen uit Verder kijken',
+  'Watch Next': 'Hierna kijken',
+  'Remove from Watch Next': 'Verwijderen uit Hierna kijken',
   Overview: 'Overzicht',
   'No overview available.': 'Geen overzicht beschikbaar.',
   'No description available.': 'Geen beschrijving beschikbaar.',

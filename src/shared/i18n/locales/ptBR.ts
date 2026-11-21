@@ -480,6 +480,8 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   Movie: 'Filme',
   'No collections yet': 'Ainda não há coleções',
   'Remove from Continue Watching': 'Remover de continuar assistindo',
+  'Watch Next': 'Assistir em seguida',
+  'Remove from Watch Next': 'Remover de Assistir em seguida',
   Overview: 'Visão geral',
   'No overview available.': 'Nenhuma visão geral disponível.',
   'No description available.': 'Nenhuma descrição disponível.',

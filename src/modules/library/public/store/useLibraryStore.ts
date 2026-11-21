@@ -2,3 +2,4 @@
 export type { HistoryItem } from '../../store/useLibraryStore';
 export { useLibraryStore } from '../../store/useLibraryStore';
 export type { WatchProgress } from '../../store/useLibraryStore';
+export type { TrackedSeries } from '../../store/useLibraryStore';

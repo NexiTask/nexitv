@@ -3,6 +3,7 @@
 export const HOME_SECTION_IDS = [
   'upcoming',
   'continueWatching',
+  'watchNext',
   'recentMovies',
   'recentSeries',
   'popularMovies',
@@ -27,6 +28,7 @@ export const DEFAULT_HOME_SECTIONS: HomeSectionPref[] = HOME_SECTION_IDS.map((id
 export const HOME_SECTION_LABELS: Record<HomeSectionId, string> = {
   upcoming: 'Coming Up',
   continueWatching: 'Continue Watching',
+  watchNext: 'Watch Next',
   recentMovies: 'Recently Added Movies',
   recentSeries: 'Recently Added Series',
   popularMovies: 'Popular Movies',

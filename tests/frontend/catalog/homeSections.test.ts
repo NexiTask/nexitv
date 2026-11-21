@@ -58,6 +58,7 @@ describe('moveHomeSection', () => {
     expect(movedDown.map((section) => section.id)).toEqual([
       'continueWatching',
       'upcoming',
+      'watchNext',
       'recentMovies',
       'recentSeries',
       'popularMovies',

@@ -13,6 +13,7 @@ import { MediaDetailsDialogs } from '../details/MediaDetailsDialogs';
 import { useMediaDetailState } from '../hooks/useMediaDetailsState';
 import { CarouselSkeleton } from '@/shared/ui/Skeleton';
 import { Tv } from 'lucide-react';
+import { useWatchNext } from '../data/useWatchNext';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { useNavigate } from 'react-router-dom';
 import { HeaderSearch } from '@/modules/search/public/components/HeaderSearch';
@@ -57,6 +58,23 @@ export function HomePage() {
 
   const { selectedMovie, selectedSeries, handleCloseMovie, handleCloseSeries, handleItemClick } =
     useMediaDetailState();
+
+  const watchNext = useWatchNext();
+  const updateTrackedSeries = useLibraryStore((state) => state.updateTrackedSeries);
+  const watchNextItems = useMemo(
+    () =>
+      watchNext.slice(0, 20).map((h) => ({
+        ...h,
+        progress: undefined,
+        subtitle: historyCardSubtitle(h, language),
+      })),
+    [watchNext, language],
+  );
+  // Dismissed until the provider lists more episodes of that show.
+  const dismissWatchNext = useCallback(
+    (item: MediaItem) => updateTrackedSeries(item.id, { muted: true, knownEpisodes: undefined }),
+    [updateTrackedSeries],
+  );
 
   const continueWatchingItems = useMemo(() => {
     if (!history || history.length === 0) return [];
@@ -159,6 +177,7 @@ export function HomePage() {
   const sectionVisible: Record<HomeSectionId, boolean> = {
     upcoming: showUpcomingOnHome,
     continueWatching: continueWatchingItems.length > 0,
+    watchNext: watchNextItems.length > 0,
     recentMovies: true,
     recentSeries: true,
     popularMovies: true,
@@ -192,6 +211,19 @@ export function HomePage() {
             onSeeAll={() => navigate('/continue')}
             onRemoveItem={removeFromHistory}
             removeLabel="Remove from Continue Watching"
+          />
+        );
+      case 'watchNext':
+        return loading ? (
+          <CarouselSkeleton key={id} title="Watch Next" />
+        ) : (
+          <HorizontalCarousel
+            key={id}
+            title="Watch Next"
+            items={watchNextItems}
+            onItemClick={handleItemClick}
+            onRemoveItem={dismissWatchNext}
+            removeLabel="Remove from Watch Next"
           />
         );
       case 'recentMovies':
