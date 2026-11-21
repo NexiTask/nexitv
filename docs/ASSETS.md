@@ -2,7 +2,12 @@
 
 ## Project artwork
 
-The Movena favicon, desktop application icons, required Windows tiles, and DMG
+The NexiTV application icon (a white "N" with a play triangle on a dark rounded
+square) replaced Movena's icon on 21 November 2026. It is original artwork for
+this project, drawn from the outline of the "N" in the bundled Unbounded font
+(SIL Open Font License 1.1, see `public/fonts/OFL-Unbounded.txt`), and is
+distributed under GPL-3.0-or-later like the rest of this artwork. It does not use
+Movena's logo. The favicon, desktop application icons, required Windows tiles, and DMG
 background stored in `public/` and `src-tauri/` are project artwork from this
 repository's contributors. They are distributed under GPL-3.0-or-later with
 the application source. The branding rules in `TRADEMARK.md` prevent
