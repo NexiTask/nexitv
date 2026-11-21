@@ -190,6 +190,8 @@ export interface SettingsState {
    * choice in `viewModes`, keyed by the section's first path segment. */
   viewMode: 'grid' | 'list';
   viewModes: Record<string, 'grid' | 'list'>;
+  /** Grid card size per section (1 = the standard size), same keys. */
+  cardScales: Record<string, number>;
   alwaysOnTop: boolean;
   accentColor: string;
   themePreference: ThemePreference;

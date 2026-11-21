@@ -417,6 +417,9 @@ export const FR_MESSAGES: Record<string, string> = {
   'Live TV view': 'Vue TV en direct',
   'Show categories': 'Afficher les catégories',
   'Hide categories': 'Masquer les catégories',
+  'Card size': 'Taille des cartes',
+  'Smaller cards': 'Cartes plus petites',
+  'Larger cards': 'Cartes plus grandes',
   'Content Filter': 'Filtre de contenu',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Exclut du contenu des Films et Séries par défaut. Un titre dont une copie n’est pas filtrée affiche toujours cette copie.',

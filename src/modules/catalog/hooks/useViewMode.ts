@@ -26,3 +26,20 @@ export function useViewMode(): [ViewMode, (mode: ViewMode) => void] {
   );
   return [mode, setMode];
 }
+
+/** The card sizes the − / + buttons step through. */
+export const CARD_SCALES = [0.8, 1, 1.25, 1.5, 1.75, 2] as const;
+
+/** The grid card size of the section on screen (1 = standard). */
+export function useCardScale(): [number, (scale: number) => void] {
+  const section = viewSection(useLocation().pathname);
+  const scale = useSettingsStore((state) => state.cardScales[section] ?? 1);
+  const setScale = useCallback(
+    (next: number) => {
+      const { cardScales, updateSetting } = useSettingsStore.getState();
+      updateSetting('cardScales', { ...cardScales, [section]: next });
+    },
+    [section],
+  );
+  return [scale, setScale];
+}

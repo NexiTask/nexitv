@@ -414,6 +414,9 @@ export const NL_MESSAGES: Record<string, string> = {
   'Live TV view': 'Live-tv-weergave',
   'Show categories': 'Categorieën tonen',
   'Hide categories': 'Categorieën verbergen',
+  'Card size': 'Kaartgrootte',
+  'Smaller cards': 'Kleinere kaarten',
+  'Larger cards': 'Grotere kaarten',
   'Content Filter': 'Inhoudsfilter',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Laat standaard inhoud weg uit Films en Series. Een titel met een niet-gefilterde kopie toont nog steeds die kopie.',

@@ -18,11 +18,14 @@ export function calculateGridLayout(
   containerWidth: number,
   gap: number,
   isLiveTv: boolean,
+  /** The viewer's card size: 1 is the standard, 2 twice as wide. */
+  scale = 1,
 ): GridLayoutMetrics {
   const safeWidth = Math.max(0, containerWidth);
   const safeGap = Math.max(0, gap);
-  const targetWidth = isLiveTv ? LIVE_TARGET_WIDTH : STANDARD_TARGET_WIDTH;
-  const minWidth = isLiveTv ? LIVE_MIN_WIDTH : STANDARD_MIN_WIDTH;
+  const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+  const targetWidth = (isLiveTv ? LIVE_TARGET_WIDTH : STANDARD_TARGET_WIDTH) * safeScale;
+  const minWidth = (isLiveTv ? LIVE_MIN_WIDTH : STANDARD_MIN_WIDTH) * safeScale;
 
   if (safeWidth === 0) {
     return {

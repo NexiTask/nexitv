@@ -303,6 +303,7 @@ const DEFAULT_SETTINGS = {
   sidebarWidth: 260,
   viewMode: 'grid' as const,
   viewModes: {} as Record<string, 'grid' | 'list'>,
+  cardScales: {} as Record<string, number>,
   alwaysOnTop: false,
   accentColor: DEFAULT_ACCENT_COLOR,
   themePreference: 'dark' as ThemePreference,
@@ -365,6 +366,18 @@ const normalizeChannelLogoAspectOverrides = (value: unknown): Record<string, Cha
   }
   return result;
 };
+
+/** Per-section card sizes: short section keys, sane scales only. */
+function normalizeCardScales(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object') return {};
+  const scales: Record<string, number> = {};
+  for (const [section, scale] of Object.entries(value).slice(0, 32)) {
+    if (section.length <= 32 && typeof scale === 'number' && scale >= 0.5 && scale <= 3) {
+      scales[section] = scale;
+    }
+  }
+  return scales;
+}
 
 /** Per-section grid/list choices: short section keys, known values only. */
 function normalizeViewModes(value: unknown): Record<string, 'grid' | 'list'> {
@@ -557,6 +570,7 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
       typeof state.showWindowControls === 'boolean' ? state.showWindowControls : true,
     liveTvView: state.liveTvView === 'guide' ? 'guide' : 'channels',
     viewModes: normalizeViewModes(state.viewModes),
+    cardScales: normalizeCardScales(state.cardScales),
     categorySidebarHidden: state.categorySidebarHidden === true,
     catalogSortModes: normalizeCatalogSortModes(state.catalogSortModes),
     catalogFilters: normalizeCatalogFilterSet(state.catalogFilters),

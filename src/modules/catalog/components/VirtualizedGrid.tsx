@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MediaCard } from './MediaCard';
 import type { MediaItem } from '../model/media';
-import { useViewMode } from '../hooks/useViewMode';
+import { useCardScale, useViewMode } from '../hooks/useViewMode';
 import { calculateGridLayout } from '../lib/gridLayout';
 import styles from './VirtualizedGrid.module.css';
 
@@ -61,6 +61,7 @@ export function VirtualizedGrid({
   const parentRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const [viewMode] = useViewMode();
+  const [cardScale] = useCardScale();
 
   const isListMode = viewMode === 'list';
   const effectiveGap = isListMode ? 0 : gap;
@@ -110,7 +111,7 @@ export function VirtualizedGrid({
     };
   }, []);
 
-  const gridLayout = calculateGridLayout(containerWidth, effectiveGap, isLiveTv);
+  const gridLayout = calculateGridLayout(containerWidth, effectiveGap, isLiveTv, cardScale);
   const columns = isListMode ? 1 : gridLayout.columns;
   const actualCardWidth = isListMode ? containerWidth : gridLayout.cardWidth;
   const actualRowHeight = isListMode ? 64 : gridLayout.rowHeight;
