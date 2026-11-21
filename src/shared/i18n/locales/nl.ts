@@ -448,6 +448,8 @@ export const NL_MESSAGES: Record<string, string> = {
   'Quick genre bar': 'Snelle balk',
   'Show these genres as quick filters above the grid':
     'Deze genres als snelle filters boven het raster tonen',
+  'View options': 'Weergaveopties',
+  Layout: 'Indeling',
   'Content Filter': 'Inhoudsfilter',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Laat standaard inhoud weg uit Films en Series. Een titel met een niet-gefilterde kopie toont nog steeds die kopie.',

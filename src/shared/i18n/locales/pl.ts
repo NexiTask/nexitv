@@ -447,6 +447,8 @@ export const PL_MESSAGES: Record<string, string> = {
   'Quick genre bar': 'Szybki pasek',
   'Show these genres as quick filters above the grid':
     'Pokaż te gatunki jako szybkie filtry nad siatką',
+  'View options': 'Opcje widoku',
+  Layout: 'Układ',
   'Content Filter': 'Filtr treści',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Domyślnie pomija treści w Filmach i Serialach. Tytuł z kopią, która nie jest filtrowana, nadal pokazuje tę kopię.',

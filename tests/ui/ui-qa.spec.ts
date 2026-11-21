@@ -268,7 +268,7 @@ test('live catalog header controls never overlap through intermediate workspace 
       title: page.getByRole('heading', { level: 1, name: 'Live TV' }),
       search: page.getByRole('combobox', { name: 'Search your library' }),
       sort: page.getByRole('button', { name: 'Sort catalog items' }),
-      view: page.getByRole('radiogroup', { name: 'Catalog layout' }),
+      view: page.getByRole('button', { name: 'View options' }),
     };
     await expect(controls.title).toBeVisible();
     await expect(controls.search).toBeVisible();

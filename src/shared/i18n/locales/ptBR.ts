@@ -448,6 +448,8 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   'Quick genre bar': 'Barra rápida',
   'Show these genres as quick filters above the grid':
     'Mostrar esses gêneros como filtros rápidos acima da grade',
+  'View options': 'Opções de visualização',
+  Layout: 'Layout',
   'Content Filter': 'Filtro de conteúdo',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Deixa conteúdo de fora de Filmes e Séries por padrão. Um título com uma cópia não filtrada ainda mostra essa cópia.',

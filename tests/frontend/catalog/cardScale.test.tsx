@@ -27,6 +27,7 @@ describe('grid card size', () => {
         <CatalogViewToggle />
       </MemoryRouter>,
     );
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }));
     const larger = screen.getByRole('button', { name: 'Larger cards' });
     // A section starts at 125%.
     expect(screen.getByText('125%')).toBeTruthy();
@@ -44,6 +45,23 @@ describe('grid card size', () => {
         <CatalogViewToggle />
       </MemoryRouter>,
     );
+    fireEvent.click(screen.getByRole('button', { name: 'View options' }));
+    expect(screen.getByRole('radiogroup', { name: 'Catalog layout' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Larger cards' })).toBeNull();
+  });
+
+  it('keeps the view options out of the header until the menu opens', () => {
+    render(
+      <MemoryRouter initialEntries={['/movies']}>
+        <CatalogViewToggle />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('radiogroup', { name: 'Catalog layout' })).toBeNull();
+    const toggle = screen.getByRole('button', { name: 'View options' });
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('radiogroup', { name: 'Catalog layout' })).toBeTruthy();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('radiogroup', { name: 'Catalog layout' })).toBeNull();
   });
 });
