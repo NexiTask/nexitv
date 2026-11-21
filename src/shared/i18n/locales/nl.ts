@@ -423,6 +423,14 @@ export const NL_MESSAGES: Record<string, string> = {
   'Interface zoom': 'Interfacezoom',
   'Scales the whole interface: text, cards and controls. Ctrl + and Ctrl − change it too, Ctrl 0 resets it.':
     'Schaalt de hele interface: tekst, kaarten en bediening. Ctrl + en Ctrl − passen hem ook aan, Ctrl 0 zet hem terug.',
+  'Color Theme': 'Kleurthema',
+  'Color theme': 'Kleurthema',
+  'A color palette over the dark or light canvas. Catppuccin brings its own soft pastel colors and Mauve accent.':
+    'Een kleurenpalet over het donkere of lichte thema. Catppuccin brengt eigen zachte pastelkleuren en het Mauve-accent mee.',
+  'Catppuccin Flavor': 'Catppuccin-variant',
+  'Catppuccin flavor': 'Catppuccin-variant',
+  'The dark flavor. The light theme always uses Latte.':
+    'De donkere variant. Het lichte thema gebruikt altijd Latte.',
   'Content Filter': 'Inhoudsfilter',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Laat standaard inhoud weg uit Films en Series. Een titel met een niet-gefilterde kopie toont nog steeds die kopie.',

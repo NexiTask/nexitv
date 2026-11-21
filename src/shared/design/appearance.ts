@@ -7,6 +7,32 @@ import {
 } from './color';
 
 export type ThemePreference = 'dark' | 'light';
+
+/** A colour theme over the dark/light canvas. */
+export type ColorTheme = 'default' | 'catppuccin';
+/** Catppuccin's dark flavours; the light canvas always uses Latte. */
+export type CatppuccinFlavor = 'mocha' | 'macchiato' | 'frappe';
+
+export interface AppearancePalette {
+  theme: ColorTheme;
+  flavor: CatppuccinFlavor;
+}
+
+export const DEFAULT_PALETTE: AppearancePalette = { theme: 'default', flavor: 'mocha' };
+
+/** Each Catppuccin flavour's Mauve, its usual accent. */
+const CATPPUCCIN_ACCENTS: Record<CatppuccinFlavor | 'latte', string> = {
+  mocha: '#cba6f7',
+  macchiato: '#c6a0f6',
+  frappe: '#ca9ee6',
+  latte: '#8839ef',
+};
+
+/** The `data-palette` value for a palette on a canvas, or null for the default. */
+export function paletteName(theme: ThemePreference, palette: AppearancePalette): string | null {
+  if (palette.theme !== 'catppuccin') return null;
+  return `catppuccin-${theme === 'light' ? 'latte' : palette.flavor}`;
+}
 export type Season = 'christmas' | 'easter';
 
 /** Seasons bring their own accent; the saved accent returns once they end. */
@@ -73,14 +99,23 @@ export function applyAppearanceTheme(
   accentValue: string,
   season: Season | null = null,
   root: HTMLElement = document.documentElement,
+  palette: AppearancePalette = DEFAULT_PALETTE,
 ): void {
-  // Seasonal palettes are drawn for the dark canvas only.
-  const appliedSeason = theme === 'dark' ? season : null;
-  const requestedAccent = appliedSeason ? SEASON_ACCENT_COLORS[appliedSeason] : accentValue;
+  const named = paletteName(theme, palette);
+  // Seasonal palettes are drawn for the default dark canvas only.
+  const appliedSeason = theme === 'dark' && !named ? season : null;
+  // A colour theme brings its own accent, unless the viewer picked one.
+  const themeAccent =
+    named && accentValue.toLowerCase() === DEFAULT_ACCENT_COLOR.toLowerCase()
+      ? CATPPUCCIN_ACCENTS[theme === 'light' ? 'latte' : palette.flavor]
+      : accentValue;
+  const requestedAccent = appliedSeason ? SEASON_ACCENT_COLORS[appliedSeason] : themeAccent;
   const accent = parseHex(requestedAccent) ? requestedAccent : DEFAULT_ACCENT_COLOR;
   const rgb = parseHex(accent);
 
   root.dataset.theme = theme;
+  if (named) root.dataset.palette = named;
+  else delete root.dataset.palette;
   if (appliedSeason) root.dataset.season = appliedSeason;
   else delete root.dataset.season;
   root.style.colorScheme = theme;

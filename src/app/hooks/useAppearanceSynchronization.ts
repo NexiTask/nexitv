@@ -34,6 +34,8 @@ export function useAppearanceSynchronization() {
   const alwaysOnTop = useSettingsStore((state) => state.alwaysOnTop);
   const accentColor = useSettingsStore((state) => state.accentColor);
   const themePreference = useSettingsStore((state) => state.themePreference);
+  const colorTheme = useSettingsStore((state) => state.colorTheme);
+  const catppuccinFlavor = useSettingsStore((state) => state.catppuccinFlavor);
   const motionPreference = useSettingsStore((state) => state.motionPreference);
   const language = useSettingsStore((state) => state.language);
   const season = useActiveSeason();
@@ -49,8 +51,11 @@ export function useAppearanceSynchronization() {
   }, [language]);
 
   useEffect(() => {
-    applyAppearanceTheme(themePreference, accentColor, season);
-  }, [themePreference, accentColor, season]);
+    applyAppearanceTheme(themePreference, accentColor, season, document.documentElement, {
+      theme: colorTheme,
+      flavor: catppuccinFlavor,
+    });
+  }, [themePreference, accentColor, season, colorTheme, catppuccinFlavor]);
 
   useEffect(() => {
     if (!desktopApi.isDesktop()) return;

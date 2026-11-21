@@ -132,6 +132,8 @@ export function sanitizeSettingsConfig(value: unknown): SettingsSnapshot {
     catalogGroupTitles: booleanOr(source.catalogGroupTitles, migrated.catalogGroupTitles),
     catalogHiddenKeywords: migrated.catalogHiddenKeywords,
     interfaceZoom: migrated.interfaceZoom,
+    colorTheme: migrated.colorTheme,
+    catppuccinFlavor: migrated.catppuccinFlavor,
     showWindowControls: booleanOr(source.showWindowControls, migrated.showWindowControls),
     smartLogoAspectMode: oneOf(
       source.smartLogoAspectMode,

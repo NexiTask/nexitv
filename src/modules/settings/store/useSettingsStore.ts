@@ -299,6 +299,8 @@ const DEFAULT_SETTINGS = {
   liveTvView: 'channels' as const,
   categorySidebarHidden: false,
   interfaceZoom: 1,
+  colorTheme: 'default' as const,
+  catppuccinFlavor: 'mocha' as const,
   catalogSortModes: emptyCatalogSortModes(),
   catalogFilters: { vod: EMPTY_CATALOG_FILTERS, series: EMPTY_CATALOG_FILTERS },
   sidebarWidth: 260,
@@ -584,6 +586,11 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
     cardScales: normalizeCardScales(state.cardScales),
     categorySidebarHidden: state.categorySidebarHidden === true,
     interfaceZoom: normalizeInterfaceZoom(state.interfaceZoom),
+    colorTheme: state.colorTheme === 'catppuccin' ? 'catppuccin' : 'default',
+    catppuccinFlavor:
+      state.catppuccinFlavor === 'macchiato' || state.catppuccinFlavor === 'frappe'
+        ? state.catppuccinFlavor
+        : 'mocha',
     catalogSortModes: normalizeCatalogSortModes(state.catalogSortModes),
     catalogFilters: normalizeCatalogFilterSet(state.catalogFilters),
     lastCollectionId:

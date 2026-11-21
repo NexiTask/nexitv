@@ -2,7 +2,7 @@ import type { AspectMode } from '@/modules/catalog/public/lib/aspect';
 import type { UiLanguage, UiLocale } from '@/shared/i18n/config';
 import type { CustomTitleRule } from '@/modules/catalog/public/lib/titleParser';
 import type { HomeSectionPref } from '@/modules/catalog/public/lib/homeSections';
-import type { ThemePreference } from '@/shared/design/appearance';
+import type { CatppuccinFlavor, ColorTheme, ThemePreference } from '@/shared/design/appearance';
 
 export type { ThemePreference } from '@/shared/design/appearance';
 
@@ -197,6 +197,9 @@ export interface SettingsState {
   alwaysOnTop: boolean;
   accentColor: string;
   themePreference: ThemePreference;
+  /** A colour theme over the dark/light canvas (Catppuccin, ...). */
+  colorTheme: ColorTheme;
+  catppuccinFlavor: CatppuccinFlavor;
   motionPreference: MotionPreference;
   onboardingDismissed: boolean;
   fourKDisclaimerDismissed: boolean;
@@ -353,6 +356,8 @@ export const SETTINGS_SNAPSHOT_KEYS = [
   'alwaysOnTop',
   'accentColor',
   'themePreference',
+  'colorTheme',
+  'catppuccinFlavor',
   'motionPreference',
   'showCollapsedSidebarBadges',
   'recordingPath',

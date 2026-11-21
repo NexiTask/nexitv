@@ -50,6 +50,45 @@ export function AppearanceSettingsSection() {
         </SettingsRow>
 
         <SettingsRow
+          title="Color Theme"
+          description="A color palette over the dark or light canvas. Catppuccin brings its own soft pastel colors and Mauve accent."
+        >
+          <Select
+            ariaLabel="Color theme"
+            variant="settings"
+            width={170}
+            value={settings.colorTheme}
+            onChange={(value) => settings.updateSetting('colorTheme', value)}
+            options={[
+              { value: 'default', label: 'Default' },
+              { value: 'catppuccin', label: 'Catppuccin', localize: false },
+            ]}
+          />
+        </SettingsRow>
+
+        {settings.colorTheme === 'catppuccin' && (
+          <SettingsRow
+            title="Catppuccin Flavor"
+            description="The dark flavor. The light theme always uses Latte."
+            disabled={settings.themePreference === 'light'}
+          >
+            <Select
+              ariaLabel="Catppuccin flavor"
+              variant="settings"
+              width={170}
+              value={settings.catppuccinFlavor}
+              disabled={settings.themePreference === 'light'}
+              onChange={(value) => settings.updateSetting('catppuccinFlavor', value)}
+              options={[
+                { value: 'mocha', label: 'Mocha', localize: false },
+                { value: 'macchiato', label: 'Macchiato', localize: false },
+                { value: 'frappe', label: 'Frappé', localize: false },
+              ]}
+            />
+          </SettingsRow>
+        )}
+
+        <SettingsRow
           title="Accent Color"
           description="Highlight color used for selected items, active controls, and focus states."
         >

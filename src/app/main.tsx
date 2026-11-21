@@ -14,6 +14,8 @@ applyAppearanceTheme(
   initialSettings.themePreference,
   initialSettings.accentColor,
   activeSeason(new Date()),
+  document.documentElement,
+  { theme: initialSettings.colorTheme, flavor: initialSettings.catppuccinFlavor },
 );
 const root = createRoot(document.getElementById('root')!);
 

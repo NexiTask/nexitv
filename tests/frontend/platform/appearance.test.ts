@@ -7,7 +7,7 @@ import {
   easterSunday,
   msUntilNextLocalMidnight,
 } from '@/shared/design/appearance';
-import { contrastRatio } from '@/shared/design/color';
+import { contrastRatio, DEFAULT_ACCENT_COLOR } from '@/shared/design/color';
 
 beforeEach(() => {
   document.documentElement.removeAttribute('data-theme');
@@ -114,5 +114,35 @@ describe('seasonal calendar', () => {
     expect(msUntilNextLocalMidnight(new Date(2026, 11, 31, 0, 0, 0))).toBe(
       new Date(2027, 0, 1).getTime() - new Date(2026, 11, 31).getTime(),
     );
+  });
+});
+
+describe('colour themes', () => {
+  const catppuccin = (flavor: 'mocha' | 'macchiato' | 'frappe' = 'mocha') => ({
+    theme: 'catppuccin' as const,
+    flavor,
+  });
+
+  it('marks the palette and brings Mauve when the accent is the default', () => {
+    const root = document.createElement('html');
+    applyAppearanceTheme('dark', DEFAULT_ACCENT_COLOR, null, root, catppuccin('macchiato'));
+    expect(root.dataset.palette).toBe('catppuccin-macchiato');
+    expect(root.style.getPropertyValue('--accent-color')).toBe('#c6a0f6');
+  });
+
+  it('uses Latte on the light canvas and keeps a picked accent', () => {
+    const root = document.createElement('html');
+    applyAppearanceTheme('light', '#ff8800', null, root, catppuccin());
+    expect(root.dataset.palette).toBe('catppuccin-latte');
+    expect(root.style.getPropertyValue('--accent-color')).toBe('#ff8800');
+  });
+
+  it('drops the palette and the seasons step aside while it is on', () => {
+    const root = document.createElement('html');
+    applyAppearanceTheme('dark', DEFAULT_ACCENT_COLOR, 'christmas', root, catppuccin());
+    expect(root.dataset.season).toBeUndefined();
+    applyAppearanceTheme('dark', DEFAULT_ACCENT_COLOR, 'christmas', root);
+    expect(root.dataset.palette).toBeUndefined();
+    expect(root.dataset.season).toBe('christmas');
   });
 });
