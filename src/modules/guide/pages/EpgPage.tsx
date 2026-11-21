@@ -251,6 +251,7 @@ export function EpgPage() {
     (categoryId: string | null) => {
       setActiveCategoryId(categoryId);
       setSelected(null);
+      setChannelSearchQuery('');
     },
     [setActiveCategoryId],
   );
@@ -495,6 +496,14 @@ export function EpgPage() {
             icon={CalendarClock}
             title="Pick a channel group"
             description="Search for a category in the sidebar and pin it, or add channels to your favorites, to see their programmes here."
+          />
+        ) : !isLoading && channelCount === 0 && channelSearchQuery.trim() ? (
+          <EmptyState
+            icon={CalendarClock}
+            title="No Results Found"
+            description="No channels match your search."
+            actionLabel="Clear search"
+            onAction={() => setChannelSearchQuery('')}
           />
         ) : !isLoading && channelCount === 0 ? (
           <EmptyState
