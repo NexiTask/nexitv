@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import {
   EMPTY_CATALOG_FILTERS,
@@ -8,6 +7,7 @@ import {
 } from '@/modules/settings/public/store/useSettingsStore';
 import { useI18n } from '@/shared/i18n/i18n';
 import { Select } from '@/shared/ui/Select';
+import { YearCombobox } from './YearCombobox';
 import { CATALOG_GENRES } from '../lib/smartCatalogFilter';
 import chipStyles from './GenreFilterBar.module.css';
 import styles from './CatalogFilterPanel.module.css';
@@ -41,49 +41,6 @@ const ADDED = [7, 30, 90, 365];
 
 const ANY = 'any';
 const runtimeKey = (min: number | null, max: number | null) => `${min ?? ''}-${max ?? ''}`;
-
-/** Year bound typed by the reader: kept as text until it is a sane year. */
-function YearInput({
-  value,
-  onCommit,
-  label,
-  placeholder,
-}: {
-  value: number | null;
-  onCommit: (year: number | null) => void;
-  label: string;
-  placeholder: string;
-}) {
-  const { t } = useI18n();
-  const [draft, setDraft] = useState(value == null ? '' : String(value));
-  const [lastValue, setLastValue] = useState(value);
-  if (value !== lastValue) {
-    setLastValue(value);
-    setDraft(value == null ? '' : String(value));
-  }
-  const commit = () => {
-    const year = Number.parseInt(draft, 10);
-    const valid = Number.isInteger(year) && year >= 1880 && year <= 2100;
-    if (!draft.trim()) onCommit(null);
-    else if (valid) onCommit(year);
-    else setDraft(value == null ? '' : String(value));
-  };
-  return (
-    <input
-      className={`uiField ${styles.yearInput}`}
-      inputMode="numeric"
-      maxLength={4}
-      aria-label={t(label)}
-      placeholder={t(placeholder)}
-      value={draft}
-      onChange={(event) => setDraft(event.target.value.replace(/\D/g, ''))}
-      onBlur={commit}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') commit();
-      }}
-    />
-  );
-}
 
 /**
  * The Movies/Series filter panel: everything the catalogue index knows about
@@ -138,14 +95,14 @@ export function CatalogFilterPanel({ type, filters, onChange }: CatalogFilterPan
         <div className={styles.field}>
           <span className={styles.label}>{t('Year')}</span>
           <div className={styles.yearRange}>
-            <YearInput
+            <YearCombobox
               value={filters.yearMin}
               onCommit={(yearMin) => set({ yearMin })}
               label="From year"
               placeholder="From"
             />
             <span className={styles.rangeDash}>–</span>
-            <YearInput
+            <YearCombobox
               value={filters.yearMax}
               onCommit={(yearMax) => set({ yearMax })}
               label="To year"

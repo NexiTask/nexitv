@@ -47,13 +47,6 @@
   gap: var(--space-1-5);
 }
 
-.yearInput {
-  width: 72px;
-  min-height: var(--control-height-md);
-  padding: 0 var(--space-2-5);
-  font-variant-numeric: tabular-nums;
-}
-
 .rangeDash {
   color: var(--text-muted);
 }

@@ -47,6 +47,16 @@ export function LibraryMetadataSettingsSection() {
           />
         </SettingsRow>
         <SettingsRow
+          title="Hide Adult Titles"
+          description="Leave out the movies and series the provider flags as adult from the Movies and Series pages. Needs the catalogue index."
+        >
+          <SettingsToggle
+            label="Hide adult titles"
+            checked={settings.catalogHideAdult}
+            onChange={(checked) => settings.updateSetting('catalogHideAdult', checked)}
+          />
+        </SettingsRow>
+        <SettingsRow
           title="Quality & Format Badges"
           description="Display resolution, frame rate, audio format, and edition pills on posters and channel rows."
         >

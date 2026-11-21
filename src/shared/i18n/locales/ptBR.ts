@@ -435,6 +435,11 @@ export const PT_BR_MESSAGES: Record<string, string> = {
     'A variante escura. O tema claro sempre usa Latte.',
   'NexiTV is a modified version of Movena by the Movena contributors, licensed under GPL-3.0-or-later. It is not the official Movena release and is not endorsed by the Movena project.':
     'NexiTV é uma versão modificada do Movena, dos colaboradores do Movena, licenciada sob GPL-3.0-or-later. Não é a versão oficial do Movena e não é endossada pelo projeto Movena.',
+  'Hide Adult Titles': 'Ocultar títulos adultos',
+  'Hide adult titles': 'Ocultar títulos adultos',
+  'Leave out the movies and series the provider flags as adult from the Movies and Series pages. Needs the catalogue index.':
+    'Deixa de fora das páginas Filmes e Séries os títulos que o provedor marca como adultos. Requer o índice do catálogo.',
+  'No matching year': 'Nenhum ano correspondente',
   'Content Filter': 'Filtro de conteúdo',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Deixa conteúdo de fora de Filmes e Séries por padrão. Um título com uma cópia não filtrada ainda mostra essa cópia.',

@@ -447,6 +447,11 @@ export const DE_MESSAGES: Record<string, string> = {
     'Die dunkle Variante. Das helle Design nutzt immer Latte.',
   'NexiTV is a modified version of Movena by the Movena contributors, licensed under GPL-3.0-or-later. It is not the official Movena release and is not endorsed by the Movena project.':
     'NexiTV ist eine veränderte Version von Movena der Movena-Mitwirkenden, lizenziert unter GPL-3.0-or-later. Es ist nicht die offizielle Movena-Version und wird vom Movena-Projekt nicht unterstützt.',
+  'Hide Adult Titles': 'Erwachsenentitel ausblenden',
+  'Hide adult titles': 'Erwachsenentitel ausblenden',
+  'Leave out the movies and series the provider flags as adult from the Movies and Series pages. Needs the catalogue index.':
+    'Lässt vom Anbieter als Erwachsenentitel markierte Filme und Serien auf den Seiten Filme und Serien weg. Benötigt den Katalogindex.',
+  'No matching year': 'Kein passendes Jahr',
   'Content Filter': 'Inhaltsfilter',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Blendet Inhalte standardmäßig in Filmen und Serien aus. Ein Titel mit einer nicht gefilterten Kopie zeigt weiterhin diese Kopie.',

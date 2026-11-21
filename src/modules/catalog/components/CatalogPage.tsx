@@ -91,7 +91,6 @@ export function CatalogPage({
   const catalogImdbQuality = useSettingsStore((state) => state.catalogImdbQuality);
   const setCatalogImdbQuality = useSettingsStore((state) => state.updateSetting);
   const catalogHideAdult = useSettingsStore((state) => state.catalogHideAdult);
-  const setCatalogHideAdult = useSettingsStore((state) => state.updateSetting);
   const catalogGroupTitles = useSettingsStore((state) => state.catalogGroupTitles);
   const verifiedResolutions = useVerifiedResolutionMap(badgeVisibility?.verified ?? true);
   const navigate = useNavigate();
@@ -427,19 +426,6 @@ export function CatalogPage({
                     { value: 'imdb-6-10k', label: t('IMDb ≥ 6.0 · 10k+ votes') },
                   ]}
                 />
-              )}
-              {type !== 'live' && (
-                <button
-                  type="button"
-                  className={`${filterBarStyles.chip} ${
-                    catalogHideAdult ? filterBarStyles.activeChip : ''
-                  }`}
-                  aria-pressed={catalogHideAdult}
-                  disabled={isLegacy}
-                  onClick={() => setCatalogHideAdult('catalogHideAdult', !catalogHideAdult)}
-                >
-                  {catalogHideAdult ? t('Adult hidden') : t('Adult shown')}
-                </button>
               )}
               {filterKind && (
                 <button
