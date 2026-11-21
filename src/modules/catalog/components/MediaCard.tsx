@@ -23,6 +23,8 @@ import {
 } from '@/modules/sources/public/store/useStreamVerificationStore';
 import { useLogoAspect } from '../hooks/useLogoAspect';
 import { useTmdbPosterFallback } from '../data/useTmdbPosterFallback';
+import { quickPlay } from '../lib/quickPlay';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   canTimeOutPosterHost,
   isPosterHostDead,
@@ -102,6 +104,7 @@ function MediaCardComponent({
 }: MediaCardProps) {
   const { t, tn, language, number } = useI18n();
   const { handleMediaCardContextMenu } = useMediaContextMenus();
+  const queryClient = useQueryClient();
   const [imgError, setImgError] = useState(() => isPosterHostDead(item.posterUrl));
   const [imgLoaded, setImgLoaded] = useState(false);
 
@@ -143,9 +146,21 @@ function MediaCardComponent({
     }
   };
 
+  // Movies and series start straight away (resuming where they were left);
+  // anything quick play cannot start opens as before.
+  const play = () => {
+    if (item.type !== 'vod' && item.type !== 'series') {
+      onClick?.(item);
+      return;
+    }
+    void quickPlay(queryClient, item).then((started) => {
+      if (!started) onClick?.(item);
+    });
+  };
+
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onClick?.(item);
+    play();
   };
 
   const renderPlaceholderIcon = () => {
@@ -405,7 +420,7 @@ function MediaCardComponent({
               <MediaCardMenu
                 item={item}
                 currentCollectionId={currentCollectionId}
-                onPlay={() => onClick?.(item)}
+                onPlay={play}
                 onViewDetails={() => (onViewDetails ? onViewDetails(item) : onClick?.(item))}
               />
             </div>
@@ -536,7 +551,7 @@ function MediaCardComponent({
               <MediaCardMenu
                 item={item}
                 currentCollectionId={currentCollectionId}
-                onPlay={() => onClick?.(item)}
+                onPlay={play}
                 onViewDetails={() => (onViewDetails ? onViewDetails(item) : onClick?.(item))}
               />
             </div>

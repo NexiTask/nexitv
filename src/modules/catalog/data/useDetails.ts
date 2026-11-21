@@ -10,6 +10,7 @@ import {
   type XtreamSeriesInfoResponse,
   type XtreamVodInfo,
 } from '@/modules/sources/public/data/xtreamClient';
+import type { XtreamCredentials } from '@/modules/sources/public/model/xtream';
 import { getXtreamQueryScope, queryKeys } from '@/modules/sources/public/model/queryKeys';
 
 export const detailQueryKeys = {
@@ -26,35 +27,46 @@ function useSourceCredentials(sourceId?: string) {
   );
 }
 
-/** One canonical, source-isolated query per detail resource. */
-export function useVodInfo(vodId: string | number | undefined, sourceId?: string, enabled = true) {
-  const credentials = useSourceCredentials(sourceId);
+/** A source's credentials outside React (the card's quick play). */
+export function sourceCredentials(sourceId?: string): XtreamCredentials | null {
+  const resolvedSourceId = resolveXtreamSourceId(sourceId);
+  return resolvedSourceId
+    ? (useAuthStore.getState().runtimes[resolvedSourceId]?.credentials ?? null)
+    : getXtreamCredentials();
+}
+
+/** The movie details query: shared by the dialog and the card's quick play,
+ * so both read and fill the same cache entry. */
+export function vodInfoQuery(
+  vodId: string | number | undefined,
+  sourceId: string | undefined,
+  credentials: XtreamCredentials | null,
+) {
   const resolvedSourceId = resolveXtreamSourceId(sourceId);
   const authScope = getXtreamQueryScope(resolvedSourceId, credentials);
-  return useQuery<XtreamVodInfo>({
+  return {
     queryKey: detailQueryKeys.vod(vodId, authScope),
-    queryFn: async ({ signal }) => {
+    queryFn: async ({ signal }: { signal: AbortSignal }): Promise<XtreamVodInfo> => {
       const data = await getVodInfo(credentials!, vodId!, signal);
       return { ...data, movie_data: { ...data.movie_data, source_id: resolvedSourceId } };
     },
-    enabled: enabled && !!credentials && vodId !== undefined && vodId !== '',
     staleTime: 1000 * 60 * 15,
     gcTime: 1000 * 60 * 30,
     retry: false,
-  });
+  } as const;
 }
 
-export function useSeriesInfo(
+/** The series details query (episodes per season); see `vodInfoQuery`. */
+export function seriesInfoQuery(
   seriesId: string | number | undefined,
-  sourceId?: string,
-  enabled = true,
+  sourceId: string | undefined,
+  credentials: XtreamCredentials | null,
 ) {
-  const credentials = useSourceCredentials(sourceId);
   const resolvedSourceId = resolveXtreamSourceId(sourceId);
   const authScope = getXtreamQueryScope(resolvedSourceId, credentials);
-  return useQuery<XtreamSeriesInfoResponse>({
+  return {
     queryKey: detailQueryKeys.series(seriesId, authScope),
-    queryFn: async ({ signal }) => {
+    queryFn: async ({ signal }: { signal: AbortSignal }): Promise<XtreamSeriesInfoResponse> => {
       const data = await getSeriesInfo(credentials!, seriesId!.toString(), signal);
       return {
         ...data,
@@ -66,9 +78,29 @@ export function useSeriesInfo(
         ),
       };
     },
-    enabled: enabled && !!credentials && seriesId !== undefined && seriesId !== '',
     staleTime: 1000 * 60 * 15,
     gcTime: 1000 * 60 * 30,
     retry: false,
+  } as const;
+}
+
+/** One canonical, source-isolated query per detail resource. */
+export function useVodInfo(vodId: string | number | undefined, sourceId?: string, enabled = true) {
+  const credentials = useSourceCredentials(sourceId);
+  return useQuery<XtreamVodInfo>({
+    ...vodInfoQuery(vodId, sourceId, credentials),
+    enabled: enabled && !!credentials && vodId !== undefined && vodId !== '',
+  });
+}
+
+export function useSeriesInfo(
+  seriesId: string | number | undefined,
+  sourceId?: string,
+  enabled = true,
+) {
+  const credentials = useSourceCredentials(sourceId);
+  return useQuery<XtreamSeriesInfoResponse>({
+    ...seriesInfoQuery(seriesId, sourceId, credentials),
+    enabled: enabled && !!credentials && seriesId !== undefined && seriesId !== '',
   });
 }
