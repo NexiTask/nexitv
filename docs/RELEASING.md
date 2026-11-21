@@ -50,7 +50,7 @@ the CLI version because its package-input contract is release-sensitive.
 
 ## Published binary status
 
-Artifacts published by `movena-app/movena` are project-published packages from
+Artifacts published by `NexiTask/nexitv` are project-published packages from
 the official download channel. That describes their origin, not operating-system
 trust or store certification. Tauri updater signatures authenticate updater
 artifacts and are separate from Authenticode or Apple Developer ID signing.
@@ -106,7 +106,7 @@ independently.
 Every published release includes `nexitv.spdx.json`, checksums that cover the
 SBOM, and GitHub artifact attestations for the complete `release-final` set.
 Consumers can verify provenance with `gh attestation verify <artifact>
---repo movena-app/movena` and verify file bytes with `SHA256SUMS.txt`.
+--repo NexiTask/nexitv` and verify file bytes with `SHA256SUMS.txt`.
 
 Direct JavaScript packages and the Rust lockfile may be refreshed within their
 existing compatible major ranges during maintenance. Breaking library majors,
