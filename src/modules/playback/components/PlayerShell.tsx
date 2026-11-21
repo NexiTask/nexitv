@@ -154,7 +154,7 @@ export function PlayerShell() {
             <ErrorState
               player
               title="Playback Interrupted"
-              description="Movena could not continue playback."
+              description="NexiTV could not continue playback."
               detail={errorMessage}
               actionLabel="Reconnect"
               onAction={retryPlayback}

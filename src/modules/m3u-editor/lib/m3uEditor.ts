@@ -241,7 +241,7 @@ export function validateM3uEntries(
       add(
         'preserved-directive',
         'info',
-        'Channel contains preserved directives that Movena does not interpret.',
+        'Channel contains preserved directives that NexiTV does not interpret.',
       );
     }
     if (entry.channelNumber?.trim()) {

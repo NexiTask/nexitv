@@ -31,7 +31,7 @@ export function StorageSettingsSection() {
     } catch (error: unknown) {
       notify.error(
         'Folder Could Not Be Selected',
-        getUserFacingErrorMessage(error, 'Movena could not open the folder picker.'),
+        getUserFacingErrorMessage(error, 'NexiTV could not open the folder picker.'),
       );
     }
   };
@@ -40,7 +40,7 @@ export function StorageSettingsSection() {
     <SettingsPageContent>
       <SettingsGroup
         title="Recording"
-        description="Movena writes live recordings below your Downloads folder. Record only media you are authorized to copy; Movena does not bypass DRM."
+        description="NexiTV writes live recordings below your Downloads folder. Record only media you are authorized to copy; NexiTV does not bypass DRM."
       >
         <SettingsRow
           title="Save Folder"
@@ -51,7 +51,7 @@ export function StorageSettingsSection() {
             type="text"
             value={settings.recordingPath}
             onChange={(event) => settings.updateSetting('recordingPath', event.target.value)}
-            placeholder="Movena Recordings"
+            placeholder="NexiTV Recordings"
             aria-label="Recording save folder"
             spellCheck={false}
             autoCorrect="off"

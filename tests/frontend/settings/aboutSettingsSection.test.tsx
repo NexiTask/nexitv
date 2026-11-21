@@ -58,7 +58,7 @@ describe('all-data deletion settings control', () => {
 
     await user.click(screen.getByRole('button', { name: 'Delete All Data' }));
 
-    const dialog = screen.getByRole('alertdialog', { name: 'Delete all Movena data?' });
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete all NexiTV data?' });
     expect(dialog).toBeTruthy();
     expect(clearAllAppDataMock).not.toHaveBeenCalled();
     expect(within(dialog).getByText(/sources and credentials/i)).toBeTruthy();

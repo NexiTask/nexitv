@@ -14,7 +14,7 @@ describe('M3U parsing and catalog mapping', () => {
     const playlist = parseM3u(
       `\uFEFF#EXTM3U x-tvg-url="guide.xml" playlist-name="Living Room"
 #EXTINF:-1 tvg-id="news.de" tvg-name="News" tvg-logo="https://img.test/news.png" tvg-chno="7" group-title="DE | News",DE - News HD
-#EXTVLCOPT:http-user-agent=Movena Test
+#EXTVLCOPT:http-user-agent=NexiTV Test
 #EXTHTTP:{"Referer":"https://portal.test/"}
 streams/news.m3u8|Origin=https%3A%2F%2Fportal.test
 `,
@@ -37,7 +37,7 @@ streams/news.m3u8|Origin=https%3A%2F%2Fportal.test
       channelNumber: '7',
       groupTitle: 'DE | News',
       headers: {
-        'User-Agent': 'Movena Test',
+        'User-Agent': 'NexiTV Test',
         Referer: 'https://portal.test/',
         Origin: 'https://portal.test',
         Cookie: 'session=one',
@@ -204,7 +204,7 @@ https://media.test/show/s01e02.mkv
     const sourceContent = `#EXTM3U x-tvg-url="https://epg.test/guide.xml" playlist-name="Living Room"
 #EXTINF:-1 tvg-id="cnn.us" tvg-name="CNN" tvg-logo="https://img.test/cnn.png" tvg-chno="10" group-title="News" catchup="append" catchup-days="3" radio="true",CNN HD
 #EXTGRP:News
-#EXTVLCOPT:http-user-agent=MovenaTest
+#EXTVLCOPT:http-user-agent=NexiTVTest
 #EXTVLCOPT:http-referrer=https://portal.test/
 https://stream.test/live/cnn.m3u8
 #EXTINF:5400 group-title="Cinema" year="2023" rating="7.5",Action Movie (2023)

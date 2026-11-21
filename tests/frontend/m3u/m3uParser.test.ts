@@ -10,14 +10,14 @@ live/news.ts`,
       {
         sourceId: 'source-worker',
         baseUrl: 'https://example.com/lists/main.m3u',
-        headers: { 'User-Agent': 'Movena test' },
+        headers: { 'User-Agent': 'NexiTV test' },
       },
     );
 
     expect(playlist.entries[0]).toMatchObject({
       sourceId: 'source-worker',
       url: 'https://example.com/lists/live/news.ts',
-      headers: { 'User-Agent': 'Movena test' },
+      headers: { 'User-Agent': 'NexiTV test' },
     });
   });
 

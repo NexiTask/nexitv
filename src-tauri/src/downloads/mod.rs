@@ -79,7 +79,7 @@ fn download_target(
     let stem = target
         .file_stem()
         .and_then(|value| value.to_str())
-        .unwrap_or("Movena download")
+        .unwrap_or("NexiTV download")
         .to_string();
     let mut reserved_targets = manager
         .reserved_targets
@@ -131,7 +131,7 @@ async fn run_media_download(
         }
         const MAX_MEDIA_BYTES: u64 = 50 * 1024 * 1024 * 1024;
         if response.content_length().is_some_and(|length| length > MAX_MEDIA_BYTES) {
-            return Err("The media resource is larger than Movena's 50 GiB safety limit".to_string());
+            return Err("The media resource is larger than NexiTV's 50 GiB safety limit".to_string());
         }
         let target = download_target(
             &app,
@@ -170,7 +170,7 @@ async fn run_media_download(
             };
             let Some(chunk) = chunk else { break };
             if downloaded_bytes.saturating_add(chunk.len() as u64) > MAX_MEDIA_BYTES {
-                return Err("The media resource exceeded Movena's 50 GiB safety limit".to_string());
+                return Err("The media resource exceeded NexiTV's 50 GiB safety limit".to_string());
             }
             file.write_all(&chunk).map_err(|error| error.to_string())?;
             downloaded_bytes = downloaded_bytes.saturating_add(chunk.len() as u64);

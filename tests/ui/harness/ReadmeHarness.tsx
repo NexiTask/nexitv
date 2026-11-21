@@ -829,7 +829,7 @@ const DOWNLOADS: DownloadJob[] = [
   {
     id: 'download-matrix',
     sourceUrl: 'https://media.example.test/vod/movie-the-matrix.mp4',
-    filePath: 'C:\\Movena\\The Matrix.mp4',
+    filePath: 'C:\\NexiTV\\The Matrix.mp4',
     fileName: 'The Matrix.mp4',
     state: 'completed',
     progress: 1,

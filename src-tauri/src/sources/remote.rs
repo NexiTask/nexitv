@@ -133,7 +133,7 @@ pub(crate) fn remote_headers(
     if !headers.contains_key(reqwest::header::USER_AGENT) {
         headers.insert(
             reqwest::header::USER_AGENT,
-            reqwest::header::HeaderValue::from_static("Movena/0.1"),
+            reqwest::header::HeaderValue::from_static("NexiTV/0.1"),
         );
     }
     Ok(headers)
@@ -248,7 +248,7 @@ pub(crate) fn safe_media_file_name(value: &str) -> String {
         .take(180)
         .collect::<String>();
     if cleaned.is_empty() {
-        "Movena download".to_string()
+        "NexiTV download".to_string()
     } else {
         cleaned
     }

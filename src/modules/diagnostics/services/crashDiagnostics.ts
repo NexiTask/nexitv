@@ -12,7 +12,7 @@ export interface CrashDetails {
 export async function createCrashDiagnosticReport(details: CrashDetails): Promise<string> {
   const version = await desktopApi.getVersion().catch(() => 'unavailable');
   return useDebugStore.getState().exportDebugReport({
-    application: { name: 'Movena', version, desktop: desktopApi.isDesktop() },
+    application: { name: 'NexiTV', version, desktop: desktopApi.isDesktop() },
     crash: redactDiagnosticValue({
       name: details.error.name,
       message: details.error.message,

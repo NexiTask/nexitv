@@ -13,7 +13,7 @@ export function ConnectionStatus() {
       setIsOnline(true);
       notify.success(
         t('Connection Restored'),
-        t('Movena is reconnecting to your sources.'),
+        t('NexiTV is reconnecting to your sources.'),
         3500,
         undefined,
         'connection',
@@ -23,7 +23,7 @@ export function ConnectionStatus() {
       setIsOnline(false);
       notify.warning(
         t('Connection Lost'),
-        t('Movena will reconnect automatically when your connection returns.'),
+        t('NexiTV will reconnect automatically when your connection returns.'),
         6000,
         undefined,
         'connection',
@@ -46,7 +46,7 @@ export function ConnectionStatus() {
       </span>
       <span className={styles.copy}>
         <strong>{t('You’re offline')}</strong>
-        <span>{t('Movena will resume requests when the connection returns.')}</span>
+        <span>{t('NexiTV will resume requests when the connection returns.')}</span>
       </span>
     </div>
   );

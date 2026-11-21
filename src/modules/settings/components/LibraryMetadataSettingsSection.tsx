@@ -103,7 +103,7 @@ export function LibraryMetadataSettingsSection() {
       >
         <SettingsRow
           title="Enable TMDB Enrichment"
-          description="Allow Movena to look up localized posters, backdrops, and descriptions when opening a title."
+          description="Allow NexiTV to look up localized posters, backdrops, and descriptions when opening a title."
         >
           <SettingsToggle
             label="Enable TMDB enrichment"
@@ -136,7 +136,7 @@ export function LibraryMetadataSettingsSection() {
         </SettingsRow>
         <SettingsRow
           title="Metadata Language"
-          description="Language requested from TMDB. Auto follows Movena's interface language."
+          description="Language requested from TMDB. Auto follows NexiTV's interface language."
           disabled={!settings.tmdbEnabled}
         >
           <Select

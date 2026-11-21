@@ -30,7 +30,7 @@ export function NotFoundPage() {
         <EmptyState
           icon={Compass}
           title="Page Not Found"
-          description="That page is not part of this Movena workspace. Return to Home to keep browsing."
+          description="That page is not part of this NexiTV workspace. Return to Home to keep browsing."
           actionLabel="Back to Home"
           onAction={() => void navigate('/')}
         />

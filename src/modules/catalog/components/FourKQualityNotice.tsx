@@ -35,7 +35,7 @@ export function FourKQualityNotice({ onClose }: FourKQualityNoticeProps) {
       </h2>
       <p id={descriptionId} className={styles.description}>
         {t(
-          'Channels appear here based on what the provider labels them as, not an independent check. A channel marked "4K" may actually stream at a lower resolution. Once you play a channel, Movena verifies its real resolution and updates this list to match.',
+          'Channels appear here based on what the provider labels them as, not an independent check. A channel marked "4K" may actually stream at a lower resolution. Once you play a channel, NexiTV verifies its real resolution and updates this list to match.',
         )}
       </p>
       <div className={styles.actions}>

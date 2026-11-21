@@ -17,7 +17,7 @@ export interface HomeSectionPref {
   enabled: boolean;
 }
 
-/** Display order matches Movena's original fixed Discover layout. */
+/** Display order matches NexiTV's original fixed Discover layout. */
 export const DEFAULT_HOME_SECTIONS: HomeSectionPref[] = HOME_SECTION_IDS.map((id) => ({
   id,
   enabled: true,

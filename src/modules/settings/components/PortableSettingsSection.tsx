@@ -46,7 +46,7 @@ export function PortableSettingsSection() {
     } catch (error: unknown) {
       notify.error(
         'Export Failed',
-        getUserFacingErrorMessage(error, 'Movena could not save the settings file.'),
+        getUserFacingErrorMessage(error, 'NexiTV could not save the settings file.'),
       );
     } finally {
       setBusyAction(null);
@@ -74,7 +74,7 @@ export function PortableSettingsSection() {
     } catch (error: unknown) {
       notify.error(
         'Import Failed',
-        getUserFacingErrorMessage(error, 'Movena could not read the settings file.'),
+        getUserFacingErrorMessage(error, 'NexiTV could not read the settings file.'),
       );
     } finally {
       setBusyAction(null);
@@ -148,7 +148,7 @@ export function PortableSettingsSection() {
     <SettingsPageContent>
       <SettingsGroup
         title="Portable Settings"
-        description="Back up your preferences or move them to another Movena installation."
+        description="Back up your preferences or move them to another NexiTV installation."
       >
         <SettingsRow
           title="Export Settings"
@@ -172,7 +172,7 @@ export function PortableSettingsSection() {
 
         <SettingsRow
           title="Import Settings"
-          description="Review a Movena settings file or paste configuration JSON to replace your preferences in one operation."
+          description="Review a NexiTV settings file or paste configuration JSON to replace your preferences in one operation."
         >
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <SettingsButton

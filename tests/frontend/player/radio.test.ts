@@ -28,10 +28,10 @@ describe('radio metadata helpers', () => {
           'tvg-chno': ' 42 ',
           'tvg-logo': 'https://radio.example.test/logo.png',
         },
-        '  Movena FM  ',
+        '  NexiTV FM  ',
       ),
     ).toEqual({
-      title: 'Movena FM',
+      title: 'NexiTV FM',
       artist: 'The Night Show',
       album: 'Late Night',
       genre: 'Jazz',

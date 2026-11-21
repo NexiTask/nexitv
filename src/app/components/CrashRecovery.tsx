@@ -61,7 +61,7 @@ export function CrashRecovery({ error, componentStack, title, description }: Cra
         <p>{t(description)}</p>
         <div className={styles.actions}>
           <Button variant="primary" size="lg" onClick={() => void restart()}>
-            <RotateCcw size={16} aria-hidden="true" /> {t('Restart Movena')}
+            <RotateCcw size={16} aria-hidden="true" /> {t('Restart NexiTV')}
           </Button>
           <Button onClick={() => void copyReport()}>
             <Clipboard size={16} aria-hidden="true" /> {t('Copy diagnostic report')}

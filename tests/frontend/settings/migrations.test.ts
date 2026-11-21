@@ -122,7 +122,7 @@ describe('persisted-state migrations', () => {
 
   it('moves the legacy relative recording folder under the new Downloads-based default', () => {
     expect(migrateSettingsState({ recordingPath: 'Downloads/IPTV_Recordings' }).recordingPath).toBe(
-      'Movena Recordings',
+      'NexiTV Recordings',
     );
     expect(migrateSettingsState({ recordingPath: 'D:\\Recordings' }).recordingPath).toBe(
       'D:\\Recordings',

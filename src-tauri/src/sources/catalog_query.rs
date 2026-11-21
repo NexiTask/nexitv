@@ -91,7 +91,7 @@ pub struct RatingOverride {
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct CatalogQuery {
-    /// Movena's (source-prefixed) category ids.
+    /// NexiTV's (source-prefixed) category ids.
     pub hidden_category_ids: Vec<String>,
     /// Hidden categories that mark where a title is from ("Indian films"
     /// filed under another market): one copy there hides the whole title.

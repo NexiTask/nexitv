@@ -165,7 +165,7 @@ export function SourcesSettingsSection({
     try {
       if (removeTarget.kind === 'xtream') await removeXtream(removeTarget.profile.id);
       else await removeM3u(removeTarget.profile.id);
-      notify.info('Source Removed', `${removeTarget.profile.name} was removed from Movena.`);
+      notify.info('Source Removed', `${removeTarget.profile.name} was removed from NexiTV.`);
       setRemoveTarget(null);
     } catch (error: unknown) {
       notify.error(
@@ -189,7 +189,7 @@ export function SourcesSettingsSection({
       <>
         <SettingsGroup
           title="Media Sources"
-          description="Enable any combination. Movena merges channels, catalogues, categories, and available guides without mixing credentials."
+          description="Enable any combination. NexiTV merges channels, catalogues, categories, and available guides without mixing credentials."
         >
           <SettingsRow
             title={
@@ -353,7 +353,7 @@ export function SourcesSettingsSection({
                     title={t(
                       profile.editorWriteBack
                         ? 'Saving in the editor also updates the original file'
-                        : 'Editor saves stay inside Movena',
+                        : 'Editor saves stay inside NexiTV',
                     )}
                   >
                     {t(profile.editorWriteBack ? 'Write Back On' : 'Write Back Off')}
@@ -409,7 +409,7 @@ export function SourcesSettingsSection({
       {removeTarget && (
         <ConfirmDialog
           title={t('Remove {name}?', { name: removeTarget.profile.name })}
-          description="Movena will remove this source, its saved connection, and any source cache. Favorites and watch history remain on this device."
+          description="NexiTV will remove this source, its saved connection, and any source cache. Favorites and watch history remain on this device."
           confirmLabel="Remove Source"
           danger
           onConfirm={() => void confirmRemove()}

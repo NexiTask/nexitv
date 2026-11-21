@@ -890,7 +890,7 @@ html[data-season='easter']:not(.is-playing) [data-seasonal-decor='sidebar-footer
    Colour themes
    ============================
    Each palette names its colours by role (--pal-*); one mapping for dark
-   and one for light turn them into Movena's tokens, so every surface
+   and one for light turn them into NexiTV's tokens, so every surface
    follows. Shadows stay the canvas's own. data-palette is set by
    applyAppearanceTheme (palettes.ts holds the names and accents); playback
    drops the layer like the other overlays. Palettes: Catppuccin, Dracula,

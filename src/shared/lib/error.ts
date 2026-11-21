@@ -158,7 +158,7 @@ export function getErrorPresentation(error: unknown, subject: string): ErrorPres
     return {
       kind: 'invalid-response',
       title: `Couldn’t read ${subject}`,
-      description: 'The source sent data Movena could not use. Check the source and try again.',
+      description: 'The source sent data NexiTV could not use. Check the source and try again.',
       detail,
     };
   }

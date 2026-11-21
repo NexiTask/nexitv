@@ -161,7 +161,7 @@ export function UpcomingPage() {
             icon={CalendarClock}
             title={t('No favorite movies or series yet')}
             description={t(
-              'Add movies or series to Favorites and Movena will keep their upcoming and recent release dates here.',
+              'Add movies or series to Favorites and NexiTV will keep their upcoming and recent release dates here.',
             )}
           />
         ) : schedule.isLoading && !schedule.data ? (
@@ -175,7 +175,7 @@ export function UpcomingPage() {
             icon={CalendarClock}
             title={t('Release schedule unavailable')}
             description={t(
-              'Movena could not check release dates right now. Your favorites are unchanged.',
+              'NexiTV could not check release dates right now. Your favorites are unchanged.',
             )}
             detail={getErrorMessage(
               schedule.error,

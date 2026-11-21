@@ -262,7 +262,7 @@ export function SearchPage() {
               <div className={searchStyles.idleState}>
                 <EmptyState
                   icon={SearchIcon}
-                  title="Search Movena"
+                  title="Search NexiTV"
                   description="Type any title, genre, year, or keyword to instantly search across movies, series, and channels."
                 />
               </div>

@@ -270,7 +270,7 @@ export const SETTINGS_NAV_GROUPS = [
       },
       {
         id: 'about',
-        label: 'About Movena',
+        label: 'About NexiTV',
         description: 'View version information, updates, support links, and reset options.',
         keywords: ['app', 'version', 'updates', 'github', 'reset'],
       },

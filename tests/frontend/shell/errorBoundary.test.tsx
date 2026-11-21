@@ -37,7 +37,7 @@ describe('top-level crash recovery', () => {
       </ErrorBoundary>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Restart Movena' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restart NexiTV' }));
     await waitFor(() => expect(desktop.relaunch).toHaveBeenCalledTimes(1));
   });
 

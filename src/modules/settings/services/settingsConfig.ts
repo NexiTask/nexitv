@@ -45,7 +45,7 @@ const stringOr = (value: unknown, fallback: string, maximumLength: number): stri
 
 /**
  * Import validation is deliberately stricter than Zustand hydration. Values
- * outside the controls Movena exposes fall back to a known-safe equivalent.
+ * outside the controls NexiTV exposes fall back to a known-safe equivalent.
  */
 export function sanitizeSettingsConfig(value: unknown): SettingsSnapshot {
   const source = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
@@ -177,7 +177,7 @@ export function sanitizeSettingsConfig(value: unknown): SettingsSnapshot {
       'system',
     ),
     showCollapsedSidebarBadges: booleanOr(source.showCollapsedSidebarBadges, true),
-    recordingPath: stringOr(migrated.recordingPath, 'Movena Recordings', 4096),
+    recordingPath: stringOr(migrated.recordingPath, 'NexiTV Recordings', 4096),
     instantRecord: booleanOr(source.instantRecord, false),
     downloadDirectory: stringOr(migrated.downloadDirectory, '', 4096),
     maxConcurrentDownloads: numberOr(
@@ -222,7 +222,7 @@ export function serializeSettingsConfig(state: SettingsState): string {
 
 export function parseSettingsConfig(text: string): ParsedSettingsConfig {
   if (new TextEncoder().encode(text).byteLength > MAX_SETTINGS_CONFIG_BYTES) {
-    throw new Error('This settings file is larger than Movena supports.');
+    throw new Error('This settings file is larger than NexiTV supports.');
   }
 
   let value: unknown;
@@ -232,12 +232,12 @@ export function parseSettingsConfig(text: string): ParsedSettingsConfig {
     throw new Error('This is not a valid JSON settings file.');
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('This file does not contain a Movena settings backup.');
+    throw new Error('This file does not contain a NexiTV settings backup.');
   }
 
   const candidate = value as Record<string, unknown>;
   if (candidate.format !== SETTINGS_CONFIG_FORMAT) {
-    throw new Error('This file is not a Movena settings backup.');
+    throw new Error('This file is not a NexiTV settings backup.');
   }
   if (
     typeof candidate.version !== 'number' ||
@@ -247,7 +247,7 @@ export function parseSettingsConfig(text: string): ParsedSettingsConfig {
     throw new Error('This settings file has an invalid format version.');
   }
   if (candidate.version > SETTINGS_CONFIG_VERSION) {
-    throw new Error('This settings file was created by a newer version of Movena.');
+    throw new Error('This settings file was created by a newer version of NexiTV.');
   }
   if (
     !candidate.settings ||
@@ -291,7 +291,7 @@ export async function saveSettingsConfig(state: SettingsState): Promise<string |
   const fileName = backupFileName();
   const path = await desktopApi.savePath({
     defaultPath: fileName,
-    filters: [{ name: 'Movena settings', extensions: ['json'] }],
+    filters: [{ name: 'NexiTV settings', extensions: ['json'] }],
   });
   if (!path) return null;
   await tauriApi.settingsConfigWrite(path, content);
@@ -301,11 +301,11 @@ export async function saveSettingsConfig(state: SettingsState): Promise<string |
 export async function selectSettingsConfig(): Promise<SelectedSettingsConfig | null> {
   const path = await desktopApi.openPath({
     multiple: false,
-    filters: [{ name: 'Movena settings', extensions: ['json'] }],
+    filters: [{ name: 'NexiTV settings', extensions: ['json'] }],
   });
   if (!path || Array.isArray(path)) return null;
   const selected = {
-    fileName: path.split(/[\\/]/).at(-1) || 'Movena settings',
+    fileName: path.split(/[\\/]/).at(-1) || 'NexiTV settings',
     content: await tauriApi.settingsConfigRead(path),
   };
   return { fileName: selected.fileName, ...parseSettingsConfig(selected.content) };

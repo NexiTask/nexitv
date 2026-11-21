@@ -23,7 +23,7 @@ export function useUpdateAnnouncements(navigate: NavigateFunction) {
     if (announcedVersion.current === updateInfo.version) return;
 
     announcedVersion.current = updateInfo.version;
-    notify.info('Update Available', `Movena v${updateInfo.version} is now available.`, 8000, {
+    notify.info('Update Available', `NexiTV v${updateInfo.version} is now available.`, 8000, {
       label: 'View',
       onClick: () => navigate('/settings?section=about'),
     });

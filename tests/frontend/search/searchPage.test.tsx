@@ -124,7 +124,7 @@ describe('search page controls', () => {
     );
 
     expect(screen.getByText('Recent searches')).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Search Movena' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Search NexiTV' })).toBeTruthy();
     expect(screen.queryByTestId('catalog-view-toggle')).toBeNull();
 
     await user.type(

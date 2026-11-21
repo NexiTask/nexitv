@@ -22,7 +22,7 @@ export function ComingUpSettingsSection() {
     <SettingsPageContent>
       <SettingsGroup
         title="Release Tracking"
-        description="Choose what Movena tracks for saved movies and series, including what happens after release time."
+        description="Choose what NexiTV tracks for saved movies and series, including what happens after release time."
       >
         <SettingsRow
           title="Enable Coming Up"

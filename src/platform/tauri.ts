@@ -58,7 +58,7 @@ export type CatalogIndexOrder = 'added' | 'rating' | 'provider';
 export interface CatalogIndexSource {
   sourceId: string;
   scope: string;
-  /** The provider's own category ids, not Movena's source-prefixed ones. */
+  /** The provider's own category ids, not NexiTV's source-prefixed ones. */
   hiddenCategoryIds: string[];
 }
 
@@ -269,7 +269,7 @@ export type MpvPropertyUpdate =
   | { property: 'sub-font' | 'sub-color'; value: string };
 
 /**
- * Strongly-typed wrapper for all Tauri IPC commands in Movena.
+ * Strongly-typed wrapper for all Tauri IPC commands in NexiTV.
  */
 export const tauriApi = {
   /** Spawn or re-initialize native mpv player instance */
@@ -302,7 +302,7 @@ export const tauriApi = {
   /** Start or stop stream recording dump to file path */
   mpvSetRecording: (path: string) => invoke<void>('mpv_set_recording', { path }),
 
-  /** Set one validated mpv property from Movena's finite public allowlist. */
+  /** Set one validated mpv property from NexiTV's finite public allowlist. */
   mpvSetProperty: (update: MpvPropertyUpdate) => invoke<void>('mpv_set_property', { update }),
 
   /** Toggle native/borderless window fullscreen */
@@ -497,13 +497,13 @@ export const tauriApi = {
   /** Remove every stored catalogue list of one source. */
   catalogCacheDelete: (sourceId: string) => invoke<void>('catalog_cache_delete', { sourceId }),
 
-  /** Remove all Movena-managed caches and the supplied source credentials. */
+  /** Remove all NexiTV-managed caches and the supplied source credentials. */
   appDataClear: (sourceIds: string[]) => invoke<void>('app_data_clear', { sourceIds }),
 
-  /** Read a user-selected, size-limited Movena settings backup. */
+  /** Read a user-selected, size-limited NexiTV settings backup. */
   settingsConfigRead: (path: string) => invoke<string>('settings_config_read', { path }),
 
-  /** Write a validated Movena settings backup to a user-selected path. */
+  /** Write a validated NexiTV settings backup to a user-selected path. */
   settingsConfigWrite: (path: string, content: string) =>
     invoke<void>('settings_config_write', { path, content }),
 };

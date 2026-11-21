@@ -330,7 +330,7 @@ describe('smart catalogue filtering', () => {
       { id: 'f7', title: 'Auch Neu', posterUrl: '', categoryId: 'de-new' },
     ];
 
-    it('reads genres from category names in the languages Movena ships', () => {
+    it('reads genres from category names in the languages NexiTV ships', () => {
       expect(getAvailableGenres(films, categories)).toEqual([
         { genre: 'Comedy', count: 1 },
         { genre: 'Sci-Fi', count: 1 },

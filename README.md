@@ -1,8 +1,16 @@
 <p align="center">
-  <img src="public/favicon.png" alt="Movena icon" width="96" height="96" />
+  <img src="public/favicon.png" alt="NexiTV icon" width="96" height="96" />
 </p>
 
-<h1 align="center">Movena</h1>
+<h1 align="center">NexiTV</h1>
+
+> **NexiTV is a modified version of [Movena](https://github.com/movena-app/movena)**,
+> the free IPTV player by the Movena contributors. It is not the official Movena
+> release and is not affiliated with or endorsed by the Movena project. It is
+> distributed under the same licence, GPL-3.0-or-later, with the original copyright
+> and licence notices kept (see [LICENSE](LICENSE) and
+> [docs/TRADEMARK.md](docs/TRADEMARK.md)); the modifications are in this repository's
+> git history.
 
 <p align="center">
   A private, cross-platform IPTV and VOD desktop player for Xtream Codes and
@@ -28,23 +36,23 @@
 </p>
 
 > [!IMPORTANT]
-> **Use official sources only.** Movena is a free, open-source player. It does
+> **Use official sources only.** NexiTV is a free, open-source player. It does
 > not sell or provide subscriptions, channels, playlists, or media. Download it
 > only from this repository or the official website.
 
 > [!NOTE]
-> Bring your own authorized content. Movena does not bypass DRM; use recording,
+> Bring your own authorized content. NexiTV does not bypass DRM; use recording,
 > catch-up, and download features only where you have permission.
 
-![Movena Discover workspace showcasing Dark and Light themes side-by-side with real metadata and TMDB artwork](.github/assets/readme/hero.webp)
+![NexiTV Discover workspace showcasing Dark and Light themes side-by-side with real metadata and TMDB artwork](.github/assets/readme/hero.webp)
 
 ## Get started
 
-1. [Download the latest Movena release](https://github.com/movena-app/movena/releases/latest) for your desktop platform.
+1. [Download the latest NexiTV release](https://github.com/NexiTask/nexitv/releases/latest) for your desktop platform.
 2. Connect an authorized Xtream Codes account or add a local or remote M3U/M3U8 playlist.
 3. Browse Live TV, movies, series, and available programme guide data.
 
-Movena keeps sources separate at the credential boundary while presenting their
+NexiTV keeps sources separate at the credential boundary while presenting their
 enabled channels, catalogues, categories, and guides in one workspace.
 
 ## Features
@@ -97,15 +105,15 @@ enabled channels, catalogues, categories, and guides in one workspace.
 **Privacy and personalization**
 
 - Keep passwords and connection secrets in the operating-system credential vault.
-- Use Movena without a project-operated account, advertising, analytics, or telemetry.
+- Use NexiTV without a project-operated account, advertising, analytics, or telemetry.
 - Choose English, German, Spanish, French, Italian, Dutch, Polish, or Brazilian Portuguese.
 - Customize accent, catalogue layout, motion, playback, subtitle, picture, and notification settings.
 - Export portable preferences without credentials, playlist URLs, history, favorites, or cached media.
-- Check for and install signed Movena updater packages from GitHub Releases.
+- Check for and install signed NexiTV updater packages from GitHub Releases.
 
 ## Product tour
 
-These are browser captures of Movena's production React pages, shared
+These are browser captures of NexiTV's production React pages, shared
 components, CSS modules, and application shell at 1440×900—not recreated
 mockups. The movie and series surfaces use real titles, factual TMDB metadata,
 and TMDB poster/backdrop artwork. Live TV uses real channel identities and
@@ -115,19 +123,19 @@ reserved `.test` fixture data. No commercial video is included.
 
 |                                                                Live TV catalogue                                                                |                                                          Timeline programme guide                                                           |
 | :---------------------------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------------: |
-|                     ![Movena Live TV catalogue with real channel identities and logos](.github/assets/readme/live-tv.webp)                      |           ![Movena timeline programme guide with real channels and example XMLTV scheduling](.github/assets/readme/live-epg.webp)           |
+|                     ![NexiTV Live TV catalogue with real channel identities and logos](.github/assets/readme/live-tv.webp)                      |           ![NexiTV timeline programme guide with real channels and example XMLTV scheduling](.github/assets/readme/live-epg.webp)           |
 |                                                       Movie details and playback actions                                                        |                                                         Seasons and episode browser                                                         |
-|         ![Movena movie details showing real Dune Part Two metadata and TMDB poster artwork](.github/assets/readme/library-details.webp)         |     ![Movena series details showing Severance with its correct two seasons and 19 episodes](.github/assets/readme/series-details.webp)      |
+|         ![NexiTV movie details showing real Dune Part Two metadata and TMDB poster artwork](.github/assets/readme/library-details.webp)         |     ![NexiTV series details showing Severance with its correct two seasons and 19 episodes](.github/assets/readme/series-details.webp)      |
 |                                                            Upcoming release calendar                                                            |                                                              Light appearance                                                               |
-|                          ![Movena upcoming release schedule with live countdowns](.github/assets/readme/upcoming.webp)                          |                          ![Movena Discover view in clean light appearance](.github/assets/readme/light-theme.webp)                          |
+|                          ![NexiTV upcoming release schedule with live countdowns](.github/assets/readme/upcoming.webp)                          |                          ![NexiTV Discover view in clean light appearance](.github/assets/readme/light-theme.webp)                          |
 |                                                               VOD player controls                                                               |                                                    Series playback & episode navigation                                                     |
-| ![Movena native VOD player controls over a TMDB backdrop with timeline, chapters, and playback settings](.github/assets/readme/player-vod.webp) |                   ![Movena series player with episode drawer and skip prompts](.github/assets/readme/player-series.webp)                    |
+| ![NexiTV native VOD player controls over a TMDB backdrop with timeline, chapters, and playback settings](.github/assets/readme/player-vod.webp) |                   ![NexiTV series player with episode drawer and skip prompts](.github/assets/readme/player-series.webp)                    |
 |                                                          M3U visual channel workspace                                                           |                                                            M3U raw syntax editor                                                            |
-|        ![Movena M3U editor with example channels, categories, filters, and stream-health status](.github/assets/readme/m3u-editor.webp)         |              ![Movena M3U raw syntax editor with line numbers and editing controls](.github/assets/readme/m3u-raw-editor.webp)              |
+|        ![NexiTV M3U editor with example channels, categories, filters, and stream-health status](.github/assets/readme/m3u-editor.webp)         |              ![NexiTV M3U raw syntax editor with line numbers and editing controls](.github/assets/readme/m3u-raw-editor.webp)              |
 |                                                                 Download queue                                                                  |                                                              Source management                                                              |
-|            ![Movena downloads page with real movie titles and deterministic example transfers](.github/assets/readme/downloads.webp)            |                     ![Movena source settings with a reserved example M3U library](.github/assets/readme/settings.webp)                      |
+|            ![NexiTV downloads page with real movie titles and deterministic example transfers](.github/assets/readme/downloads.webp)            |                     ![NexiTV source settings with a reserved example M3U library](.github/assets/readme/settings.webp)                      |
 |                                                              Global library search                                                              |                                                           Playback configuration                                                            |
-|               ![Movena global search returning a real movie title and example Live TV results](.github/assets/readme/search.webp)               | ![Movena player and video settings for decoding, buffering, playback behavior, and subtitles](.github/assets/readme/playback-settings.webp) |
+|               ![NexiTV global search returning a real movie title and example Live TV results](.github/assets/readme/search.webp)               | ![NexiTV player and video settings for decoding, buffering, playback behavior, and subtitles](.github/assets/readme/playback-settings.webp) |
 
 ## Download and platform support
 
@@ -209,7 +217,7 @@ npm run setup:mpv
 ```
 
 On Linux, install the Tauri prerequisites and your distribution's libmpv
-development package. Then start Movena:
+development package. Then start NexiTV:
 
 ```bash
 npm run dev
@@ -232,12 +240,12 @@ Project direction is documented in the [roadmap](docs/ROADMAP.md).
 
 ## Project information
 
-Movena keeps app data local and operates no media proxy or project account.
+NexiTV keeps app data local and operates no media proxy or project account.
 Read the [privacy documentation](docs/PRIVACY.md) and
 [security policy](.github/SECURITY.md) for data handling and private vulnerability
 reporting.
 
-Movena is licensed under [GPL-3.0-or-later](LICENSE). Packaging and distribution
+NexiTV is licensed under [GPL-3.0-or-later](LICENSE). Packaging and distribution
 requirements are documented in [docs/RELEASING.md](docs/RELEASING.md).
 See [CHANGELOG.md](CHANGELOG.md) for unreleased and tagged product changes.
 Third-party notices and asset provenance are in

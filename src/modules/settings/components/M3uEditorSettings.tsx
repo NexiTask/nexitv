@@ -58,7 +58,7 @@ export function M3uEditorSettings() {
       </SettingsRow>
       <SettingsRow
         title="Preserve Unknown Tags"
-        description="Retain provider attributes, comments, and directives that Movena does not interpret."
+        description="Retain provider attributes, comments, and directives that NexiTV does not interpret."
       >
         <SettingsToggle
           label="Preserve unknown M3U tags"

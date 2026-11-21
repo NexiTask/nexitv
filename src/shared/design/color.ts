@@ -113,7 +113,7 @@ export function contrastRatio(foreground: string, background: string): number | 
 
 /**
  * Retains the selected accent hue while lifting a dark custom value enough to
- * remain legible as small text on Movena's deepest elevated surface. The 5.5
+ * remain legible as small text on NexiTV's deepest elevated surface. The 5.5
  * target leaves headroom for the accent-tinted selection surface.
  */
 export function accessibleAccentForeground(hex: string, theme: 'dark' | 'light' = 'dark'): string {

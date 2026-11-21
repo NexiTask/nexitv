@@ -1,6 +1,6 @@
 //! Dedicated window and fullscreen management for Windows.
 //!
-//! Movena uses a frameless, transparent window (`decorations: false`, `transparent: true`).
+//! NexiTV uses a frameless, transparent window (`decorations: false`, `transparent: true`).
 //! On Windows, Desktop Window Manager (DWM) and the Windows Shell (Explorer) require
 //! explicit style management to achieve seamless, gapless fullscreen:
 //! 1. The Windows Shell is notified via `ITaskbarList2::MarkFullscreenWindow` so the

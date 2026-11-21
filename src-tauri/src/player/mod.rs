@@ -525,7 +525,7 @@ pub fn mpv_start(
 
         // A web page URL is not media by itself. mpv's built-in ytdl hook
         // delegates supported sites (including YouTube channel /live URLs) to
-        // yt-dlp. Point it at Movena's bundled resolver instead of depending
+        // yt-dlp. Point it at NexiTV's bundled resolver instead of depending
         // on a machine-wide installation or the user's PATH.
         #[cfg(target_os = "windows")]
         if let Some(ytdlp_path) = bundled_ytdlp_path(&app) {
@@ -1072,13 +1072,13 @@ mod recording_path_tests {
     #[test]
     fn resolves_relative_recording_paths_below_downloads() {
         let resolved = resolve_recording_path(
-            "Movena Recordings/channel.ts",
+            "NexiTV Recordings/channel.ts",
             Path::new("C:/Users/test/Downloads"),
         )
         .unwrap();
         assert_eq!(
             resolved,
-            Path::new("C:/Users/test/Downloads/Movena Recordings/channel.ts")
+            Path::new("C:/Users/test/Downloads/NexiTV Recordings/channel.ts")
         );
     }
 
@@ -1092,7 +1092,7 @@ mod recording_path_tests {
     #[test]
     fn rejects_absolute_recording_paths() {
         let absolute = std::env::temp_dir()
-            .join("Movena Recordings")
+            .join("NexiTV Recordings")
             .join("channel.ts");
         assert!(absolute.is_absolute());
         let result = resolve_recording_path(
@@ -1208,11 +1208,11 @@ mod recording_path_tests {
     #[test]
     fn passes_the_bundled_resolver_path_to_mpv_without_shell_parsing() {
         let option =
-            ytdlp_script_option(Path::new("C:/Program Files/Movena, Desktop/yt-dlp.exe")).unwrap();
+            ytdlp_script_option(Path::new("C:/Program Files/NexiTV, Desktop/yt-dlp.exe")).unwrap();
 
         assert_eq!(
             option,
-            "ytdl_hook-ytdl_path=%43%C:/Program Files/Movena, Desktop/yt-dlp.exe"
+            "ytdl_hook-ytdl_path=%43%C:/Program Files/NexiTV, Desktop/yt-dlp.exe"
         );
         assert!(ytdlp_script_option(Path::new("")).is_err());
     }
@@ -1220,9 +1220,9 @@ mod recording_path_tests {
     #[cfg(target_os = "windows")]
     #[test]
     fn normalizes_windows_extended_paths_for_the_resolver() {
-        let option = ytdlp_script_option(Path::new(r"\\?\C:\Movena\yt-dlp.exe")).unwrap();
+        let option = ytdlp_script_option(Path::new(r"\\?\C:\NexiTV\yt-dlp.exe")).unwrap();
 
-        assert_eq!(option, "ytdl_hook-ytdl_path=%20%C:/Movena/yt-dlp.exe");
+        assert_eq!(option, "ytdl_hook-ytdl_path=%20%C:/NexiTV/yt-dlp.exe");
     }
 
     #[test]
@@ -1232,7 +1232,7 @@ mod recording_path_tests {
             assert!(!mpv.is_null());
             let _guard = MpvGuard::new(mpv);
             let option =
-                ytdlp_script_option(Path::new("C:/Program Files/Movena, Desktop/yt-dlp.exe"))
+                ytdlp_script_option(Path::new("C:/Program Files/NexiTV, Desktop/yt-dlp.exe"))
                     .unwrap();
 
             assert_eq!(set_mpv_option(mpv, "script-opts", &option), Ok(()));

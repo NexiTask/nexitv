@@ -49,7 +49,7 @@ export function AboutSettingsSection() {
     } else {
       notify.info(
         'Up to Date',
-        `Movena ${appVersion ? `v${appVersion}` : ''} is the latest version.`,
+        `NexiTV ${appVersion ? `v${appVersion}` : ''} is the latest version.`,
       );
     }
   };
@@ -86,7 +86,7 @@ export function AboutSettingsSection() {
       setConfirmAction(null);
       notify.warning(
         'All Data Deleted',
-        'All Movena settings, sources, history, downloads, and caches were removed. Restart the app to begin setup again.',
+        'All NexiTV settings, sources, history, downloads, and caches were removed. Restart the app to begin setup again.',
       );
     } catch (error: unknown) {
       notify.error(
@@ -113,7 +113,7 @@ export function AboutSettingsSection() {
   return (
     <SettingsPageContent>
       <SettingsGroup
-        title="Movena Desktop"
+        title="NexiTV Desktop"
         description={`Version ${appVersion ?? '…'} · Tauri 2 · Rust · React · libmpv`}
       >
         <div className={styles.aboutBody}>
@@ -154,7 +154,7 @@ export function AboutSettingsSection() {
               <div className={styles.updatePanel}>
                 <div className={styles.updatePanelHeader}>
                   <span className={styles.updatePanelTitle}>
-                    {t('Movena {version} is available', { version: `v${updateInfo.version}` })}
+                    {t('NexiTV {version} is available', { version: `v${updateInfo.version}` })}
                   </span>
                   <span className={styles.updatePanelMeta}>
                     {t('You have {version}', { version: `v${updateInfo.currentVersion}` })}
@@ -193,7 +193,7 @@ export function AboutSettingsSection() {
                   <div className={styles.updatePanelProgress}>
                     <RefreshCw size={15} className="animate-spin" />
                     <span className={styles.updatePanelMeta}>
-                      {t('Installed. Restarting Movena…')}
+                      {t('Installed. Restarting NexiTV…')}
                     </span>
                   </div>
                 )}
@@ -230,12 +230,17 @@ export function AboutSettingsSection() {
 
       <SettingsGroup
         title="Open Source & Lawful Use"
-        description="Movena is free software licensed under GPL-3.0-or-later. It provides no channels, subscriptions, playlists, or media and is not affiliated with or endorsed by Xtream Codes or any content provider."
+        description="NexiTV is free software licensed under GPL-3.0-or-later. It provides no channels, subscriptions, playlists, or media and is not affiliated with or endorsed by Xtream Codes or any content provider."
       >
         <div className={styles.aboutBody}>
           <p className={styles.aboutTagline}>
+            NexiTV is a modified version of Movena by the Movena contributors, licensed under
+            GPL-3.0-or-later. It is not the official Movena release and is not endorsed by the
+            Movena project.
+          </p>
+          <p className={styles.aboutTagline}>
             Configure only sources you are authorized to access. Record or download media only when
-            you have the necessary rights. Movena does not bypass DRM.
+            you have the necessary rights. NexiTV does not bypass DRM.
           </p>
           <div className={styles.aboutLinks}>
             <SettingsButton
@@ -304,7 +309,7 @@ export function AboutSettingsSection() {
 
       {confirmAction === 'all-data' && (
         <ConfirmDialog
-          title="Delete all Movena data?"
+          title="Delete all NexiTV data?"
           description="This permanently removes settings, sources and credentials, history, favorites, collections, searches, download records, and cached content. Original playlist files and completed downloads are not removed."
           confirmLabel="Delete All Data"
           danger

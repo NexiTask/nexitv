@@ -43,7 +43,7 @@ const PERSISTED_STORAGE_KEYS = [
 ];
 
 /**
- * Erases all data managed by Movena. Original playlist files and completed
+ * Erases all data managed by NexiTV. Original playlist files and completed
  * downloads are deliberately not touched because they may live in arbitrary
  * user-selected folders outside the app's data directory.
  */

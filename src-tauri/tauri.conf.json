@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Movena",
+  "productName": "NexiTV",
   "version": "0.1.32",
   "identifier": "com.movena.desktop",
   "build": {
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Movena",
+        "title": "NexiTV",
         "width": 1280,
         "height": 800,
         "minWidth": 960,
@@ -65,7 +65,7 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlENzJEMTlGNjk0OUNCRTkKUldUcHkwbHBuOUZ5bmQ5bU4rL1NnNmdlS2lhbEtUL3U2RFBvMjZaR1FwdjMwZS9WTUszMXFqZ2EK",
-      "endpoints": ["https://github.com/movena-app/movena/releases/latest/download/latest.json"]
+      "endpoints": ["https://github.com/NexiTask/nexitv/releases/latest/download/latest.json"]
     }
   }
 }

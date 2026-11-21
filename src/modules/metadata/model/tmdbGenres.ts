@@ -1,6 +1,6 @@
 /**
- * TMDB's genre ids in Movena's catalogue genre vocabulary. The ids are fixed
- * across languages; TMDB genres Movena has no filter for (War, Western,
+ * TMDB's genre ids in NexiTV's catalogue genre vocabulary. The ids are fixed
+ * across languages; TMDB genres NexiTV has no filter for (War, Western,
  * Reality, …) are left out. Series combine some genres into one id.
  */
 const MOVIE_GENRES: Readonly<Record<number, readonly string[]>> = {

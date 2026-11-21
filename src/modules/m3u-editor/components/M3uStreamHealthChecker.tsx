@@ -585,7 +585,7 @@ export function M3uStreamHealthChecker({
           description={t(
             pendingDestructiveAction === 'offline'
               ? 'Every stream currently marked offline will be removed from this draft.'
-              : 'Movena will keep the first entry for each identical URL and remove the remaining copies.',
+              : 'NexiTV will keep the first entry for each identical URL and remove the remaining copies.',
           )}
           confirmLabel={t('Delete')}
           danger

@@ -25,7 +25,7 @@ export interface TmdbTitleMatch {
   id: number;
   voteAverage: number | null;
   voteCount: number;
-  /** In Movena's genre vocabulary; see tmdbGenreNames. */
+  /** In NexiTV's genre vocabulary; see tmdbGenreNames. */
   genres: string[];
 }
 

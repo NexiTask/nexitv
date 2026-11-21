@@ -124,7 +124,7 @@ describe('portable settings configuration', () => {
     expect(() => parseSettingsConfig('{')).toThrow('valid JSON');
     expect(() =>
       parseSettingsConfig(JSON.stringify({ format: 'other', version: 1, settings: {} })),
-    ).toThrow('not a Movena');
+    ).toThrow('not a NexiTV');
     expect(() =>
       parseSettingsConfig(
         JSON.stringify({

@@ -112,7 +112,7 @@ describe('desktop API gateway', () => {
     expect(pointerHandler).toHaveBeenCalledOnce();
   });
 
-  it('maps updater progress to Movena-owned DTOs', async () => {
+  it('maps updater progress to NexiTV-owned DTOs', async () => {
     const close = vi.fn().mockResolvedValue(undefined);
     const downloadAndInstall = vi.fn(async (handler: (event: unknown) => void) => {
       handler({ event: 'Started', data: { contentLength: 10 } });

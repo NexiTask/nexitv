@@ -84,7 +84,7 @@ export function M3uVersionHistoryDialog({
         <div>
           <h2 className={styles.drawerHeaderTitle}>{t('Playlist Version History')}</h2>
           <p className={styles.sectionDescription}>
-            {t('Movena retains the ten most recent checkpoints for this source.')}
+            {t('NexiTV retains the ten most recent checkpoints for this source.')}
           </p>
         </div>
         <IconButton size="sm" type="button" onClick={onClose} aria-label={t('Close')}>

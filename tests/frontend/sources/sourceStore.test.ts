@@ -182,7 +182,7 @@ describe('M3U source state and secret boundary', () => {
       name: 'After',
       url: 'https://list.test/new.m3u',
       epgUrl: 'https://guide.test/new.xml',
-      userAgent: 'Movena Test',
+      userAgent: 'NexiTV Test',
       refreshIntervalMinutes: 720,
     });
 
@@ -195,7 +195,7 @@ describe('M3U source state and secret boundary', () => {
     expect(repository.storeM3uConnection).toHaveBeenLastCalledWith(profile.id, {
       location: 'https://list.test/new.m3u',
       epgUrl: 'https://guide.test/new.xml',
-      headers: { 'User-Agent': 'Movena Test' },
+      headers: { 'User-Agent': 'NexiTV Test' },
     });
     expect(useSourceStore.getState().runtimes[profile.id]!.revision).toBe(2);
   });

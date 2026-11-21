@@ -55,7 +55,7 @@ const GENRE_MATCHERS = new Map<KnownGenre, RegExp>(
 
 /**
  * How providers spell each genre in category names and genre fields, across
- * the languages Movena ships ("DE | Komödie", "Krimi", "Ciencia ficción").
+ * the languages NexiTV ships ("DE | Komödie", "Krimi", "Ciencia ficción").
  * Compared without accents or case and as substrings, so plurals such as
  * "Komödien" match. Titles keep the English word match: there a genre word is
  * more often simply part of the name.

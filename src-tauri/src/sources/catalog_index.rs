@@ -560,7 +560,7 @@ fn ensure_indexed(
 pub struct IndexSource {
     source_id: String,
     scope: String,
-    /// The provider's own category ids (not Movena's prefixed ones).
+    /// The provider's own category ids (not NexiTV's prefixed ones).
     #[serde(default)]
     hidden_category_ids: Vec<String>,
 }

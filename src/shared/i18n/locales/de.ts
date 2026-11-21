@@ -36,7 +36,7 @@ export const DE_MESSAGES: Record<string, string> = {
   Reset: 'Zurücksetzen',
   Retry: 'Erneut versuchen',
   'Try Again': 'Erneut versuchen',
-  'Restart Movena': 'Movena neu starten',
+  'Restart NexiTV': 'NexiTV neu starten',
   'Technical details': 'Technische Details',
   'Trying again': 'Neuer Versuch läuft',
   Reload: 'Neu laden',
@@ -143,7 +143,7 @@ export const DE_MESSAGES: Record<string, string> = {
   'No Results Found': 'Keine Ergebnisse gefunden',
   'No settings found': 'Keine Einstellungen gefunden',
   'Try a feature name or preference.': 'Versuchen Sie es mit einer Funktion oder Einstellung.',
-  'Search Movena': 'Movena durchsuchen',
+  'Search NexiTV': 'NexiTV durchsuchen',
   'Type any title, genre, year, or keyword to instantly search across movies, series, and channels.':
     'Suchen Sie mit Titel, Genre, Jahr oder Stichwort sofort in Filmen, Serien und Kanälen.',
   'No recent searches': 'Keine letzten Suchanfragen',
@@ -170,8 +170,8 @@ export const DE_MESSAGES: Record<string, string> = {
   'Loading categories': 'Kategorien werden geladen',
   'Loading guide': 'Programm wird geladen',
   'Page Not Found': 'Seite nicht gefunden',
-  'That page is not part of this Movena workspace. Return to Home to keep browsing.':
-    'Diese Seite gehört nicht zu diesem Movena-Bereich. Kehren Sie zum Start zurück.',
+  'That page is not part of this NexiTV workspace. Return to Home to keep browsing.':
+    'Diese Seite gehört nicht zu diesem NexiTV-Bereich. Kehren Sie zum Start zurück.',
   'Back to Home': 'Zurück zum Start',
   'Connect an Xtream account or add an M3U playlist to fill Home with available media.':
     'Verbinden Sie ein Xtream-Konto oder fügen Sie eine M3U-Wiedergabeliste hinzu, um Start mit verfügbaren Medien zu füllen.',
@@ -445,6 +445,8 @@ export const DE_MESSAGES: Record<string, string> = {
   'Catppuccin flavor': 'Catppuccin-Variante',
   'The dark flavor. The light theme always uses Latte.':
     'Die dunkle Variante. Das helle Design nutzt immer Latte.',
+  'NexiTV is a modified version of Movena by the Movena contributors, licensed under GPL-3.0-or-later. It is not the official Movena release and is not endorsed by the Movena project.':
+    'NexiTV ist eine veränderte Version von Movena der Movena-Mitwirkenden, lizenziert unter GPL-3.0-or-later. Es ist nicht die offizielle Movena-Version und wird vom Movena-Projekt nicht unterstützt.',
   'Content Filter': 'Inhaltsfilter',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Blendet Inhalte standardmäßig in Filmen und Serien aus. Ein Titel mit einer nicht gefilterten Kopie zeigt weiterhin diese Kopie.',
@@ -610,8 +612,8 @@ export const DE_MESSAGES: Record<string, string> = {
   'Playback Stalled': 'Wiedergabe angehalten',
   'Trying Alternate Source': 'Alternative Quelle wird versucht',
   'Backup Server Active': 'Backup-Server aktiv',
-  'Movena switched this source to an available provider server.':
-    'Movena hat diese Quelle auf einen verfügbaren Anbieter-Server umgestellt.',
+  'NexiTV switched this source to an available provider server.':
+    'NexiTV hat diese Quelle auf einen verfügbaren Anbieter-Server umgestellt.',
   'The primary stream is unavailable. Trying another source.':
     'Der primäre Stream ist nicht verfügbar. Eine andere Quelle wird versucht.',
   'The stream stopped responding. Reconnecting…':
@@ -620,8 +622,8 @@ export const DE_MESSAGES: Record<string, string> = {
     'Der Stream wurde unerwartet beendet. Stellen Sie die Verbindung erneut her oder wählen Sie eine andere Quelle.',
   'The stream did not start in time. Reconnect or choose another source.':
     'Der Stream wurde nicht rechtzeitig gestartet. Stellen Sie die Verbindung erneut her oder wählen Sie eine andere Quelle.',
-  'Movena couldn’t start this stream. Check the connection and try again.':
-    'Movena konnte diesen Stream nicht starten. Prüfen Sie die Verbindung und versuchen Sie es erneut.',
+  'NexiTV couldn’t start this stream. Check the connection and try again.':
+    'NexiTV konnte diesen Stream nicht starten. Prüfen Sie die Verbindung und versuchen Sie es erneut.',
   'Could not change playback state.': 'Der Wiedergabestatus konnte nicht geändert werden.',
   'Could not seek to that position.': 'Zu dieser Position konnte nicht gesprungen werden.',
   'Could not seek backward.': 'Es konnte nicht zurückgespult werden.',
@@ -708,8 +710,8 @@ export const DE_MESSAGES: Record<string, string> = {
     'Der Download ist fehlgeschlagen. Versuchen Sie es gleich erneut.',
   'The download could not be paused.': 'Der Download konnte nicht pausiert werden.',
   'The download could not be resumed.': 'Der Download konnte nicht fortgesetzt werden.',
-  'Movena could not reveal the downloaded file.':
-    'Movena konnte die heruntergeladene Datei nicht anzeigen.',
+  'NexiTV could not reveal the downloaded file.':
+    'NexiTV konnte die heruntergeladene Datei nicht anzeigen.',
   'Recording Started': 'Aufnahme gestartet',
   'Recording Stopped': 'Aufnahme beendet',
   'Recording Failed': 'Aufnahme fehlgeschlagen',
@@ -721,8 +723,8 @@ export const DE_MESSAGES: Record<string, string> = {
   // Source setup and management
   Sources: 'Quellen',
   'Media Sources': 'Medienquellen',
-  'Enable any combination. Movena merges channels, catalogues, categories, and available guides without mixing credentials.':
-    'Aktivieren Sie beliebige Kombinationen. Movena führt Kanäle, Kataloge, Kategorien und Programme zusammen, ohne Anmeldedaten zu vermischen.',
+  'Enable any combination. NexiTV merges channels, catalogues, categories, and available guides without mixing credentials.':
+    'Aktivieren Sie beliebige Kombinationen. NexiTV führt Kanäle, Kataloge, Kategorien und Programme zusammen, ohne Anmeldedaten zu vermischen.',
   'Xtream accounts and M3U playlists live together in one source list.':
     'Xtream-Konten und M3U-Wiedergabelisten stehen gemeinsam in einer Quellenliste.',
   '{count} source configured': '{count} Quelle konfiguriert',
@@ -739,8 +741,8 @@ export const DE_MESSAGES: Record<string, string> = {
   'M3U · {location} · {counts}{epg}{note}': 'M3U · {location} · {counts}{epg}{note}',
   'Remove {name}?': '{name} entfernen?',
   'Remove Source': 'Quelle entfernen',
-  'Movena will remove this source, its saved connection, and any source cache. Favorites and watch history remain on this device.':
-    'Movena entfernt diese Quelle, ihre gespeicherte Verbindung und den Quellencache. Favoriten und Wiedergabeverlauf bleiben auf diesem Gerät.',
+  'NexiTV will remove this source, its saved connection, and any source cache. Favorites and watch history remain on this device.':
+    'NexiTV entfernt diese Quelle, ihre gespeicherte Verbindung und den Quellencache. Favoriten und Wiedergabeverlauf bleiben auf diesem Gerät.',
   'Add Source': 'Quelle hinzufügen',
   'Edit source': 'Quelle bearbeiten',
   'Remove source': 'Quelle entfernen',
@@ -858,7 +860,7 @@ export const DE_MESSAGES: Record<string, string> = {
     '{count} von {total} Quellen neu geladen. Nicht erreichbar: {names}',
   '{names} kept the edited copy. Allow refresh overwrite to replace it.':
     '{names} behält die bearbeitete Kopie. Erlauben Sie das Überschreiben, um sie zu ersetzen.',
-  '{name} was removed from Movena.': '{name} wurde aus Movena entfernt.',
+  '{name} was removed from NexiTV.': '{name} wurde aus NexiTV entfernt.',
   '{name} is active with {count} entries.': '{name} ist mit {count} Einträgen aktiv.',
   'We couldn’t connect to this source. Check its details and try again.':
     'Die Verbindung zu dieser Quelle ist fehlgeschlagen. Prüfen Sie die Angaben und versuchen Sie es erneut.',
@@ -868,7 +870,7 @@ export const DE_MESSAGES: Record<string, string> = {
     'Die Quelle konnte nicht entfernt werden. Versuchen Sie es erneut.',
 
   // Onboarding
-  'Welcome to Movena': 'Willkommen bei Movena',
+  'Welcome to NexiTV': 'Willkommen bei NexiTV',
   'Your media, one beautiful place.': 'Ihre Medien an einem schönen Ort.',
   'Get Started': 'Loslegen',
   'Connect a Source': 'Quelle verbinden',
@@ -920,7 +922,7 @@ export const DE_MESSAGES: Record<string, string> = {
   'Player & Video': 'Player & Video',
   'Recording & Storage': 'Aufnahme & Speicher',
   'Developer Tools': 'Entwicklerwerkzeuge',
-  'About Movena': 'Über Movena',
+  'About NexiTV': 'Über NexiTV',
   'Connect Xtream and M3U sources, then enable any combination.':
     'Verbinden Sie Xtream- und M3U-Quellen und aktivieren Sie beliebige Kombinationen.',
   'Configure optional TMDB enrichment for movies and series.':
@@ -947,11 +949,11 @@ export const DE_MESSAGES: Record<string, string> = {
   // Appearance settings
   Appearance: 'Darstellung',
   Window: 'Fenster',
-  'Desktop-window behavior specific to Movena.':
-    'Movena-spezifisches Verhalten des Desktopfensters.',
+  'Desktop-window behavior specific to NexiTV.':
+    'NexiTV-spezifisches Verhalten des Desktopfensters.',
   'Keep Window on Top': 'Fenster im Vordergrund halten',
-  'Keep Movena above other desktop applications.': 'Movena über anderen Desktopanwendungen halten.',
-  'Keep Movena window on top': 'Movena-Fenster im Vordergrund halten',
+  'Keep NexiTV above other desktop applications.': 'NexiTV über anderen Desktopanwendungen halten.',
+  'Keep NexiTV window on top': 'NexiTV-Fenster im Vordergrund halten',
   Sidebar: 'Seitenleiste',
   'Choose what remains visible when the navigation rail is collapsed.':
     'Wählen Sie, was bei eingeklappter Navigation sichtbar bleibt.',
@@ -964,8 +966,8 @@ export const DE_MESSAGES: Record<string, string> = {
   'Choose how browsing surfaces look by default.':
     'Wählen Sie das standardmäßige Erscheinungsbild der Katalogansichten.',
   Theme: 'Design',
-  'Use light or dark colors across the Movena interface.':
-    'Helle oder dunkle Farben in der gesamten Movena-Oberfläche verwenden.',
+  'Use light or dark colors across the NexiTV interface.':
+    'Helle oder dunkle Farben in der gesamten NexiTV-Oberfläche verwenden.',
   'Interface theme': 'Oberflächendesign',
   Dark: 'Dunkel',
   Light: 'Hell',
@@ -1038,15 +1040,15 @@ export const DE_MESSAGES: Record<string, string> = {
   'Optional TMDB lookup for richer movie and series details. Your API key stays local and is never included in settings exports.':
     'Optionale TMDB-Abfrage für ausführlichere Film- und Seriendetails. Ihr API-Schlüssel bleibt lokal und wird nie exportiert.',
   'Enable TMDB Enrichment': 'TMDB-Anreicherung aktivieren',
-  'Allow Movena to look up localized posters, backdrops, and descriptions when opening a title.':
-    'Movena darf beim Öffnen eines Titels lokalisierte Poster, Hintergründe und Beschreibungen abrufen.',
+  'Allow NexiTV to look up localized posters, backdrops, and descriptions when opening a title.':
+    'NexiTV darf beim Öffnen eines Titels lokalisierte Poster, Hintergründe und Beschreibungen abrufen.',
   'Enable TMDB enrichment': 'TMDB-Anreicherung aktivieren',
   'TMDB API Key': 'TMDB-API-Schlüssel',
   'Stored locally and sent only to api.themoviedb.org. Create a free key at themoviedb.org.':
     'Wird lokal gespeichert und nur an api.themoviedb.org gesendet. Einen kostenlosen Schlüssel erhalten Sie auf themoviedb.org.',
   'Metadata Language': 'Metadatensprache',
-  "Language requested from TMDB. Auto follows Movena's interface language.":
-    'Von TMDB angeforderte Sprache. Automatisch folgt der Sprache der Movena-Oberfläche.',
+  "Language requested from TMDB. Auto follows NexiTV's interface language.":
+    'Von TMDB angeforderte Sprache. Automatisch folgt der Sprache der NexiTV-Oberfläche.',
   'TMDB metadata language': 'TMDB-Metadatensprache',
   'Poster Quality': 'Posterqualität',
   'Higher quality uses more bandwidth and storage in the image cache.':
@@ -1059,12 +1061,12 @@ export const DE_MESSAGES: Record<string, string> = {
   // Import/export and app data
   Configuration: 'Konfiguration',
   'Portable Settings': 'Portable Einstellungen',
-  'Back up your preferences or move them to another Movena installation.':
-    'Sichern Sie Ihre Einstellungen oder übertragen Sie sie auf eine andere Movena-Installation.',
+  'Back up your preferences or move them to another NexiTV installation.':
+    'Sichern Sie Ihre Einstellungen oder übertragen Sie sie auf eine andere NexiTV-Installation.',
   'Save appearance, playback, recording, notification, category, and developer preferences as readable JSON, or copy the configuration directly.':
     'Speichern Sie Darstellungs-, Wiedergabe-, Aufnahme-, Benachrichtigungs-, Kategorie- und Entwicklereinstellungen als lesbare JSON-Datei oder kopieren Sie die Konfiguration.',
-  'Review a Movena settings file or paste configuration JSON to replace your preferences in one operation.':
-    'Prüfen Sie eine Movena-Einstellungsdatei oder fügen Sie Konfigurations-JSON ein, um Ihre Einstellungen in einem Schritt zu ersetzen.',
+  'Review a NexiTV settings file or paste configuration JSON to replace your preferences in one operation.':
+    'Prüfen Sie eine NexiTV-Einstellungsdatei oder fügen Sie Konfigurations-JSON ein, um Ihre Einstellungen in einem Schritt zu ersetzen.',
   'Export File': 'Datei exportieren',
   'Copy to Clipboard': 'In Zwischenablage kopieren',
   'Choose File': 'Datei auswählen',
@@ -1120,9 +1122,9 @@ export const DE_MESSAGES: Record<string, string> = {
   'Export Failed': 'Export fehlgeschlagen',
   'Import Failed': 'Import fehlgeschlagen',
   'Copy Failed': 'Kopieren fehlgeschlagen',
-  'Movena could not save the settings file.':
-    'Movena konnte die Einstellungsdatei nicht speichern.',
-  'Movena could not read the settings file.': 'Movena konnte die Einstellungsdatei nicht lesen.',
+  'NexiTV could not save the settings file.':
+    'NexiTV konnte die Einstellungsdatei nicht speichern.',
+  'NexiTV could not read the settings file.': 'NexiTV konnte die Einstellungsdatei nicht lesen.',
   'Could not copy the settings to the clipboard.':
     'Die Einstellungen konnten nicht in die Zwischenablage kopiert werden.',
   'Danger Zone': 'Gefahrenbereich',
@@ -1132,11 +1134,11 @@ export const DE_MESSAGES: Record<string, string> = {
   'Application settings were restored to their defaults.':
     'Die Anwendungseinstellungen wurden auf die Standardwerte zurückgesetzt.',
   'All Data Deleted': 'Alle Daten gelöscht',
-  'All Movena settings, sources, history, downloads, and caches were removed. Restart the app to begin setup again.':
-    'Alle Movena-Einstellungen, Quellen, Verläufe, Downloads und Caches wurden entfernt. Starten Sie die App neu, um die Einrichtung erneut zu beginnen.',
+  'All NexiTV settings, sources, history, downloads, and caches were removed. Restart the app to begin setup again.':
+    'Alle NexiTV-Einstellungen, Quellen, Verläufe, Downloads und Caches wurden entfernt. Starten Sie die App neu, um die Einrichtung erneut zu beginnen.',
   'Could Not Delete Data': 'Daten konnten nicht gelöscht werden',
-  'Some Movena data could not be removed. Please try again.':
-    'Einige Movena-Daten konnten nicht entfernt werden. Versuchen Sie es erneut.',
+  'Some NexiTV data could not be removed. Please try again.':
+    'Einige NexiTV-Daten konnten nicht entfernt werden. Versuchen Sie es erneut.',
 
   // Playback settings
   Playback: 'Wiedergabe',
@@ -1178,7 +1180,7 @@ export const DE_MESSAGES: Record<string, string> = {
   'Seek Step': 'Spulschritt',
   'Live Stream Format': 'Livestream-Format',
   'Format requested from Xtream sources for live channels. Use HLS only if your provider requires it.':
-    'Format, das Movena bei Xtream-Quellen für Livesender anfordert. Nur auf HLS stellen, wenn dein Anbieter das verlangt.',
+    'Format, das NexiTV bei Xtream-Quellen für Livesender anfordert. Nur auf HLS stellen, wenn dein Anbieter das verlangt.',
   'Time skipped by the keyboard arrow keys and seek controls.':
     'Zeitspanne der Pfeiltasten und Spulsteuerung.',
   'Subtitles & Audio': 'Untertitel & Audio',
@@ -1253,8 +1255,8 @@ export const DE_MESSAGES: Record<string, string> = {
   // Recording/download settings
   Recording: 'Aufnahme',
   'Recording Files': 'Aufnahmedateien',
-  'Movena writes live recordings below your Downloads folder.':
-    'Movena speichert Live-Aufnahmen in Ihrem Download-Ordner.',
+  'NexiTV writes live recordings below your Downloads folder.':
+    'NexiTV speichert Live-Aufnahmen in Ihrem Download-Ordner.',
   'Save Folder': 'Speicherordner',
   'Use a relative folder name; missing folders are created automatically.':
     'Verwenden Sie einen relativen Ordnernamen; fehlende Ordner werden automatisch erstellt.',
@@ -1293,7 +1295,7 @@ export const DE_MESSAGES: Record<string, string> = {
   'Download Folder': 'Download-Ordner',
   'Choose a destination from the desktop app.': 'Wählen Sie in der Desktop-App einen Zielordner.',
   'Folder Could Not Be Selected': 'Ordner konnte nicht ausgewählt werden',
-  'Movena could not open the folder picker.': 'Movena konnte die Ordnerauswahl nicht öffnen.',
+  'NexiTV could not open the folder picker.': 'NexiTV konnte die Ordnerauswahl nicht öffnen.',
 
   // Guide settings
   Guide: 'TV-Programm',
@@ -1327,8 +1329,8 @@ export const DE_MESSAGES: Record<string, string> = {
   'Could not check for a guide.': 'Es konnte nicht nach einem Programm gesucht werden.',
   'The guide could not be loaded.': 'Das Programm konnte nicht geladen werden.',
   'Playlist Guides': 'Wiedergabelisten-Programme',
-  "Movena reads x-tvg-url, url-tvg, and each playlist's saved XMLTV override independently.":
-    'Movena liest x-tvg-url, url-tvg und die gespeicherte XMLTV-Überschreibung jeder Wiedergabeliste unabhängig.',
+  "NexiTV reads x-tvg-url, url-tvg, and each playlist's saved XMLTV override independently.":
+    'NexiTV liest x-tvg-url, url-tvg und die gespeicherte XMLTV-Überschreibung jeder Wiedergabeliste unabhängig.',
   'Xtream Guides': 'Xtream-Programme',
   'Detect the best guide independently for every enabled Xtream source.':
     'Das beste Programm für jede aktivierte Xtream-Quelle separat erkennen.',
@@ -1534,12 +1536,12 @@ export const DE_MESSAGES: Record<string, string> = {
 
   // Errors and connectivity
   'You’re offline': 'Sie sind offline',
-  'Movena will resume requests when the connection returns.':
-    'Movena setzt Anfragen fort, sobald die Verbindung wiederhergestellt ist.',
-  'Movena is reconnecting to your sources.':
-    'Movena stellt die Verbindung zu Ihren Quellen wieder her.',
-  'Movena will reconnect automatically when your connection returns.':
-    'Movena verbindet sich automatisch wieder, sobald Ihre Verbindung zurückkehrt.',
+  'NexiTV will resume requests when the connection returns.':
+    'NexiTV setzt Anfragen fort, sobald die Verbindung wiederhergestellt ist.',
+  'NexiTV is reconnecting to your sources.':
+    'NexiTV stellt die Verbindung zu Ihren Quellen wieder her.',
+  'NexiTV will reconnect automatically when your connection returns.':
+    'NexiTV verbindet sich automatisch wieder, sobald Ihre Verbindung zurückkehrt.',
   'Stream Unavailable': 'Stream nicht verfügbar',
   'This item needs to be opened from its catalogue.':
     'Dieses Element muss aus seinem Katalog geöffnet werden.',
@@ -1558,7 +1560,7 @@ export const DE_MESSAGES: Record<string, string> = {
     'Das gespeicherte Konto wurde abgelehnt oder ist abgelaufen. Prüfen Sie die Verbindungsdaten in den Einstellungen.',
   'The source address or connection details may have changed. Review them in Settings, then try again.':
     'Die Quelladresse oder Verbindungsdaten haben sich möglicherweise geändert. Prüfen Sie sie in den Einstellungen und versuchen Sie es erneut.',
-  'The source sent data Movena could not use. Check the source and try again.':
+  'The source sent data NexiTV could not use. Check the source and try again.':
     'Die Quelle hat unbrauchbare Daten gesendet. Prüfen Sie die Quelle und versuchen Sie es erneut.',
   'The source is unavailable or busy right now. Try again in a moment.':
     'Die Quelle ist momentan nicht verfügbar oder ausgelastet. Versuchen Sie es gleich erneut.',
@@ -1572,7 +1574,7 @@ export const DE_MESSAGES: Record<string, string> = {
 
   // About
   About: 'Über',
-  'Movena Desktop': 'Movena Desktop',
+  'NexiTV Desktop': 'NexiTV Desktop',
   'A native desktop client for Xtream and M3U live TV, movies, and series.':
     'Ein nativer Desktop-Client für Xtream- und M3U-Live-TV, Filme und Serien.',
   'View on GitHub': 'Auf GitHub ansehen',
@@ -1582,15 +1584,15 @@ export const DE_MESSAGES: Record<string, string> = {
   'Restore Defaults': 'Standardeinstellungen wiederherstellen',
   'Source connections, favorites, collections, and watch history are not removed.':
     'Quellverbindungen, Favoriten, Sammlungen und Wiedergabeverlauf werden nicht entfernt.',
-  'Remove all data stored by Movena and return the app to a fresh state.':
-    'Alle von Movena gespeicherten Daten entfernen und die App in den Ausgangszustand versetzen.',
+  'Remove all data stored by NexiTV and return the app to a fresh state.':
+    'Alle von NexiTV gespeicherten Daten entfernen und die App in den Ausgangszustand versetzen.',
   'Delete All Data': 'Alle Daten löschen',
   'Removes settings, sources and credentials, library data, searches, download records, and cached content.':
     'Entfernt Einstellungen, Quellen und Anmeldedaten, Bibliotheksdaten, Suchanfragen, Download-Einträge und Cache-Inhalte.',
   'Reset all settings?': 'Alle Einstellungen zurücksetzen?',
   'Playback, appearance, notification, recording, and developer preferences will return to their defaults. Your source connections and library data will remain.':
     'Wiedergabe-, Darstellungs-, Benachrichtigungs-, Aufnahme- und Entwicklereinstellungen werden zurückgesetzt. Quellverbindungen und Bibliotheksdaten bleiben erhalten.',
-  'Delete all Movena data?': 'Alle Movena-Daten löschen?',
+  'Delete all NexiTV data?': 'Alle NexiTV-Daten löschen?',
   'This permanently removes settings, sources and credentials, history, favorites, collections, searches, download records, and cached content. Original playlist files and completed downloads are not removed.':
     'Dadurch werden Einstellungen, Quellen und Anmeldedaten, Verlauf, Favoriten, Sammlungen, Suchanfragen, Download-Einträge und Cache-Inhalte dauerhaft entfernt. Originale Wiedergabelistendateien und abgeschlossene Downloads bleiben erhalten.',
   'App navigation shortcuts, available when you are not editing text.':

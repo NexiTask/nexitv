@@ -1,5 +1,5 @@
 /**
- * Ratings across Movena share TMDB's 0–10 scale. Provider and playlist values
+ * Ratings across NexiTV share TMDB's 0–10 scale. Provider and playlist values
  * are untrusted input; TMDB values come with the vote count that says how much
  * an average is worth.
  */

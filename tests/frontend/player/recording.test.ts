@@ -22,7 +22,7 @@ describe('recording output paths', () => {
 
   it('uses the canonical relative directory when the setting is blank', () => {
     expect(createRecordingOutput('Live', '', now).path).toBe(
-      'Movena Recordings/Live_2026-08-10T12-34-56-789Z.ts',
+      'NexiTV Recordings/Live_2026-08-10T12-34-56-789Z.ts',
     );
   });
 });

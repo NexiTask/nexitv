@@ -27,7 +27,7 @@ use objc2_foundation::{NSAlignmentOptions, NSData, NSPoint, NSRect, NSSize};
 use tauri::{AppHandle, Emitter, Manager};
 
 /// Window title handed to mpv via `--title`, used to recognise its NSWindow.
-pub const SURFACE_TITLE: &str = "Movena Video Surface";
+pub const SURFACE_TITLE: &str = "NexiTV Video Surface";
 
 /// How long to wait for mpv to create its window before giving up. mpv only
 /// builds it once the first video frame is configured, so this covers the

@@ -37,7 +37,7 @@ export function AppearanceSettingsSection() {
       >
         <SettingsRow
           title="Theme"
-          description="Use light or dark colors across the Movena interface."
+          description="Use light or dark colors across the NexiTV interface."
         >
           <SegmentedControl<ThemePreference>
             value={settings.themePreference}

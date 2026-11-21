@@ -496,7 +496,7 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
       setIsDirty(false);
       await deleteM3uDraft(selectedSourceId);
       localStorage.removeItem(legacyDraftKey(selectedSourceId));
-      notify.success('Source Updated', 'Changes are saved and available throughout Movena.');
+      notify.success('Source Updated', 'Changes are saved and available throughout NexiTV.');
     } catch (error: unknown) {
       notify.error(
         'Save Failed',
@@ -770,7 +770,7 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
         <ConfirmDialog
           title={t('Save playlist changes?')}
           description={t(
-            '{added} added, {changed} changed, and {removed} removed. Movena will update the source cache and refresh its catalogue.',
+            '{added} added, {changed} changed, and {removed} removed. NexiTV will update the source cache and refresh its catalogue.',
             {
               added: number(changeSummary.added),
               changed: number(changeSummary.changed),

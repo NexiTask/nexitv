@@ -276,7 +276,7 @@ async function fetchXtream<T>(
         promoteXtreamServer(creds.sourceId, currentUrl);
         notify.info(
           'Backup Server Active',
-          'Movena switched this source to an available provider server.',
+          'NexiTV switched this source to an available provider server.',
           4500,
           undefined,
           'connection',

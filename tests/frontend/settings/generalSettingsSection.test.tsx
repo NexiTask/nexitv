@@ -14,7 +14,7 @@ describe('GeneralSettingsSection', () => {
   it('toggles always on top and collapsed sidebar badges', () => {
     render(<GeneralSettingsSection />);
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Keep Movena window on top' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Keep NexiTV window on top' }));
     expect(useSettingsStore.getState().alwaysOnTop).toBe(true);
 
     fireEvent.click(

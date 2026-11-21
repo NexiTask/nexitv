@@ -100,7 +100,7 @@ function DownloadRow({ job }: { job: DownloadJob }) {
     void desktopApi.revealItemInDir(job.filePath).catch((error: unknown) => {
       notify.error(
         'File Could Not Be Opened',
-        getUserFacingErrorMessage(error, 'Movena could not reveal the downloaded file.'),
+        getUserFacingErrorMessage(error, 'NexiTV could not reveal the downloaded file.'),
         undefined,
         undefined,
         'downloads',

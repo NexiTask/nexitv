@@ -30,7 +30,7 @@ import styles from './ComponentHarness.module.css';
 const COPY = {
   en: {
     eyebrow: 'Production component QA',
-    description: 'Focused states rendered from the same shared controls used by Movena.',
+    description: 'Focused states rendered from the same shared controls used by NexiTV.',
     primitives: 'Controls and selection',
     content: 'Content states',
     settings: 'Settings controls',
@@ -40,7 +40,7 @@ const COPY = {
   de: {
     eyebrow: 'Prüfung der Produktionskomponenten',
     description:
-      'Gezielte Zustände mit denselben gemeinsam genutzten Bedienelementen, die Movena verwendet.',
+      'Gezielte Zustände mit denselben gemeinsam genutzten Bedienelementen, die NexiTV verwendet.',
     primitives: 'Bedienelemente und Auswahl',
     content: 'Inhaltszustände',
     settings: 'Einstellungen und Steuerelemente',
@@ -180,7 +180,7 @@ function SettingsControlsSurface() {
     <SettingsPageContent>
       <SettingsGroup
         title="Playback Preferences"
-        description="Choose how Movena balances compatibility, performance, and visual quality."
+        description="Choose how NexiTV balances compatibility, performance, and visual quality."
       >
         <SettingsRow
           title="Enable hardware decoding"
@@ -230,7 +230,7 @@ function SettingsControlsSurface() {
             <SettingsInput
               aria-label="Download folder"
               readOnly
-              value="C:\\Users\\viewer\\Downloads\\Movena Media"
+              value="C:\\Users\\viewer\\Downloads\\NexiTV Media"
             />
             <SettingsButton>Choose</SettingsButton>
           </div>

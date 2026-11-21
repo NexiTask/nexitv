@@ -1,4 +1,4 @@
-export const DEFAULT_RECORDING_DIRECTORY = 'Movena Recordings';
+export const DEFAULT_RECORDING_DIRECTORY = 'NexiTV Recordings';
 
 export interface RecordingOutput {
   fileName: string;

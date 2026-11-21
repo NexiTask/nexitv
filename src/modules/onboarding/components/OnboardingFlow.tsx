@@ -110,7 +110,7 @@ export function OnboardingFlow({ onDone }: { onDone: () => void }) {
                       </p>
                       <p className={styles.subtitle}>
                         {t(
-                          'Movena provides no channels, subscriptions, playlists, or media. Connect only sources you are authorized to access.',
+                          'NexiTV provides no channels, subscriptions, playlists, or media. Connect only sources you are authorized to access.',
                         )}
                       </p>
                     </div>

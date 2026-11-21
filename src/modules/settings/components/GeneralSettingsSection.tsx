@@ -46,10 +46,10 @@ export function GeneralSettingsSection() {
       >
         <SettingsRow
           title="Keep Window on Top"
-          description="Keep Movena above other desktop applications while active."
+          description="Keep NexiTV above other desktop applications while active."
         >
           <SettingsToggle
-            label="Keep Movena window on top"
+            label="Keep NexiTV window on top"
             checked={settings.alwaysOnTop}
             onChange={(checked) => settings.updateSetting('alwaysOnTop', checked)}
           />

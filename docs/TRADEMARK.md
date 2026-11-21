@@ -1,5 +1,10 @@
 # Trademark and branding policy
 
+> **NexiTV** is a modified version of Movena, distributed under the same licence. Following this
+> policy, it is branded as its own product, states its origin in the README and in
+> Settings → About, does not use the Movena name or logo as its own, and does not claim to
+> be an official Movena build or to be sponsored or endorsed by the Movena project.
+
 The source code and project artwork are licensed under GPL-3.0-or-later as
 described in `LICENSE` and `ASSETS.md`. Copyright permission does not imply that
 a modified product is official or endorsed by this project.

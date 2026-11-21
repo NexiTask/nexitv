@@ -34,9 +34,9 @@ export interface M3uEntry {
   radio?: boolean | undefined;
   radioMetadata?: ReturnType<typeof normalizeRadioDisplayMetadata> | undefined;
   episode?: M3uEpisodeIdentity | undefined;
-  /** Vendor attributes that Movena does not interpret but must preserve. */
+  /** Vendor attributes that NexiTV does not interpret but must preserve. */
   extraAttributes?: Record<string, string> | undefined;
-  /** Entry-scoped directives/comments that Movena does not interpret. */
+  /** Entry-scoped directives/comments that NexiTV does not interpret. */
   extraDirectives?: string[] | undefined;
 }
 

@@ -18,7 +18,7 @@ function storageKey(namespace: string, sourceId: string): string {
 }
 
 /**
- * Stores credential-bearing editor state in Movena's native application-data
+ * Stores credential-bearing editor state in NexiTV's native application-data
  * cache, never localStorage/IndexedDB.
  */
 export async function loadM3uEditorState(
