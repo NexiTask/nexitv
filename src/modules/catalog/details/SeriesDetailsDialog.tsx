@@ -17,6 +17,8 @@ import {
   useAuthStore,
 } from '@/modules/sources/public/store/useAuthStore';
 import type { XtreamEpisode } from '@/modules/sources/public/data/xtreamClient';
+import type { MediaItem } from '../model/media';
+import { VersionSwitcher } from './VersionSwitcher';
 import { useSeriesInfo } from '../data/useDetails';
 import { usePlayerStore } from '@/modules/playback/public/store/usePlayerStore';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
@@ -64,6 +66,9 @@ interface SeriesDetailsDialogProps {
   sourceItemId?: string | undefined;
   initialSeasonNumber?: number | undefined;
   initialEpisodeNumber?: number | undefined;
+  /** The other provider variants behind the grouped card, when grouped. */
+  versions?: readonly MediaItem[] | undefined;
+  onSelectVersion?: ((item: MediaItem) => void) | undefined;
   onClose: () => void;
 }
 
@@ -82,6 +87,8 @@ function XtreamSeriesDetailsDialog({
   sourceItemId,
   initialSeasonNumber,
   initialEpisodeNumber,
+  versions,
+  onSelectVersion,
   onClose,
 }: SeriesDetailsDialogProps) {
   const { t, tn, number, language } = useI18n();
@@ -532,6 +539,14 @@ function XtreamSeriesDetailsDialog({
               >
                 {plot}
               </div>
+
+              {versions && onSelectVersion && (
+                <VersionSwitcher
+                  variants={versions}
+                  activeId={seriesId}
+                  onSelect={onSelectVersion}
+                />
+              )}
 
               {hasMoreDetails && (
                 <button

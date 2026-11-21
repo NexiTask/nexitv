@@ -408,6 +408,10 @@ export const tauriApi = {
       fold,
     }),
 
+  /** The provider variants behind one grouped card, as (source id, raw JSON) pairs. */
+  catalogIndexVariants: (kind: CatalogPageKind, itemId: string) =>
+    invoke<[string, string][]>('catalog_index_variants', { kind, itemId }),
+
   /** The category sidebar's counts, or null while the index cannot serve the page. */
   catalogIndexPageStats: (
     kind: CatalogPageKind,

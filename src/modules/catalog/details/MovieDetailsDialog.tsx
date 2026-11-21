@@ -24,6 +24,8 @@ import { MovieDetailSkeleton } from '@/shared/ui/Skeleton';
 import { DetailsDialogShell } from '../components/DetailsDialogShell';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { getErrorPresentation } from '@/shared/lib/error';
+import type { MediaItem } from '../model/media';
+import { VersionSwitcher } from './VersionSwitcher';
 import styles from './MovieDetailsDialog.module.css';
 import { downloadMediaItem } from '@/modules/downloads/public/services/mediaDownload';
 import { M3uMovieDetailsDialog } from './M3uMovieDetailsDialog';
@@ -40,6 +42,9 @@ interface MovieDetailsDialogProps {
   moviePoster: string;
   sourceId?: string | undefined;
   sourceItemId?: string | undefined;
+  /** The other provider variants behind the grouped card, when grouped. */
+  versions?: readonly MediaItem[] | undefined;
+  onSelectVersion?: ((item: MediaItem) => void) | undefined;
   onClose: () => void;
 }
 
@@ -56,6 +61,8 @@ function XtreamMovieDetailsDialog({
   moviePoster,
   sourceId,
   sourceItemId,
+  versions,
+  onSelectVersion,
   onClose,
 }: MovieDetailsDialogProps) {
   const { t, language, number } = useI18n();
@@ -375,6 +382,14 @@ function XtreamMovieDetailsDialog({
                   </span>
                 ))}
               </div>
+
+              {versions && onSelectVersion && (
+                <VersionSwitcher
+                  variants={versions}
+                  activeId={movieId}
+                  onSelect={onSelectVersion}
+                />
+              )}
 
               {/* Synopsis plot */}
               <div

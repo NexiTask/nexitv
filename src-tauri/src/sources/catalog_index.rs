@@ -1073,6 +1073,41 @@ pub fn catalog_index_page_rows(
     )
 }
 
+/// The provider variants behind one grouped card: the rows sharing the title's
+/// IMDb identity, as (source id, raw JSON) pairs, without the row itself.
+/// Empty when the title has no IMDb identity.
+#[tauri::command(async)]
+pub fn catalog_index_variants(
+    app: tauri::AppHandle,
+    kind: String,
+    item_id: String,
+) -> Result<Vec<(String, String)>, String> {
+    validate_page_kind(&kind)?;
+    with_reader(&app, |connection| {
+        let identity: Option<String> = connection
+            .query_row(
+                "SELECT imdb_tconst FROM items WHERE kind = ?1 AND f_id = ?2",
+                params![kind, item_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(identity) = identity else {
+            return Ok(Vec::new());
+        };
+        let mut statement = connection.prepare(
+            "SELECT source_id, raw FROM items
+             WHERE kind = ?1 AND imdb_tconst = ?2 AND f_id IS NOT NULL AND f_id != ?3
+             ORDER BY source_id, ord",
+        )?;
+        let rows = statement
+            .query_map(params![kind, identity, item_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    })
+}
+
 /// The category sidebar's counts; `None` until the index can serve the page.
 #[tauri::command(async)]
 pub fn catalog_index_page_stats(
