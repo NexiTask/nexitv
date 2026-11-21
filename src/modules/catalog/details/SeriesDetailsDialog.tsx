@@ -1,8 +1,6 @@
 import { useEffect, useId, useState, useMemo, useRef } from 'react';
 import {
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Clock,
   Download,
   Heart,
@@ -20,6 +18,8 @@ import type { XtreamEpisode } from '@/modules/sources/public/data/xtreamClient';
 import type { MediaItem } from '../model/media';
 import type { TitleVariant } from '../data/useTitleVariants';
 import { VersionSwitcher } from './VersionSwitcher';
+import { DetailsHero } from './DetailsHero';
+import heroStyles from './DetailsHero.module.css';
 import { useImdbFacts } from '../data/useImdbFacts';
 import { useSeriesInfo } from '../data/useDetails';
 import { usePlayerStore } from '@/modules/playback/public/store/usePlayerStore';
@@ -35,7 +35,7 @@ import {
   parseEpisodeTitle,
   parseMediaDisplayTitle,
 } from '../lib/titleParser';
-import { getPrimaryMediaTags, getTagColorType, mergeMediaTags } from '@/shared/lib/mediaTags';
+import { getPrimaryMediaTags, mergeMediaTags } from '@/shared/lib/mediaTags';
 import { countryName } from '@/shared/lib/categoryName';
 import { SeriesDetailSkeleton } from '@/shared/ui/Skeleton';
 import { useMediaContextMenus } from '../hooks/useMediaContextMenus';
@@ -109,7 +109,6 @@ function XtreamSeriesDetailsDialog({
   const providerSeriesId = sourceItemId || seriesId;
   const resolvedSourceId = resolveXtreamSourceId(sourceId);
   const playStream = usePlayerStore((state) => state.playStream);
-  const [imageError, setImageError] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
 
   const titleId = useId();
@@ -260,6 +259,17 @@ function XtreamSeriesDetailsDialog({
   const currentEpisodes = useMemo(() => {
     return selectedSeason && data?.episodes ? data.episodes[selectedSeason] || [] : [];
   }, [selectedSeason, data?.episodes]);
+
+  // Episode thumbnails only when the provider has real stills: many lists
+  // repeat the series cover on every episode, which is just noise.
+  const showEpisodeStills = useMemo(() => {
+    const stills = new Set(
+      currentEpisodes
+        .map((episode) => episode.info?.movie_image)
+        .filter((image): image is string => Boolean(image) && image !== data?.info?.cover),
+    );
+    return stills.size > 1 && stills.size * 2 >= currentEpisodes.length;
+  }, [currentEpisodes, data?.info?.cover]);
   const availableEpisodeKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const [seasonNumber, episodes] of Object.entries(data?.episodes ?? {})) {
@@ -278,7 +288,7 @@ function XtreamSeriesDetailsDialog({
     )
       return;
     positionedEpisodeRef.current = true;
-    initialEpisodeRef.current.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    initialEpisodeRef.current.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   }, [currentEpisodes, initialEpisodeNumber, initialSeasonNumber, selectedSeason]);
 
   const handlePlayEpisode = (
@@ -426,167 +436,128 @@ function XtreamSeriesDetailsDialog({
         <SeriesDetailSkeleton />
       ) : data ? (
         <>
-          {/* Backdrop hero layer — omitted when no real backdrop art exists. */}
-          {backdropUrl && (
-            <div className={styles.backdropContainer}>
-              <div className={styles.backdrop} style={{ backgroundImage: `url(${backdropUrl})` }} />
-              <div className={styles.backdropOverlay} />
-            </div>
-          )}
-
-          <div className={styles.content}>
-            {/* Left: Poster column with cover + action buttons */}
-            <div className={`${styles.posterColumn} subtle-scrollbar`}>
-              <div className={styles.posterWrapper}>
-                {imageError || !(enriched?.posterUrl || data.info?.cover || seriesPoster) ? (
-                  <div className={styles.posterPlaceholder}>
-                    <MonitorPlay size={44} className={styles.posterPlaceholderIcon} />
-                    <span className={styles.posterPlaceholderTitle}>{cleanSeriesTitle}</span>
-                  </div>
-                ) : (
-                  <img
-                    src={enriched?.posterUrl || data.info?.cover || seriesPoster}
-                    alt={cleanSeriesTitle}
-                    className={styles.poster}
-                    onError={() => setImageError(true)}
+          <div className={`${heroStyles.page} subtle-scrollbar`}>
+            <DetailsHero
+              titleId={titleId}
+              title={cleanSeriesTitle}
+              posterUrl={enriched?.posterUrl || data.info?.cover || seriesPoster}
+              posterIcon={<MonitorPlay size={40} />}
+              backdropUrl={backdropUrl}
+              facts={[
+                Number.isFinite(releaseYear) && (
+                  <span key="year" className={heroStyles.fact}>
+                    {releaseYear}
+                  </span>
+                ),
+                enriched?.runtimeMinutes && (
+                  <span key="runtime" className={heroStyles.fact}>
+                    <Clock size={14} />{' '}
+                    {language === 'en'
+                      ? `${number(enriched.runtimeMinutes)}m`
+                      : t('{count} min', { count: number(enriched.runtimeMinutes) })}
+                  </span>
+                ),
+                rating && (
+                  <MediaRatingFact
+                    key="rating"
+                    rating={rating}
+                    className={heroStyles.fact}
+                    iconClassName={heroStyles.star}
                   />
-                )}
-              </div>
-
-              {/* Action Buttons below cover */}
-              <div className={styles.actionButtons}>
-                {historyItem && historyItem.episodeNum ? (
-                  <button
-                    type="button"
-                    className={styles.playBtn}
-                    onClick={handleResumeClick}
-                    data-modal-primary
-                  >
-                    <Play size={20} fill="currentColor" />
-                    <span className={styles.playBtnLabel}>
-                      <span>
-                        {t(historyItem.currentTime ? 'Resume' : 'Play')} S{historyItem.seasonNum}:E
-                        {historyItem.episodeNum}
-                      </span>
-                      {resumeHint && <span className={styles.playBtnHint}>{resumeHint}</span>}
-                    </span>
-                    {resumeProgress > 0 && (
-                      <span className={styles.actionProgress} aria-hidden="true">
-                        <span
-                          className={styles.actionProgressFill}
-                          style={{ width: `${resumeProgress}%` }}
-                        />
-                      </span>
-                    )}
-                  </button>
-                ) : currentEpisodes.length > 0 ? (
-                  <button
-                    type="button"
-                    className={styles.playBtn}
-                    onClick={() => {
-                      const firstEpisode = currentEpisodes[0];
-                      if (firstEpisode) handlePlayEpisode(firstEpisode);
-                    }}
-                    data-modal-primary
-                  >
-                    <Play size={20} fill="currentColor" />
-                    <span>{t('Start Watching')}</span>
-                  </button>
-                ) : null}
-
-                <button
-                  type="button"
-                  className={`${styles.favoriteBtn} ${isFav ? styles.activeFavoriteBtn : ''}`}
-                  onClick={toggleFavorite}
-                  aria-label={t(isFav ? 'Remove from favorites' : 'Add to favorites')}
-                  aria-pressed={isFav}
-                >
-                  <Heart size={18} fill={isFav ? 'currentColor' : 'none'} />
-                  <span>{t(isFav ? 'In Favorites' : 'Add to Favorites')}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Right: details header, metadata, plot, and season/episode browser */}
-            <div className={`${styles.detailsArea} subtle-scrollbar`}>
-              <div className={styles.headerBlock}>
-                <h1 id={titleId} className={styles.title}>
-                  {cleanSeriesTitle}
-                </h1>
-
-                <div className={styles.mediaFacts}>
-                  {Number.isFinite(releaseYear) && (
-                    <span className={styles.factItem}>{releaseYear}</span>
-                  )}
-                  {enriched?.runtimeMinutes && (
-                    <span className={styles.factItem}>
-                      <Clock size={14} />{' '}
-                      {language === 'en'
-                        ? `${number(enriched.runtimeMinutes)}m`
-                        : t('{count} min', { count: number(enriched.runtimeMinutes) })}
-                    </span>
-                  )}
-                  {rating && (
-                    <MediaRatingFact
-                      rating={rating}
-                      className={styles.factItem}
-                      iconClassName={styles.starIcon}
-                    />
-                  )}
-                  {genres && <span className={styles.factItem}>{genres}</span>}
-                  {displayedSeasonCount > 0 && (
-                    <span className={styles.factItem}>
-                      {tn('{count} season', '{count} seasons', displayedSeasonCount, {
-                        count: number(displayedSeasonCount),
-                      })}
-                    </span>
-                  )}
-                  {displayedEpisodeCount > 0 && (
-                    <span className={styles.factItem}>
-                      {tn('{count} episode', '{count} episodes', displayedEpisodeCount, {
-                        count: number(displayedEpisodeCount),
-                      })}
-                    </span>
-                  )}
-                  {displayCountry && <span className={styles.factItem}>{displayCountry}</span>}
-                  {getPrimaryMediaTags(parsedTitle.tags).map((tag) => (
-                    <span
-                      key={tag}
-                      className={`${styles.factItem} ${styles.technicalFact}`}
-                      data-tag-type={getTagColorType(tag)}
+                ),
+                displayedSeasonCount > 0 && (
+                  <span key="seasons" className={heroStyles.fact}>
+                    {tn('{count} season', '{count} seasons', displayedSeasonCount, {
+                      count: number(displayedSeasonCount),
+                    })}
+                  </span>
+                ),
+                displayedEpisodeCount > 0 && (
+                  <span key="episodes" className={heroStyles.fact}>
+                    {tn('{count} episode', '{count} episodes', displayedEpisodeCount, {
+                      count: number(displayedEpisodeCount),
+                    })}
+                  </span>
+                ),
+                displayCountry && (
+                  <span key="country" className={heroStyles.fact}>
+                    {displayCountry}
+                  </span>
+                ),
+              ]}
+              genres={genres}
+              tags={getPrimaryMediaTags(parsedTitle.tags)}
+              plot={plot}
+              expanded={detailsExpanded}
+              onToggleExpanded={
+                hasMoreDetails ? () => setDetailsExpanded((expanded) => !expanded) : undefined
+              }
+              actions={
+                <>
+                  {historyItem && historyItem.episodeNum ? (
+                    <button
+                      type="button"
+                      className={heroStyles.primaryBtn}
+                      onClick={handleResumeClick}
+                      data-modal-primary
                     >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
+                      <Play size={20} fill="currentColor" />
+                      <span className={heroStyles.primaryLabel}>
+                        <span>
+                          {t(historyItem.currentTime ? 'Resume' : 'Play')} S{historyItem.seasonNum}
+                          :E
+                          {historyItem.episodeNum}
+                        </span>
+                        {resumeHint && <span className={heroStyles.primaryHint}>{resumeHint}</span>}
+                      </span>
+                      {resumeProgress > 0 && (
+                        <span className={heroStyles.progress} aria-hidden="true">
+                          <span
+                            className={heroStyles.progressFill}
+                            style={{ width: `${resumeProgress}%` }}
+                          />
+                        </span>
+                      )}
+                    </button>
+                  ) : currentEpisodes.length > 0 ? (
+                    <button
+                      type="button"
+                      className={heroStyles.primaryBtn}
+                      onClick={() => {
+                        const firstEpisode = currentEpisodes[0];
+                        if (firstEpisode) handlePlayEpisode(firstEpisode);
+                      }}
+                      data-modal-primary
+                    >
+                      <Play size={20} fill="currentColor" />
+                      <span>{t('Start Watching')}</span>
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={`${heroStyles.iconBtn} ${isFav ? heroStyles.iconBtnActive : ''}`}
+                    onClick={toggleFavorite}
+                    aria-label={t(isFav ? 'Remove from favorites' : 'Add to favorites')}
+                    title={t(isFav ? 'In Favorites' : 'Add to Favorites')}
+                    aria-pressed={isFav}
+                  >
+                    <Heart size={18} fill={isFav ? 'currentColor' : 'none'} />
+                  </button>
+                </>
+              }
+              versions={
+                versions &&
+                onSelectVersion && (
+                  <VersionSwitcher
+                    variants={versions}
+                    activeId={seriesId}
+                    onSelect={onSelectVersion}
+                  />
+                )
+              }
+            />
 
-              <div
-                className={`${styles.plot} ${detailsExpanded ? styles.expandedText : styles.collapsedText}`}
-              >
-                {plot}
-              </div>
-
-              {versions && onSelectVersion && (
-                <VersionSwitcher
-                  variants={versions}
-                  activeId={seriesId}
-                  onSelect={onSelectVersion}
-                />
-              )}
-
-              {hasMoreDetails && (
-                <button
-                  type="button"
-                  className={styles.detailsToggle}
-                  onClick={() => setDetailsExpanded((expanded) => !expanded)}
-                  aria-expanded={detailsExpanded}
-                >
-                  {detailsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  {t(detailsExpanded ? 'Show less' : 'More details')}
-                </button>
-              )}
-
+            <div className={heroStyles.body}>
               {/* Episodes Section */}
               <section className={styles.episodeSection} aria-label={t('Episodes')}>
                 <div className={styles.episodeBrowserHeader}>
@@ -611,7 +582,7 @@ function XtreamSeriesDetailsDialog({
                   )}
                 </div>
 
-                <div className={styles.episodesList}>
+                <div className={`${styles.episodesList} ${styles.episodeRows}`}>
                   {currentEpisodes.map((episode) => {
                     const episodeLibraryId = resolvedSourceId
                       ? xtreamItemId(resolvedSourceId, 'episode', episode.id)
@@ -683,7 +654,7 @@ function XtreamSeriesDetailsDialog({
                         type="button"
                         key={episode.id}
                         ref={isRequestedEpisode ? initialEpisodeRef : undefined}
-                        className={`${styles.episodeCard} ${isSavedEp && epProgress > 0 ? styles.currentEpisodeCard : ''} ${isRequestedEpisode ? styles.requestedEpisodeCard : ''}`}
+                        className={`${styles.episodeRow} ${isSavedEp && epProgress > 0 ? styles.currentEpisodeRow : ''} ${isRequestedEpisode ? styles.requestedEpisodeRow : ''} ${isWatched && !isSavedEp ? styles.watchedEpisodeRow : ''}`}
                         onClick={() => handlePlayEpisode(episode)}
                         onContextMenu={(e) =>
                           handleMediaCardContextMenu(e, episodeItem, {
@@ -693,56 +664,59 @@ function XtreamSeriesDetailsDialog({
                         aria-label={episodeLabel}
                         aria-current={isRequestedEpisode ? 'true' : undefined}
                       >
-                        <div className={styles.episodeImageWrapper}>
-                          <img
-                            src={episode.info?.movie_image || data.info?.cover || seriesPoster}
-                            alt=""
-                            className={styles.episodeImage}
-                            loading="lazy"
+                        <span className={styles.episodeNumber} aria-hidden="true">
+                          <span className={styles.episodeNumberText}>{episode.episode_num}</span>
+                          <Play
+                            size={16}
+                            fill="currentColor"
+                            className={styles.episodeNumberPlay}
                           />
-                          <div className={styles.playOverlay} aria-hidden="true">
-                            <div className={styles.playCircle}>
-                              <Play size={20} fill="currentColor" />
-                            </div>
-                          </div>
-                          {isDownloaded && (
-                            <span className={styles.episodeDownloadedBadge} title={t('Downloaded')}>
-                              <HardDriveDownload size={13} />
-                            </span>
-                          )}
-                          {(isWatched || epProgress > 0) && (
-                            <span
-                              className={`${styles.episodeProgress} ${isWatched ? styles.watchedEpisodeProgress : ''}`}
-                              aria-hidden="true"
-                            >
-                              <span
-                                className={styles.episodeProgressFill}
-                                style={{ width: `${isWatched ? 100 : epProgress}%` }}
-                              />
-                            </span>
-                          )}
-                        </div>
+                        </span>
 
-                        <div className={styles.episodeInfo}>
-                          <div className={styles.episodeHeaderLine}>
-                            <span className={styles.episodeBadge}>E{episode.episode_num}</span>
-                            <span className={styles.episodeTitle}>{parsedEpisode.cleanTitle}</span>
-                          </div>
+                        {showEpisodeStills && (
+                          <span className={styles.episodeThumb}>
+                            <img
+                              src={episode.info?.movie_image || data.info?.cover || seriesPoster}
+                              alt=""
+                              loading="lazy"
+                            />
+                          </span>
+                        )}
+
+                        <span className={styles.episodeMain}>
+                          <span className={styles.episodeTitle}>{parsedEpisode.cleanTitle}</span>
                           {episode.info?.plot && (
-                            <p className={styles.episodePlot}>{episode.info.plot}</p>
+                            <span className={styles.episodePlot}>{episode.info.plot}</span>
                           )}
-                          <div className={styles.episodeMeta}>
-                            {durationLabel && <span>{durationLabel}</span>}
-                            {episodeStatus && (
-                              <span
-                                className={`${styles.episodeStatus} ${isWatched && !isSavedEp ? styles.watchedStatus : ''}`}
-                              >
-                                {isWatched && !isSavedEp && <CheckCircle2 size={13} />}
-                                {episodeStatus}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                        </span>
+
+                        <span className={styles.episodeSide}>
+                          {isDownloaded && (
+                            <span className={styles.episodeDownloaded} title={t('Downloaded')}>
+                              <HardDriveDownload size={14} />
+                            </span>
+                          )}
+                          {episodeStatus && (
+                            <span
+                              className={`${styles.episodeStatus} ${isWatched && !isSavedEp ? styles.watchedStatus : ''}`}
+                            >
+                              {isWatched && !isSavedEp && <CheckCircle2 size={13} />}
+                              {episodeStatus}
+                            </span>
+                          )}
+                          {durationLabel && (
+                            <span className={styles.episodeDuration}>{durationLabel}</span>
+                          )}
+                        </span>
+
+                        {epProgress > 0 && !isWatched && (
+                          <span className={styles.episodeProgress} aria-hidden="true">
+                            <span
+                              className={styles.episodeProgressFill}
+                              style={{ width: `${epProgress}%` }}
+                            />
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -764,19 +738,19 @@ function XtreamSeriesDetailsDialog({
 
               {/* Director & Cast Credits */}
               {(director || castList.length > 0) && (
-                <div className={styles.creditsSection}>
+                <div className={heroStyles.credits}>
                   {director && (
-                    <div className={styles.creditBlock}>
-                      <span className={styles.creditLabel}>{t('Director')}</span>
-                      <span className={styles.creditValue}>{director}</span>
+                    <div className={heroStyles.creditBlock}>
+                      <h2 className={heroStyles.sectionTitle}>{t('Director')}</h2>
+                      <span className={heroStyles.creditValue}>{director}</span>
                     </div>
                   )}
                   {castList.length > 0 && (
-                    <div className={styles.creditBlock}>
-                      <span className={styles.creditLabel}>{t('Cast')}</span>
-                      <div className={styles.castTags}>
-                        {(detailsExpanded ? castList : castList.slice(0, 6)).map((actor, idx) => (
-                          <span key={idx} className={styles.castTag}>
+                    <div className={heroStyles.creditBlock}>
+                      <h2 className={heroStyles.sectionTitle}>{t('Cast')}</h2>
+                      <div className={heroStyles.cast}>
+                        {(detailsExpanded ? castList : castList.slice(0, 10)).map((actor, idx) => (
+                          <span key={idx} className={heroStyles.castName}>
                             {actor}
                           </span>
                         ))}

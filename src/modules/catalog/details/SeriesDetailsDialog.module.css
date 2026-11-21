@@ -624,3 +624,161 @@
   width: 100%;
   min-height: 0;
 }
+
+/* Compact episode rows (the Xtream sheet): number, optional still, title and
+   a line of plot, then status and runtime on the right. */
+.episodeRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
+  min-height: 64px;
+  padding: var(--space-2-5) var(--space-4) var(--space-2-5) var(--space-2);
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.episodeRow + .episodeRow::before {
+  content: '';
+  position: absolute;
+  inset: 0 var(--space-4) auto;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.episodeRow:hover,
+.episodeRow:focus-visible {
+  border-color: var(--border-subtle);
+  background: var(--surface-control);
+}
+
+.episodeRow:hover::before,
+.episodeRow:hover + .episodeRow::before,
+.currentEpisodeRow::before,
+.currentEpisodeRow + .episodeRow::before,
+.requestedEpisodeRow::before,
+.requestedEpisodeRow + .episodeRow::before {
+  visibility: hidden;
+}
+
+.currentEpisodeRow {
+  border-color: rgba(var(--accent-color-rgb), var(--alpha-40));
+  background: rgba(var(--accent-color-rgb), var(--alpha-8));
+}
+
+.requestedEpisodeRow {
+  border-color: var(--accent-color);
+  background: var(--surface-selection);
+}
+
+.episodeNumber {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  color: var(--text-muted);
+  font-size: var(--font-size-heading, 18px);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.episodeNumberPlay {
+  position: absolute;
+  color: var(--text-primary);
+  visibility: hidden;
+}
+
+.episodeRow:hover .episodeNumberText,
+.episodeRow:focus-visible .episodeNumberText {
+  visibility: hidden;
+}
+
+.episodeRow:hover .episodeNumberPlay,
+.episodeRow:focus-visible .episodeNumberPlay {
+  visibility: visible;
+}
+
+.watchedEpisodeRow .episodeNumberText,
+.watchedEpisodeRow .episodeTitle {
+  color: var(--text-muted);
+}
+
+.episodeThumb {
+  flex: none;
+  width: 120px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+}
+
+.episodeThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.episodeMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.episodeMain .episodeTitle {
+  display: block;
+}
+
+.episodeMain .episodePlot {
+  -webkit-line-clamp: 1;
+}
+
+.episodeSide {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--font-size-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.episodeDuration {
+  min-width: 52px;
+  text-align: right;
+}
+
+.episodeDownloaded {
+  display: inline-flex;
+  color: var(--text-secondary);
+}
+
+.episodeRow .episodeProgress {
+  inset: auto var(--space-2) 0;
+  height: 2px;
+  border-radius: var(--radius-full);
+}
+
+@media (max-width: 768px) {
+  .episodeThumb {
+    width: 88px;
+  }
+
+  .episodeMain .episodePlot {
+    display: none;
+  }
+}
+
+.episodeRows {
+  gap: 0;
+}

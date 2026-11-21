@@ -1,15 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import {
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  Download,
-  Film,
-  Heart,
-  Play,
-  RotateCcw,
-  Settings,
-} from 'lucide-react';
+import { Clock, Download, Film, Heart, Play, RotateCcw, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getXtreamCredentials, useAuthStore } from '@/modules/sources/public/store/useAuthStore';
 import { getStreamUrl } from '@/modules/sources/public/data/xtreamClient';
@@ -18,7 +8,7 @@ import { usePlayerStore } from '@/modules/playback/public/store/usePlayerStore';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import { formatRemaining } from '@/shared/lib/time';
 import { parseMediaDisplayTitle } from '../lib/titleParser';
-import { getPrimaryMediaTags, getTagColorType } from '@/shared/lib/mediaTags';
+import { getPrimaryMediaTags } from '@/shared/lib/mediaTags';
 import { countryName } from '@/shared/lib/categoryName';
 import { MovieDetailSkeleton } from '@/shared/ui/Skeleton';
 import { DetailsDialogShell } from '../components/DetailsDialogShell';
@@ -27,6 +17,8 @@ import { getErrorPresentation } from '@/shared/lib/error';
 import type { MediaItem } from '../model/media';
 import type { TitleVariant } from '../data/useTitleVariants';
 import { VersionSwitcher } from './VersionSwitcher';
+import { DetailsHero } from './DetailsHero';
+import heroStyles from './DetailsHero.module.css';
 import { useImdbFacts } from '../data/useImdbFacts';
 import styles from './MovieDetailsDialog.module.css';
 import { downloadMediaItem } from '@/modules/downloads/public/services/mediaDownload';
@@ -81,7 +73,6 @@ function XtreamMovieDetailsDialog({
   });
   const providerMovieId = sourceItemId || movieId;
   const playStream = usePlayerStore((state) => state.playStream);
-  const [imageError, setImageError] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const titleId = useId();
 
@@ -278,180 +269,139 @@ function XtreamMovieDetailsDialog({
         <MovieDetailSkeleton />
       ) : data ? (
         <>
-          {/* Backdrop hero layer — omitted when no real backdrop art exists. */}
-          {backdropUrl && (
-            <div className={styles.backdropContainer}>
-              <div className={styles.backdrop} style={{ backgroundImage: `url(${backdropUrl})` }} />
-              <div className={styles.backdropOverlay} />
-            </div>
-          )}
-
-          <div className={styles.content}>
-            {/* Left: Poster column with cover + action buttons */}
-            <div className={`${styles.posterColumn} subtle-scrollbar`}>
-              <div className={styles.posterWrapper}>
-                {imageError || !(enriched?.posterUrl || data.info.movie_image || moviePoster) ? (
-                  <div className={styles.posterPlaceholder}>
-                    <Film size={44} className={styles.posterPlaceholderIcon} />
-                    <span className={styles.posterPlaceholderTitle}>{parsedTitle.cleanTitle}</span>
-                  </div>
-                ) : (
-                  <img
-                    src={enriched?.posterUrl || data.info.movie_image || moviePoster}
-                    alt={parsedTitle.cleanTitle}
-                    className={styles.poster}
-                    onError={() => setImageError(true)}
+          <div className={`${heroStyles.page} subtle-scrollbar`}>
+            <DetailsHero
+              titleId={titleId}
+              title={parsedTitle.cleanTitle}
+              posterUrl={enriched?.posterUrl || data.info.movie_image || moviePoster}
+              posterIcon={<Film size={40} />}
+              backdropUrl={backdropUrl}
+              facts={[
+                Number.isFinite(releaseYear) && (
+                  <span key="year" className={heroStyles.fact}>
+                    {releaseYear}
+                  </span>
+                ),
+                duration && (
+                  <span key="duration" className={heroStyles.fact}>
+                    <Clock size={14} /> {duration}
+                  </span>
+                ),
+                rating && (
+                  <MediaRatingFact
+                    key="rating"
+                    rating={rating}
+                    className={heroStyles.fact}
+                    iconClassName={heroStyles.star}
                   />
-                )}
-              </div>
-
-              {/* Action Buttons below cover */}
-              <div className={styles.actionButtons}>
-                {historyItem && historyItem.currentTime ? (
-                  <>
+                ),
+                displayCountry && (
+                  <span key="country" className={heroStyles.fact}>
+                    {displayCountry}
+                  </span>
+                ),
+              ]}
+              genres={genres}
+              tags={getPrimaryMediaTags(parsedTitle.tags)}
+              plot={plot}
+              expanded={detailsExpanded}
+              onToggleExpanded={
+                hasMoreDetails ? () => setDetailsExpanded((expanded) => !expanded) : undefined
+              }
+              actions={
+                <>
+                  {historyItem && historyItem.currentTime ? (
+                    <>
+                      <button
+                        type="button"
+                        className={heroStyles.primaryBtn}
+                        onClick={() => handlePlay(false)}
+                        data-modal-primary
+                      >
+                        <Play size={20} fill="currentColor" />
+                        <span className={heroStyles.primaryLabel}>
+                          <span>{t('Resume')}</span>
+                          {remainingLabel && (
+                            <span className={heroStyles.primaryHint}>{remainingLabel}</span>
+                          )}
+                        </span>
+                        {progress > 0 && (
+                          <span className={heroStyles.progress} aria-hidden="true">
+                            <span
+                              className={heroStyles.progressFill}
+                              style={{ width: `${progress}%` }}
+                            />
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className={heroStyles.secondaryBtn}
+                        onClick={() => handlePlay(true)}
+                      >
+                        <RotateCcw size={16} />
+                        <span>{t('Start Over')}</span>
+                      </button>
+                    </>
+                  ) : (
                     <button
                       type="button"
-                      className={styles.playBtn}
+                      className={heroStyles.primaryBtn}
                       onClick={() => handlePlay(false)}
                       data-modal-primary
                     >
                       <Play size={20} fill="currentColor" />
-                      <span className={styles.playBtnLabel}>
-                        <span>{t('Resume')}</span>
-                        {remainingLabel && (
-                          <span className={styles.playBtnHint}>{remainingLabel}</span>
-                        )}
-                      </span>
-                      {progress > 0 && (
-                        <span className={styles.actionProgress} aria-hidden="true">
-                          <span
-                            className={styles.actionProgressFill}
-                            style={{ width: `${progress}%` }}
-                          />
-                        </span>
-                      )}
+                      <span>{t('Play Movie')}</span>
                     </button>
-                    <button
-                      type="button"
-                      className={styles.secondaryBtn}
-                      onClick={() => handlePlay(true)}
-                    >
-                      <RotateCcw size={16} />
-                      <span>{t('Start Over')}</span>
-                    </button>
-                  </>
-                ) : (
+                  )}
                   <button
                     type="button"
-                    className={styles.playBtn}
-                    onClick={() => handlePlay(false)}
-                    data-modal-primary
-                  >
-                    <Play size={20} fill="currentColor" />
-                    <span>{t('Play Movie')}</span>
-                  </button>
-                )}
-
-                <div className={styles.iconActionRow}>
-                  <button
-                    type="button"
-                    className={`${styles.favoriteBtn} ${styles.iconActionButton} ${isFav ? styles.activeFavoriteBtn : ''}`}
+                    className={`${heroStyles.iconBtn} ${isFav ? heroStyles.iconBtnActive : ''}`}
                     onClick={toggleFavorite}
                     aria-label={t(isFav ? 'Remove from favorites' : 'Add to favorites')}
+                    title={t(isFav ? 'In Favorites' : 'Add to Favorites')}
                     aria-pressed={isFav}
                   >
                     <Heart size={18} fill={isFav ? 'currentColor' : 'none'} />
                   </button>
                   <button
                     type="button"
-                    className={`${styles.secondaryBtn} ${styles.iconActionButton}`}
+                    className={heroStyles.iconBtn}
                     onClick={handleDownload}
                     aria-label={t('Download movie')}
+                    title={t('Download movie')}
                   >
                     <Download size={18} />
                   </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Main details & credits */}
-            <div className={`${styles.detailsArea} subtle-scrollbar`}>
-              <h1 id={titleId} className={styles.title}>
-                {parsedTitle.cleanTitle}
-              </h1>
-
-              {/* Media Facts Bar */}
-              <div className={styles.mediaFacts}>
-                {Number.isFinite(releaseYear) && (
-                  <span className={styles.factItem}>{releaseYear}</span>
-                )}
-                {duration && (
-                  <span className={styles.factItem}>
-                    <Clock size={14} /> {duration}
-                  </span>
-                )}
-                {rating && (
-                  <MediaRatingFact
-                    rating={rating}
-                    className={styles.factItem}
-                    iconClassName={styles.starIcon}
+                </>
+              }
+              versions={
+                versions &&
+                onSelectVersion && (
+                  <VersionSwitcher
+                    variants={versions}
+                    activeId={movieId}
+                    onSelect={onSelectVersion}
                   />
-                )}
-                {genres && <span className={styles.factItem}>{genres}</span>}
-                {displayCountry && <span className={styles.factItem}>{displayCountry}</span>}
-                {getPrimaryMediaTags(parsedTitle.tags).map((tag) => (
-                  <span
-                    key={tag}
-                    className={`${styles.factItem} ${styles.technicalFact}`}
-                    data-tag-type={getTagColorType(tag)}
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
+                )
+              }
+            />
 
-              {versions && onSelectVersion && (
-                <VersionSwitcher
-                  variants={versions}
-                  activeId={movieId}
-                  onSelect={onSelectVersion}
-                />
-              )}
-
-              {/* Synopsis plot */}
-              <div
-                className={`${styles.plot} ${detailsExpanded ? styles.expandedText : styles.collapsedText}`}
-              >
-                {plot}
-              </div>
-
-              {hasMoreDetails && (
-                <button
-                  type="button"
-                  className={styles.detailsToggle}
-                  onClick={() => setDetailsExpanded((expanded) => !expanded)}
-                  aria-expanded={detailsExpanded}
-                >
-                  {detailsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  {t(detailsExpanded ? 'Show less' : 'More details')}
-                </button>
-              )}
-
-              {/* Director & Cast Credits */}
-              {(director || castList.length > 0) && (
-                <div className={styles.creditsSection}>
+            {(director || castList.length > 0) && (
+              <div className={heroStyles.body}>
+                <div className={heroStyles.credits}>
                   {director && (
-                    <div className={styles.creditBlock}>
-                      <span className={styles.creditLabel}>{t('Director')}</span>
-                      <span className={styles.creditValue}>{director}</span>
+                    <div className={heroStyles.creditBlock}>
+                      <h2 className={heroStyles.sectionTitle}>{t('Director')}</h2>
+                      <span className={heroStyles.creditValue}>{director}</span>
                     </div>
                   )}
                   {castList.length > 0 && (
-                    <div className={styles.creditBlock}>
-                      <span className={styles.creditLabel}>{t('Cast')}</span>
-                      <div className={styles.castTags}>
-                        {(detailsExpanded ? castList : castList.slice(0, 6)).map((actor, idx) => (
-                          <span key={idx} className={styles.castTag}>
+                    <div className={heroStyles.creditBlock}>
+                      <h2 className={heroStyles.sectionTitle}>{t('Cast')}</h2>
+                      <div className={heroStyles.cast}>
+                        {(detailsExpanded ? castList : castList.slice(0, 10)).map((actor, idx) => (
+                          <span key={idx} className={heroStyles.castName}>
                             {actor}
                           </span>
                         ))}
@@ -459,8 +409,8 @@ function XtreamMovieDetailsDialog({
                     </div>
                   )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </>
       ) : null}

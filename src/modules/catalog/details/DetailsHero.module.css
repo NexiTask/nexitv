@@ -1,0 +1,374 @@
+/* The sheet scrolls as one: the hero first, then episodes and credits. */
+.page {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.hero {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 360px;
+  padding: var(--space-10) var(--space-8) var(--space-6);
+  isolation: isolate;
+}
+
+.art {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-position: center 22%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: var(--alpha-70);
+}
+
+/* No landscape art: the poster, blurred into a wash of its own colours. */
+.artFromPoster {
+  opacity: var(--alpha-55);
+  filter: blur(40px) saturate(1.3);
+  transform: scale(1.25);
+}
+
+/* Fades into the panel at the bottom and keeps the text side readable, in
+   either theme: mixed from the panel's own surface, not from black. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(
+      to top,
+      var(--surface-elevated) 0%,
+      color-mix(in srgb, var(--surface-elevated) 72%, transparent) 35%,
+      color-mix(in srgb, var(--surface-elevated) 10%, transparent) 100%
+    ),
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--surface-elevated) 55%, transparent) 0%,
+      transparent 70%
+    );
+}
+
+.inner {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-8);
+  width: 100%;
+  min-width: 0;
+}
+
+.poster {
+  flex: none;
+  width: 200px;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-control);
+  box-shadow: var(--shadow-detail-control);
+}
+
+.poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.posterPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--font-size-control);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  padding-right: var(--space-10);
+  color: var(--text-primary);
+  font-size: clamp(28px, 3.4vw, 42px);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-shadow: var(--shadow-detail-title);
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-4);
+  row-gap: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.fact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.star {
+  color: var(--color-warning);
+}
+
+.tag {
+  padding: var(--space-px, 1px) var(--space-1-5);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-xs);
+  color: var(--badge-accent, var(--text-primary));
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+}
+
+.genre {
+  padding: var(--space-0-5) var(--space-2-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface-control) 70%, transparent);
+  color: var(--text-secondary);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+}
+
+.plot {
+  max-width: 72ch;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-relaxed);
+}
+
+.plotCollapsed {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.moreToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: calc(-1 * var(--space-2));
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.moreToggle:hover {
+  color: var(--accent-foreground);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+/* Buttons shared by both sheets. */
+.primaryBtn,
+.secondaryBtn,
+.iconBtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 46px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.primaryBtn {
+  min-width: 180px;
+  padding: 0 var(--space-6) 0 var(--space-5);
+  border: none;
+  background: var(--text-primary);
+  color: var(--bg-base);
+  box-shadow: var(--shadow-detail-control);
+}
+
+.primaryBtn:hover {
+  background: color-mix(in srgb, var(--text-primary) 88%, var(--bg-base));
+}
+
+.primaryLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.primaryHint {
+  max-width: 260px;
+  overflow: hidden;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  opacity: var(--alpha-70);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress {
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: rgba(var(--neutral-black-rgb), var(--alpha-20));
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  background: var(--accent-color);
+}
+
+.secondaryBtn,
+.iconBtn {
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-control) 80%, transparent);
+  color: var(--text-primary);
+}
+
+.secondaryBtn {
+  padding: 0 var(--space-4);
+}
+
+.iconBtn {
+  width: 46px;
+  padding: 0;
+}
+
+.secondaryBtn:hover,
+.iconBtn:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-control-hover);
+}
+
+.iconBtnActive,
+.iconBtnActive:hover {
+  border-color: rgba(var(--accent-color-rgb), var(--alpha-40));
+  background: rgba(var(--accent-color-rgb), var(--alpha-12));
+  color: var(--accent-foreground);
+}
+
+/* Below the hero: episodes, credits. */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-2) var(--space-8) var(--space-8);
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.credits {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.creditBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.creditValue {
+  color: var(--text-primary);
+  font-size: var(--font-size-body);
+}
+
+.cast {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+}
+
+.castName {
+  padding: var(--space-0-75) var(--space-2-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--surface-control);
+  color: var(--text-secondary);
+  font-size: var(--font-size-small);
+}
+
+@media (max-width: 768px) {
+  .hero {
+    min-height: 0;
+    padding: var(--space-10) var(--space-4) var(--space-4);
+  }
+
+  .inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+
+  .poster {
+    width: 120px;
+  }
+
+  .body {
+    padding: var(--space-2) var(--space-4) var(--space-6);
+  }
+
+  .credits {
+    grid-template-columns: 1fr;
+  }
+}

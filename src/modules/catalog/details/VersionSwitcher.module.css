@@ -1,9 +1,8 @@
-/* The "N versions" row on a detail sheet. */
+/* The "N versions" row on a detail sheet: a label and a compact picker. */
 .versionRow {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-top: var(--space-3);
 }
 
 .versionLabel {
@@ -13,6 +12,6 @@
 }
 
 .versionRow > :last-child {
-  flex: 1;
+  flex: none;
   min-width: 0;
 }
