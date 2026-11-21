@@ -237,6 +237,7 @@ const DEFAULT_SETTINGS = {
   catalogHideAdult: true,
   catalogGroupTitles: true,
   catalogHiddenKeywords: [] as string[],
+  showWindowControls: true,
   catalogSortModes: emptyCatalogSortModes(),
   sidebarWidth: 260,
   viewMode: 'grid' as const,
@@ -480,6 +481,8 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
     catalogGroupTitles:
       typeof state.catalogGroupTitles === 'boolean' ? state.catalogGroupTitles : true,
     catalogHiddenKeywords: normalizeHiddenKeywords(state.catalogHiddenKeywords),
+    showWindowControls:
+      typeof state.showWindowControls === 'boolean' ? state.showWindowControls : true,
     catalogSortModes: normalizeCatalogSortModes(state.catalogSortModes),
     lastCollectionId:
       typeof state.lastCollectionId === 'string' && state.lastCollectionId.length <= 512

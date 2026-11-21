@@ -382,6 +382,10 @@ export const DE_MESSAGES: Record<string, string> = {
   Rating: 'Bewertung',
   'Rating {rating}': 'Bewertung {rating}',
   Provider: 'Anbieter',
+  'Window Buttons': 'Fensterschaltflächen',
+  'Show the minimize, maximize and close buttons in the top corner. Turn off when your window manager handles windows, e.g. a tiling desktop.':
+    'Zeigt die Schaltflächen zum Minimieren, Maximieren und Schließen in der oberen Ecke. Ausschalten, wenn der Fenstermanager die Fenster verwaltet, z. B. ein Kachel-Desktop.',
+  'Show window buttons': 'Fensterschaltflächen anzeigen',
   'Content Filter': 'Inhaltsfilter',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Blendet Inhalte standardmäßig in Filmen und Serien aus. Ein Titel mit einer nicht gefilterten Kopie zeigt weiterhin diese Kopie.',

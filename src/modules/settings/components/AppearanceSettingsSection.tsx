@@ -12,7 +12,12 @@ import { useSettingsStore, type ThemePreference } from '../store/useSettingsStor
 import { DEFAULT_ACCENT_COLOR } from '@/shared/design/color';
 import { AccentColorPicker } from '@/shared/ui/AccentColorPicker';
 import { SegmentedControl } from '@/shared/ui/SegmentedControl';
-import { SettingsGroup, SettingsPageContent, SettingsRow } from './SettingsControls';
+import {
+  SettingsGroup,
+  SettingsPageContent,
+  SettingsRow,
+  SettingsToggle,
+} from './SettingsControls';
 export function AppearanceSettingsSection() {
   const settings = useSettingsStore();
   const accentColor = settings.accentColor || DEFAULT_ACCENT_COLOR;
@@ -64,6 +69,17 @@ export function AppearanceSettingsSection() {
               },
               { value: 'list', label: 'List', icon: RiLayoutRowLine, activeIcon: RiLayoutRowFill },
             ]}
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          title="Window Buttons"
+          description="Show the minimize, maximize and close buttons in the top corner. Turn off when your window manager handles windows, e.g. a tiling desktop."
+        >
+          <SettingsToggle
+            label="Show window buttons"
+            checked={settings.showWindowControls}
+            onChange={(checked) => settings.updateSetting('showWindowControls', checked)}
           />
         </SettingsRow>
       </SettingsGroup>

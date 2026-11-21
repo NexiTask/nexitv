@@ -370,6 +370,10 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   Rating: 'Avaliação',
   'Rating {rating}': 'Avaliação {rating}',
   Provider: 'Provedor',
+  'Window Buttons': 'Botões da janela',
+  'Show the minimize, maximize and close buttons in the top corner. Turn off when your window manager handles windows, e.g. a tiling desktop.':
+    'Mostra os botões de minimizar, maximizar e fechar no canto superior. Desative quando o gerenciador de janelas cuidar delas, por ex. um desktop lado a lado.',
+  'Show window buttons': 'Mostrar botões da janela',
   'Content Filter': 'Filtro de conteúdo',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Deixa conteúdo de fora de Filmes e Séries por padrão. Um título com uma cópia não filtrada ainda mostra essa cópia.',

@@ -152,6 +152,9 @@ export interface SettingsState {
   /** Movies/Series leave out the categories whose name contains one of these
    * (case-insensitive), e.g. "Bollywood" for a dubbed copy filed abroad. */
   catalogHiddenKeywords: string[];
+  /** The app's own minimize/maximize/close buttons; tiling window managers
+   * (Hyprland) manage windows themselves and do not need them. */
+  showWindowControls: boolean;
   catalogSortModes: CatalogSortModes;
 
   // UI & Desktop
@@ -290,6 +293,7 @@ export const SETTINGS_SNAPSHOT_KEYS = [
   'catalogHideAdult',
   'catalogGroupTitles',
   'catalogHiddenKeywords',
+  'showWindowControls',
   'smartLogoAspectMode',
   'imageSharpness',
   'imageBrightness',

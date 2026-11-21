@@ -369,6 +369,10 @@ export const PL_MESSAGES: Record<string, string> = {
   Rating: 'Ocena',
   'Rating {rating}': 'Ocena {rating}',
   Provider: 'Dostawca',
+  'Window Buttons': 'Przyciski okna',
+  'Show the minimize, maximize and close buttons in the top corner. Turn off when your window manager handles windows, e.g. a tiling desktop.':
+    'Pokazuje przyciski minimalizacji, maksymalizacji i zamknięcia w górnym rogu. Wyłącz, gdy oknami zarządza menedżer okien, np. pulpit kafelkowy.',
+  'Show window buttons': 'Pokaż przyciski okna',
   'Content Filter': 'Filtr treści',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Domyślnie pomija treści w Filmach i Serialach. Tytuł z kopią, która nie jest filtrowana, nadal pokazuje tę kopię.',

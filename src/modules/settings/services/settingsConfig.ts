@@ -131,6 +131,7 @@ export function sanitizeSettingsConfig(value: unknown): SettingsSnapshot {
     catalogHideAdult: booleanOr(source.catalogHideAdult, migrated.catalogHideAdult),
     catalogGroupTitles: booleanOr(source.catalogGroupTitles, migrated.catalogGroupTitles),
     catalogHiddenKeywords: migrated.catalogHiddenKeywords,
+    showWindowControls: booleanOr(source.showWindowControls, migrated.showWindowControls),
     smartLogoAspectMode: oneOf(
       source.smartLogoAspectMode,
       ['auto', 'force-16:9', 'off'] as const,

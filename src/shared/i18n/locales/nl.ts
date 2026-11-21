@@ -370,6 +370,10 @@ export const NL_MESSAGES: Record<string, string> = {
   Rating: 'Beoordeling',
   'Rating {rating}': 'Beoordeling {rating}',
   Provider: 'Aanbieder',
+  'Window Buttons': 'Vensterknoppen',
+  'Show the minimize, maximize and close buttons in the top corner. Turn off when your window manager handles windows, e.g. a tiling desktop.':
+    'Toont de knoppen minimaliseren, maximaliseren en sluiten in de bovenhoek. Zet uit als je vensterbeheerder de vensters regelt, bijv. een tegelbureaublad.',
+  'Show window buttons': 'Vensterknoppen tonen',
   'Content Filter': 'Inhoudsfilter',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Laat standaard inhoud weg uit Films en Series. Een titel met een niet-gefilterde kopie toont nog steeds die kopie.',

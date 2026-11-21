@@ -2,6 +2,7 @@ import { desktopApi } from '@/platform/desktop';
 import { Minus, Square, X } from 'lucide-react';
 import { IconButton } from '@/shared/ui/Button';
 import { usePlayerStore } from '@/modules/playback/store/usePlayerStore';
+import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import { isMacOS } from '@/platform/runtime';
 import styles from './WindowChrome.module.css';
 import { useI18n } from '@/shared/i18n/i18n';
@@ -83,8 +84,9 @@ function MacWindowChrome() {
 
 export function WindowChrome() {
   const isFullscreen = usePlayerStore((state) => state.isFullscreen);
+  const showWindowControls = useSettingsStore((state) => state.showWindowControls);
 
-  if (isFullscreen) return null;
+  if (isFullscreen || !showWindowControls) return null;
 
   return isMacOS() ? <MacWindowChrome /> : <WindowsWindowChrome />;
 }

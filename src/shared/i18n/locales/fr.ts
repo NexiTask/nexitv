@@ -373,6 +373,10 @@ export const FR_MESSAGES: Record<string, string> = {
   Rating: 'Note',
   'Rating {rating}': 'Notation {rating}',
   Provider: 'Fournisseur',
+  'Window Buttons': 'Boutons de fenêtre',
+  'Show the minimize, maximize and close buttons in the top corner. Turn off when your window manager handles windows, e.g. a tiling desktop.':
+    'Affiche les boutons réduire, agrandir et fermer dans le coin supérieur. Désactivez-les si votre gestionnaire de fenêtres s’en charge, p. ex. un bureau en mosaïque.',
+  'Show window buttons': 'Afficher les boutons de fenêtre',
   'Content Filter': 'Filtre de contenu',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Exclut du contenu des Films et Séries par défaut. Un titre dont une copie n’est pas filtrée affiche toujours cette copie.',

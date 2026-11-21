@@ -370,6 +370,10 @@ export const IT_MESSAGES: Record<string, string> = {
   Rating: 'Valutazione',
   'Rating {rating}': 'Valutazione {rating}',
   Provider: 'Fornitore',
+  'Window Buttons': 'Pulsanti finestra',
+  'Show the minimize, maximize and close buttons in the top corner. Turn off when your window manager handles windows, e.g. a tiling desktop.':
+    'Mostra i pulsanti riduci, ingrandisci e chiudi nell’angolo in alto. Disattivali se il gestore finestre se ne occupa, ad es. un desktop a tasselli.',
+  'Show window buttons': 'Mostra pulsanti finestra',
   'Content Filter': 'Filtro contenuti',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Esclude contenuti da Film e Serie per impostazione predefinita. Un titolo con una copia non filtrata mostra comunque quella copia.',
