@@ -411,6 +411,7 @@ export const NL_MESSAGES: Record<string, string> = {
   '4K only': 'Alleen 4K',
   'IMDb-rated only': 'Alleen met IMDb-score',
   'Clear filters': 'Filters wissen',
+  'Live TV view': 'Live-tv-weergave',
   'Content Filter': 'Inhoudsfilter',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Laat standaard inhoud weg uit Films en Series. Een titel met een niet-gefilterde kopie toont nog steeds die kopie.',

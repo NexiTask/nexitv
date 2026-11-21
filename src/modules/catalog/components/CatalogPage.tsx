@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, type ReactNode } from 'react';
 import { SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { VirtualizedGrid } from './VirtualizedGrid';
@@ -54,6 +54,8 @@ const NO_OVERRIDES: Record<string, never> = {};
 const NO_LOOKUPS: RatingLookups = new Map();
 
 export interface CatalogPageProps {
+  /** Beside the page title (Live TV's view switch). */
+  titleActions?: ReactNode | undefined;
   type: 'vod' | 'series' | 'live';
   title: string;
   icon: LucideIcon;
@@ -75,6 +77,7 @@ export function CatalogPage({
   onItemClick,
   onViewDetails,
   isLiveTv = false,
+  titleActions,
 }: CatalogPageProps) {
   const { t, tn, number } = useI18n();
   const sources = useEnabledSources();
@@ -389,6 +392,7 @@ export function CatalogPage({
       <div className={styles.catalogMain}>
         <CatalogPageHeader
           title={title}
+          titleActions={titleActions}
           meta={getCountMeta()}
           actions={
             <>

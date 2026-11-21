@@ -23,7 +23,8 @@ import {
   RiTv2Fill,
   RiTv2Line,
 } from '@/shared/ui/icons';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
+import type { LucideIcon } from 'lucide-react';
 import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
 import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
@@ -53,13 +54,24 @@ export function Sidebar() {
   const sources = useEnabledSources();
   const prefetch = (path: string) => void prefetchNavigationData(path, sources);
 
-  const navItems = [
+  const liveTvView = useSettingsStore((state) => state.liveTvView);
+  const { pathname } = useLocation();
+  const isAlsoActive = (item: { alsoActiveOn?: readonly string[] }) =>
+    item.alsoActiveOn?.includes(pathname) ?? false;
+
+  const navItems: {
+    icons: { line: LucideIcon; fill: LucideIcon };
+    label: string;
+    path: string;
+    alsoActiveOn?: readonly string[];
+  }[] = [
     { icons: { line: RiHome5Line, fill: RiHome5Fill }, label: 'Home', path: '/' },
-    { icons: { line: RiTv2Line, fill: RiTv2Fill }, label: 'Live TV', path: '/live' },
+    // Live TV holds the channel grid and the guide; it reopens the last one.
     {
-      icons: { line: RiCalendarScheduleLine, fill: RiCalendarScheduleFill },
-      label: 'TV Guide',
-      path: '/epg',
+      icons: { line: RiTv2Line, fill: RiTv2Fill },
+      label: 'Live TV',
+      path: liveTvView === 'guide' ? '/epg' : '/live',
+      alsoActiveOn: ['/live', '/epg'],
     },
     { icons: { line: RiMovie2Line, fill: RiMovie2Fill }, label: 'Movies', path: '/movies' },
     { icons: { line: RiSlideshow3Line, fill: RiSlideshow3Fill }, label: 'Series', path: '/series' },
@@ -132,14 +144,16 @@ export function Sidebar() {
               onMouseEnter={() => prefetch(item.path)}
               onFocus={() => prefetch(item.path)}
               className={({ isActive }) =>
-                isActive ? `${styles.navItem} ${styles.active}` : styles.navItem
+                isActive || isAlsoActive(item)
+                  ? `${styles.navItem} ${styles.active}`
+                  : styles.navItem
               }
             >
               {({ isActive }) => (
                 <>
                   <StateIcon
                     icons={item.icons}
-                    active={isActive}
+                    active={isActive || isAlsoActive(item)}
                     className={styles.icon}
                     size={20}
                   />

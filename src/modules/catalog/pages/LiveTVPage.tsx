@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { Tv } from 'lucide-react';
 import type { MediaItem } from '../model/media';
 import { CatalogPage } from '../components/CatalogPage';
+import { LiveTvViewToggle } from '../components/LiveTvViewToggle';
 import {
   selectPrimaryXtreamCredentials,
   useAuthStore,
@@ -31,6 +32,7 @@ export function LiveTvPage() {
       noSourceDescription="Connect an Xtream account or add an M3U playlist in Settings to view live channels."
       onItemClick={handlePlay}
       isLiveTv
+      titleActions={<LiveTvViewToggle view="channels" />}
     />
   );
 }

@@ -177,6 +177,8 @@ export interface SettingsState {
   /** The app's own minimize/maximize/close buttons; tiling window managers
    * (Hyprland) manage windows themselves and do not need them. */
   showWindowControls: boolean;
+  /** Live TV's view: the channel grid or the programme guide. */
+  liveTvView: 'channels' | 'guide';
   catalogSortModes: CatalogSortModes;
   catalogFilters: Record<CatalogFilterKind, CatalogFilters>;
 

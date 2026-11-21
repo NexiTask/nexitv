@@ -20,6 +20,7 @@ import { usePlayerStore } from '@/modules/playback/public/store/usePlayerStore';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import appStyles from '@/app/shell/AppLayout.module.css';
 import styles from './EpgPage.module.css';
+import { LiveTvViewToggle } from '@/modules/catalog/public/components/LiveTvViewToggle';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { getCombinedErrorMessage, getErrorPresentation } from '@/shared/lib/error';
 import { playableFromMediaItem } from '@/modules/playback/public/lib/playback';
@@ -466,7 +467,8 @@ export function EpgPage() {
 
       <div className={appStyles.catalogMain}>
         <CatalogPageHeader
-          title="TV Guide"
+          title="Live TV"
+          titleActions={<LiveTvViewToggle view="guide" />}
           meta={
             isLoading
               ? t('Loading channels')

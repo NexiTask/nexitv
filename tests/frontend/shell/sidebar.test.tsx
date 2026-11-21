@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { LiveTvViewToggle } from '@/modules/catalog/components/LiveTvViewToggle';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from '@/app/shell/Sidebar';
 import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
@@ -156,5 +157,39 @@ describe('Sidebar library counts', () => {
       ).disabled,
     ).toBe(true);
     expect(useSettingsStore.getState().sidebarCollapsed).toBe(false);
+  });
+});
+
+describe('Live TV holds the guide', () => {
+  beforeEach(() => {
+    useSettingsStore.setState({ sidebarCollapsed: false, liveTvView: 'channels' });
+  });
+
+  it('has no separate TV Guide entry and stays highlighted on the guide', () => {
+    useSettingsStore.setState({ liveTvView: 'guide' });
+    render(
+      <MemoryRouter initialEntries={['/epg']}>
+        <Sidebar />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('link', { name: 'TV Guide' })).toBeNull();
+    const live = screen.getByRole('link', { name: 'Live TV' });
+    expect(live.getAttribute('href')).toBe('/epg');
+    expect(live.className).toContain('active');
+  });
+
+  it('switches views with the toggle and remembers the choice', () => {
+    function Where() {
+      return <span data-testid="where">{useLocation().pathname}</span>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/live']}>
+        <LiveTvViewToggle view="channels" />
+        <Where />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Guide' }));
+    expect(screen.getByTestId('where').textContent).toBe('/epg');
+    expect(useSettingsStore.getState().liveTvView).toBe('channels');
   });
 });

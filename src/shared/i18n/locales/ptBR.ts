@@ -411,6 +411,7 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   '4K only': 'Somente 4K',
   'IMDb-rated only': 'Somente com nota IMDb',
   'Clear filters': 'Limpar filtros',
+  'Live TV view': 'Visualização de TV ao vivo',
   'Content Filter': 'Filtro de conteúdo',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Deixa conteúdo de fora de Filmes e Séries por padrão. Um título com uma cópia não filtrada ainda mostra essa cópia.',
