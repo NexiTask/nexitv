@@ -343,6 +343,54 @@ describe('CatalogPage component', () => {
     expect(screen.getByText('The Matrix')).toBeTruthy();
   });
 
+  it('hides the quick genre bar when the setting is off', async () => {
+    const mockItems: MediaItem[] = [
+      {
+        id: 'm1',
+        title: 'Die Hard',
+        genre: 'Action',
+        added: '100',
+        year: '1988',
+        rating: 8.2,
+        posterUrl: '',
+        type: 'vod',
+        categoryId: 'cat-1',
+      },
+    ];
+    vi.spyOn(catalogApi, 'useCatalogByType').mockReturnValue({
+      data: mockItems,
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+    vi.spyOn(categoriesApi, 'useCategories').mockReturnValue({
+      data: [{ category_id: 'cat-1', category_name: 'All Movies' }],
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+    useSettingsStore.getState().updateSetting('catalogGenreBar', false);
+
+    renderWithProviders(
+      <CatalogPage
+        type="vod"
+        title="Movies"
+        icon={Film}
+        emptyTitle="No Movies Found"
+        emptyDescription="There are no movies in this category."
+        noSourceDescription="Connect a source."
+        onItemClick={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText('Die Hard')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /All Genres/i })).toBeNull();
+  });
+
   it('lists Top Rated best first whatever sort the catalogue is set to', () => {
     useSettingsStore.setState({
       tmdbEnabled: false,

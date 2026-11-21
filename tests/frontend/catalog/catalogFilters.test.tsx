@@ -80,6 +80,8 @@ describe('catalogue filter panel', () => {
         onChange={onChange}
         quality="all"
         onQualityChange={vi.fn()}
+        genreBar
+        onGenreBarChange={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Comedy' }));
@@ -92,6 +94,8 @@ describe('catalogue filter panel', () => {
         onChange={onChange}
         quality="all"
         onQualityChange={vi.fn()}
+        genreBar
+        onGenreBarChange={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: '+Comedy' }));
@@ -104,6 +108,8 @@ describe('catalogue filter panel', () => {
         onChange={onChange}
         quality="all"
         onQualityChange={vi.fn()}
+        genreBar
+        onGenreBarChange={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: '−Comedy' }));
@@ -119,6 +125,8 @@ describe('catalogue filter panel', () => {
         onChange={onChange}
         quality="all"
         onQualityChange={vi.fn()}
+        genreBar
+        onGenreBarChange={vi.fn()}
       />,
     );
     const from = screen.getByRole('combobox', { name: 'From year' });
@@ -136,6 +144,8 @@ describe('catalogue filter panel', () => {
         onChange={onChange}
         quality="all"
         onQualityChange={vi.fn()}
+        genreBar
+        onGenreBarChange={vi.fn()}
       />,
     );
     const to = screen.getByRole('combobox', { name: 'To year' });
@@ -169,6 +179,8 @@ describe('catalogue filter panel', () => {
         onChange={onChange}
         quality="all"
         onQualityChange={vi.fn()}
+        genreBar
+        onGenreBarChange={vi.fn()}
       />,
     );
     const from = screen.getByRole('combobox', { name: 'From year' });
@@ -199,11 +211,46 @@ describe('catalogue filter panel', () => {
         onChange={onChange}
         quality="imdb-65-5k"
         onQualityChange={onQualityChange}
+        genreBar
+        onGenreBarChange={vi.fn()}
       />,
     );
     expect(screen.getByRole('button', { name: 'IMDb quality' }).textContent).toContain('6.5');
     fireEvent.click(screen.getByRole('button', { name: /Clear filters/ }));
     expect(onChange).toHaveBeenLastCalledWith(EMPTY_CATALOG_FILTERS);
     expect(onQualityChange).toHaveBeenLastCalledWith('all');
+  });
+
+  it('switches the quick genre bar from inside the panel', () => {
+    const onGenreBarChange = vi.fn();
+    const { rerender } = render(
+      <CatalogFilterPanel
+        type="vod"
+        filters={EMPTY_CATALOG_FILTERS}
+        onChange={vi.fn()}
+        quality="all"
+        onQualityChange={vi.fn()}
+        genreBar
+        onGenreBarChange={onGenreBarChange}
+      />,
+    );
+    const toggle = screen.getByRole('button', { name: 'Quick genre bar' });
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(toggle);
+    expect(onGenreBarChange).toHaveBeenLastCalledWith(false);
+    rerender(
+      <CatalogFilterPanel
+        type="vod"
+        filters={EMPTY_CATALOG_FILTERS}
+        onChange={vi.fn()}
+        quality="all"
+        onQualityChange={vi.fn()}
+        genreBar={false}
+        onGenreBarChange={onGenreBarChange}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Quick genre bar' }).getAttribute('aria-pressed'),
+    ).toBe('false');
   });
 });

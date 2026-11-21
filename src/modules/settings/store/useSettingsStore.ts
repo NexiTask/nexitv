@@ -294,6 +294,7 @@ const DEFAULT_SETTINGS = {
   selectedCategoryIds: emptySelectedCategoryIds(),
   catalogImdbQuality: 'all' as ImdbQualityPreset,
   catalogHideAdult: true,
+  catalogGenreBar: true,
   catalogGroupTitles: true,
   catalogHiddenKeywords: [] as string[],
   showWindowControls: true,
@@ -577,6 +578,7 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
         ? (state.catalogImdbQuality as ImdbQualityPreset)
         : 'all',
     catalogHideAdult: typeof state.catalogHideAdult === 'boolean' ? state.catalogHideAdult : true,
+    catalogGenreBar: typeof state.catalogGenreBar === 'boolean' ? state.catalogGenreBar : true,
     catalogGroupTitles:
       typeof state.catalogGroupTitles === 'boolean' ? state.catalogGroupTitles : true,
     catalogHiddenKeywords: normalizeHiddenKeywords(state.catalogHiddenKeywords),

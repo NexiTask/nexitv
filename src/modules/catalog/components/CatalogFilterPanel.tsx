@@ -20,6 +20,9 @@ interface CatalogFilterPanelProps {
   /** The IMDb quality preset (a global setting, shared by Movies and Series). */
   quality: ImdbQualityPreset;
   onQualityChange: (preset: ImdbQualityPreset) => void;
+  /** Whether the quick genre bar above the grid is shown (a global setting). */
+  genreBar: boolean;
+  onGenreBarChange: (on: boolean) => void;
 }
 
 /** Runtime buckets: films by feature length, series by episode length. */
@@ -56,6 +59,8 @@ export function CatalogFilterPanel({
   onChange,
   quality,
   onQualityChange,
+  genreBar,
+  onGenreBarChange,
 }: CatalogFilterPanelProps) {
   const { t, number } = useI18n();
   const set = (patch: Partial<CatalogFilters>) => onChange({ ...filters, ...patch });
@@ -222,6 +227,15 @@ export function CatalogFilterPanel({
         <span className={styles.label}>
           {t('Genres')}
           <span className={styles.hint}>{t('Click to include, again to exclude')}</span>
+          <button
+            type="button"
+            className={`${styles.barToggle} ${genreBar ? styles.barToggleOn : ''}`}
+            aria-pressed={genreBar}
+            title={t('Show these genres as quick filters above the grid')}
+            onClick={() => onGenreBarChange(!genreBar)}
+          >
+            {t('Quick genre bar')}
+          </button>
         </span>
         <div className={styles.chips}>
           {CATALOG_GENRES.map((genre) => {

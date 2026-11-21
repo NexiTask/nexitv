@@ -441,6 +441,13 @@ export const NL_MESSAGES: Record<string, string> = {
     'Laat films en series die de aanbieder als volwassen markeert weg van de pagina’s Films en Series. Vereist de catalogusindex.',
   'No matching year': 'Geen passend jaar',
   Quality: 'Kwaliteit',
+  'Quick Genre Filters': 'Snelle genrefilters',
+  'Show quick genre filters': 'Snelle genrefilters tonen',
+  'Show a row of genre chips above the Movies and Series grids. Turn it off to pick genres only inside the Filters panel.':
+    'Toont een rij genres boven de rasters van Films en Series. Zet uit om genres alleen in het filterpaneel te kiezen.',
+  'Quick genre bar': 'Snelle balk',
+  'Show these genres as quick filters above the grid':
+    'Deze genres als snelle filters boven het raster tonen',
   'Content Filter': 'Inhoudsfilter',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Laat standaard inhoud weg uit Films en Series. Een titel met een niet-gefilterde kopie toont nog steeds die kopie.',

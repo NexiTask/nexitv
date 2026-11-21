@@ -440,6 +440,13 @@ export const PL_MESSAGES: Record<string, string> = {
     'Pomija na stronach Filmy i Seriale tytuły oznaczone przez dostawcę jako dla dorosłych. Wymaga indeksu katalogu.',
   'No matching year': 'Brak pasującego roku',
   Quality: 'Jakość',
+  'Quick Genre Filters': 'Szybkie filtry gatunków',
+  'Show quick genre filters': 'Pokaż szybkie filtry gatunków',
+  'Show a row of genre chips above the Movies and Series grids. Turn it off to pick genres only inside the Filters panel.':
+    'Pokazuje rząd gatunków nad siatkami Filmów i Seriali. Wyłącz, aby wybierać gatunki tylko w panelu filtrów.',
+  'Quick genre bar': 'Szybki pasek',
+  'Show these genres as quick filters above the grid':
+    'Pokaż te gatunki jako szybkie filtry nad siatką',
   'Content Filter': 'Filtr treści',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Domyślnie pomija treści w Filmach i Serialach. Tytuł z kopią, która nie jest filtrowana, nadal pokazuje tę kopię.',

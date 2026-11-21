@@ -169,6 +169,9 @@ export interface SettingsState {
   catalogImdbQuality: ImdbQualityPreset;
   /** Movies/Series leave out the titles the provider flags as adult. */
   catalogHideAdult: boolean;
+  /** The genre chips above the Movies/Series grids; off leaves genres to the
+   * Filters panel. */
+  catalogGenreBar: boolean;
   /** Provider variants of one IMDb title collapse into a single card. */
   catalogGroupTitles: boolean;
   /** Movies/Series leave out the categories whose name contains one of these
@@ -330,6 +333,7 @@ export const SETTINGS_SNAPSHOT_KEYS = [
   'badgeVisibility',
   'catalogImdbQuality',
   'catalogHideAdult',
+  'catalogGenreBar',
   'catalogGroupTitles',
   'catalogHiddenKeywords',
   'showWindowControls',

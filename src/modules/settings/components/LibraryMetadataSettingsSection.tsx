@@ -57,6 +57,16 @@ export function LibraryMetadataSettingsSection() {
           />
         </SettingsRow>
         <SettingsRow
+          title="Quick Genre Filters"
+          description="Show a row of genre chips above the Movies and Series grids. Turn it off to pick genres only inside the Filters panel."
+        >
+          <SettingsToggle
+            label="Show quick genre filters"
+            checked={settings.catalogGenreBar}
+            onChange={(checked) => settings.updateSetting('catalogGenreBar', checked)}
+          />
+        </SettingsRow>
+        <SettingsRow
           title="Quality & Format Badges"
           description="Display resolution, frame rate, audio format, and edition pills on posters and channel rows."
         >

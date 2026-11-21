@@ -444,6 +444,13 @@ export const FR_MESSAGES: Record<string, string> = {
     'Exclut des pages Films et Séries les titres que le fournisseur marque comme pour adultes. Nécessite l’index du catalogue.',
   'No matching year': 'Aucune année correspondante',
   Quality: 'Qualité',
+  'Quick Genre Filters': 'Filtres de genre rapides',
+  'Show quick genre filters': 'Afficher les filtres de genre rapides',
+  'Show a row of genre chips above the Movies and Series grids. Turn it off to pick genres only inside the Filters panel.':
+    'Affiche une rangée de genres au-dessus des grilles Films et Séries. Désactivez-la pour choisir les genres uniquement dans le panneau de filtres.',
+  'Quick genre bar': 'Barre rapide',
+  'Show these genres as quick filters above the grid':
+    'Afficher ces genres comme filtres rapides au-dessus de la grille',
   'Content Filter': 'Filtre de contenu',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Exclut du contenu des Films et Séries par défaut. Un titre dont une copie n’est pas filtrée affiche toujours cette copie.',

@@ -24,7 +24,7 @@
 
 .label {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-2);
   color: var(--text-muted);
   font-size: var(--font-size-caption);
@@ -117,4 +117,32 @@
 .filtersButton {
   border-color: var(--border-subtle);
   min-height: var(--control-height-md);
+}
+
+/* The quick genre bar switch, on the Genres label's right. */
+.barToggle {
+  margin-left: auto;
+  padding: var(--space-0-5) var(--space-2-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.barToggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.barToggleOn,
+.barToggleOn:hover {
+  border-color: rgba(var(--accent-color-rgb), var(--alpha-30));
+  background: var(--surface-selection);
+  color: var(--text-primary);
 }

@@ -453,6 +453,13 @@ export const DE_MESSAGES: Record<string, string> = {
     'Lässt vom Anbieter als Erwachsenentitel markierte Filme und Serien auf den Seiten Filme und Serien weg. Benötigt den Katalogindex.',
   'No matching year': 'Kein passendes Jahr',
   Quality: 'Qualität',
+  'Quick Genre Filters': 'Schnelle Genre-Filter',
+  'Show quick genre filters': 'Schnelle Genre-Filter anzeigen',
+  'Show a row of genre chips above the Movies and Series grids. Turn it off to pick genres only inside the Filters panel.':
+    'Zeigt über den Raster von Filmen und Serien eine Reihe von Genre-Chips. Ausschalten, um Genres nur im Filterbereich zu wählen.',
+  'Quick genre bar': 'Schnellleiste',
+  'Show these genres as quick filters above the grid':
+    'Diese Genres als schnelle Filter über dem Raster anzeigen',
   'Content Filter': 'Inhaltsfilter',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Blendet Inhalte standardmäßig in Filmen und Serien aus. Ein Titel mit einer nicht gefilterten Kopie zeigt weiterhin diese Kopie.',

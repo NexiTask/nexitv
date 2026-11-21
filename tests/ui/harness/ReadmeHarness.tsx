@@ -1376,6 +1376,8 @@ function MoviesFiltersShowcase() {
           onChange={() => undefined}
           quality="all"
           onQualityChange={() => undefined}
+          genreBar={false}
+          onGenreBarChange={() => undefined}
         />
         <div className={appStyles.catalogContent}>
           <VirtualizedGrid items={SHOWCASE_ITEMS} />

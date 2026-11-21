@@ -90,6 +90,8 @@ export function CatalogPage({
   const catalogImdbQuality = useSettingsStore((state) => state.catalogImdbQuality);
   const setCatalogImdbQuality = useSettingsStore((state) => state.updateSetting);
   const catalogHideAdult = useSettingsStore((state) => state.catalogHideAdult);
+  const catalogGenreBar = useSettingsStore((state) => state.catalogGenreBar);
+  const setCatalogGenreBar = useSettingsStore((state) => state.updateSetting);
   const catalogGroupTitles = useSettingsStore((state) => state.catalogGroupTitles);
   const verifiedResolutions = useVerifiedResolutionMap(badgeVisibility?.verified ?? true);
   const navigate = useNavigate();
@@ -124,10 +126,11 @@ export function CatalogPage({
   const watchedIds = useLibraryStore((state) => state.watched);
   const watchHistory = useLibraryStore((state) => state.history);
 
-  // Reset genre when category changes
+  // Reset genre when category changes, or when the genre bar is turned off (a
+  // genre picked there must not keep filtering with nothing to undo it).
   useEffect(() => {
     setSelectedGenre(null);
-  }, [activeCategoryId]);
+  }, [activeCategoryId, catalogGenreBar]);
 
   const {
     data: legacyItems,
@@ -449,6 +452,8 @@ export function CatalogPage({
             onChange={(next) => setCatalogFilters(filterKind, next)}
             quality={catalogImdbQuality}
             onQualityChange={(preset) => setCatalogImdbQuality('catalogImdbQuality', preset)}
+            genreBar={catalogGenreBar}
+            onGenreBarChange={(on) => setCatalogGenreBar('catalogGenreBar', on)}
           />
         )}
 
@@ -479,7 +484,7 @@ export function CatalogPage({
           />
         ) : itemCount === 0 ? (
           <div className={styles.catalogContent}>
-            {type !== 'live' && categoryItemCount > 0 && (
+            {type !== 'live' && catalogGenreBar && categoryItemCount > 0 && (
               <GenreFilterBar
                 items={indexGenreCounts ? undefined : categoryItems}
                 counts={indexGenreCounts}
@@ -493,7 +498,7 @@ export function CatalogPage({
           </div>
         ) : (
           <div className={styles.catalogContent}>
-            {type !== 'live' && (
+            {type !== 'live' && catalogGenreBar && (
               <GenreFilterBar
                 items={indexGenreCounts ? undefined : categoryItems}
                 counts={indexGenreCounts}

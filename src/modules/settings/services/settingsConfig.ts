@@ -129,6 +129,7 @@ export function sanitizeSettingsConfig(value: unknown): SettingsSnapshot {
       migrated.catalogImdbQuality,
     ),
     catalogHideAdult: booleanOr(source.catalogHideAdult, migrated.catalogHideAdult),
+    catalogGenreBar: booleanOr(source.catalogGenreBar, migrated.catalogGenreBar),
     catalogGroupTitles: booleanOr(source.catalogGroupTitles, migrated.catalogGroupTitles),
     catalogHiddenKeywords: migrated.catalogHiddenKeywords,
     interfaceZoom: migrated.interfaceZoom,
