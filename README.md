@@ -32,7 +32,18 @@
 > Bring your own authorized content. NexiTV does not bypass DRM; use recording,
 > catch-up, and download features only where you have permission.
 
-![NexiTV Movies page in the Catppuccin theme: IMDb ratings on every card, 125% cards, and a real catalogue](.github/assets/readme/app-movies.webp)
+## Product tour
+
+These are screenshots of the NexiTV desktop app running on a real catalogue, in
+the Catppuccin Mocha theme with 125% cards. The posters are artwork from TMDB,
+shown here only to illustrate the app; no account, source name, or credential
+appears in them.
+
+|                                                  Movies with IMDb ratings                                                  |                                                            Movie info page                                                            |
+| :------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------: |
+| ![NexiTV Movies page with IMDb ratings, vote counts, and 4K badges on real posters](.github/assets/readme/app-movies.webp) | ![NexiTV movie info page with IMDb rating, genres, version picker, director, and cast](.github/assets/readme/app-movie-details.webp)  |
+|                                                           Series                                                           |                                                           Series info page                                                            |
+|               ![NexiTV Series page with IMDb ratings on real posters](.github/assets/readme/app-series.webp)               | ![NexiTV series info page with seasons, compact episode rows, and Mark season watched](.github/assets/readme/app-series-details.webp) |
 
 ## Get started
 
@@ -119,19 +130,6 @@ enabled channels, catalogues, categories, and guides in one workspace.
 - Customize accent, catalogue layout, motion, playback, subtitle, picture, and notification settings.
 - Export portable preferences without credentials, playlist URLs, history, favorites, or cached media.
 - Check for and install signed NexiTV updater packages from GitHub Releases.
-
-## Product tour
-
-These are screenshots of the NexiTV desktop app running on a real catalogue, in
-the Catppuccin Mocha theme with 125% cards. The posters are artwork from TMDB,
-shown here only to illustrate the app; no account, source name, or credential
-appears in them.
-
-|                                                  Movies with IMDb ratings                                                  |                                                            Movie info page                                                            |
-| :------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------: |
-| ![NexiTV Movies page with IMDb ratings, vote counts, and 4K badges on real posters](.github/assets/readme/app-movies.webp) | ![NexiTV movie info page with IMDb rating, genres, version picker, director, and cast](.github/assets/readme/app-movie-details.webp)  |
-|                                                           Series                                                           |                                                           Series info page                                                            |
-|               ![NexiTV Series page with IMDb ratings on real posters](.github/assets/readme/app-series.webp)               | ![NexiTV series info page with seasons, compact episode rows, and Mark season watched](.github/assets/readme/app-series-details.webp) |
 
 ## Download and platform support
 
