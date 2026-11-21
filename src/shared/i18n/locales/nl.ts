@@ -238,6 +238,9 @@ export const NL_MESSAGES: Record<string, string> = {
   'Browse all categories': 'Alle categorieën bekijken',
   'Browse all categories, {count} available': 'Alle categorieën bekijken, {count} beschikbaar',
   'IMDb quality': 'IMDb-kwaliteit',
+  'IMDb ratings are being updated — coverage and the quality view fill in as matches land.':
+    'IMDb-beoordelingen worden bijgewerkt: de dekking en de kwaliteitsweergave vullen zich terwijl er overeenkomsten binnenkomen.',
+  'IMDb updating…': 'IMDb wordt bijgewerkt…',
   'Quality: All': 'Kwaliteit: Alles',
   'IMDb ≥ 7.0 · 1k+ votes': 'IMDb ≥ 7,0 · 1k+ stemmen',
   'IMDb ≥ 6.5 · 5k+ votes': 'IMDb ≥ 6,5 · 5k+ stemmen',

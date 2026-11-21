@@ -13,7 +13,6 @@ import { storeTmdbApiKey } from '@/modules/metadata/public/services/tmdbCredenti
 import { useImdbRefresh } from '@/modules/metadata/public/hooks/useImdbRefresh';
 import { notify } from '@/shared/notifications/useNotificationStore';
 import { getErrorMessage } from '@/shared/lib/error';
-import styles from './LibraryMetadataSettingsSection.module.css';
 
 export function LibraryMetadataSettingsSection() {
   const settings = useSettingsStore();
@@ -21,12 +20,6 @@ export function LibraryMetadataSettingsSection() {
 
   return (
     <SettingsPageContent>
-      {imdb.status && (imdb.status.running || imdb.isStarting) && (
-        <div className={styles.updateNotice} role="status">
-          <span className={styles.updatePulse} aria-hidden="true" />
-          IMDb ratings are being updated — coverage and the quality view fill in as matches land.
-        </div>
-      )}
       {/* Stream Quality & Badges */}
       <SettingsGroup
         title="Stream Quality & Badges"
