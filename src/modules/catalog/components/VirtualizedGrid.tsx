@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MediaCard } from './MediaCard';
 import type { MediaItem } from '../model/media';
-import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
+import { useViewMode } from '../hooks/useViewMode';
 import { calculateGridLayout } from '../lib/gridLayout';
 import styles from './VirtualizedGrid.module.css';
 
@@ -60,7 +60,7 @@ export function VirtualizedGrid({
 }: VirtualizedGridProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
-  const viewMode = useSettingsStore((state) => state.viewMode);
+  const [viewMode] = useViewMode();
 
   const isListMode = viewMode === 'list';
   const effectiveGap = isListMode ? 0 : gap;

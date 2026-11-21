@@ -927,8 +927,8 @@ export const FR_MESSAGES: Record<string, string> = {
   Dark: 'Sombre',
   Light: 'Clair',
   'Default Catalogue View': 'Vue du catalogue par défaut',
-  'Layout used when opening movies, series, and live channels.':
-    'Disposition utilisée lors de l’ouverture de films, de séries et de chaînes en direct.',
+  'Layout a section starts with. Each section remembers the view you pick there.':
+    'Affichage de départ d’une section. Chaque section retient l’affichage que vous y choisissez.',
   Grid: 'Grille',
   List: 'Liste',
   'Accent Color': "Couleur d'accentuation",

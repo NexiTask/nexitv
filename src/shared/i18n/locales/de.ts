@@ -949,8 +949,8 @@ export const DE_MESSAGES: Record<string, string> = {
   Dark: 'Dunkel',
   Light: 'Hell',
   'Default Catalogue View': 'Standard-Katalogansicht',
-  'Layout used when opening movies, series, and live channels.':
-    'Layout beim Öffnen von Filmen, Serien und Live-Kanälen.',
+  'Layout a section starts with. Each section remembers the view you pick there.':
+    'Ansicht, mit der ein Bereich startet. Jeder Bereich merkt sich die dort gewählte Ansicht.',
   Grid: 'Raster',
   List: 'Liste',
   'Accent Color': 'Akzentfarbe',

@@ -16,6 +16,7 @@ import { HeaderSearch } from '@/modules/search/public/components/HeaderSearch';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { CatalogPageHeader } from './CatalogPageHeader';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
+import { useViewMode } from '../hooks/useViewMode';
 import {
   EMPTY_CATALOG_FILTERS,
   IMDB_QUALITY_PRESETS,
@@ -81,7 +82,7 @@ export function CatalogPage({
 }: CatalogPageProps) {
   const { t, tn, number } = useI18n();
   const sources = useEnabledSources();
-  const viewMode = useSettingsStore((state) => state.viewMode);
+  const [viewMode] = useViewMode();
   const catalogSortModes = useSettingsStore((state) => state.catalogSortModes);
   const setCatalogSort = useSettingsStore((state) => state.setCatalogSort);
   const badgeVisibility = useSettingsStore((state) => state.badgeVisibility);

@@ -184,7 +184,10 @@ export interface SettingsState {
 
   // UI & Desktop
   sidebarWidth: number;
+  /** The default grid/list view; a section the viewer switched keeps its own
+   * choice in `viewModes`, keyed by the section's first path segment. */
   viewMode: 'grid' | 'list';
+  viewModes: Record<string, 'grid' | 'list'>;
   alwaysOnTop: boolean;
   accentColor: string;
   themePreference: ThemePreference;

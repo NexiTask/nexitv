@@ -912,8 +912,8 @@ export const PL_MESSAGES: Record<string, string> = {
   Dark: 'Ciemny',
   Light: 'Jasny',
   'Default Catalogue View': 'Domyślny widok katalogu',
-  'Layout used when opening movies, series, and live channels.':
-    'Układ używany podczas otwierania filmów, seriali i kanałów na żywo.',
+  'Layout a section starts with. Each section remembers the view you pick there.':
+    'Widok, od którego zaczyna sekcja. Każda sekcja zapamiętuje wybrany w niej widok.',
   Grid: 'Siatka',
   List: 'Lista',
   'Accent Color': 'Kolor akcentujący',

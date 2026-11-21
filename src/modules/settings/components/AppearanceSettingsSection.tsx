@@ -55,7 +55,7 @@ export function AppearanceSettingsSection() {
 
         <SettingsRow
           title="Default Catalogue View"
-          description="Layout used when opening movies, series, and live channels."
+          description="Layout a section starts with. Each section remembers the view you pick there."
         >
           <SegmentedControl<'grid' | 'list'>
             value={settings.viewMode}

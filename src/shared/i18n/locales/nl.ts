@@ -921,8 +921,8 @@ export const NL_MESSAGES: Record<string, string> = {
   Dark: 'Donker',
   Light: 'Licht',
   'Default Catalogue View': 'Standaardcatalogusweergave',
-  'Layout used when opening movies, series, and live channels.':
-    'Lay-out gebruikt bij het openen van films, series en livekanalen.',
+  'Layout a section starts with. Each section remembers the view you pick there.':
+    'Weergave waarmee een onderdeel begint. Elk onderdeel onthoudt de weergave die je daar kiest.',
   Grid: 'Raster',
   List: 'Lijst',
   'Accent Color': 'Accentkleur',

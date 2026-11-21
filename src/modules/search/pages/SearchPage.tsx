@@ -8,7 +8,7 @@ import { PageTransition } from '@/app/shell/PageTransition';
 import { useSearchStore } from '../store/useSearchStore';
 import { useCatalogSearch } from '../data/useCatalogSearch';
 import { GridSkeleton, TextLineSkeleton } from '@/shared/ui/Skeleton';
-import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
+import { useViewMode } from '@/modules/catalog/public/hooks/useViewMode';
 import { CatalogViewToggle } from '@/modules/catalog/public/components/CatalogViewToggle';
 import { SegmentedControl } from '@/shared/ui/SegmentedControl';
 import styles from '@/app/shell/AppLayout.module.css';
@@ -39,7 +39,7 @@ function filterTypeFromParam(value: string | null): FilterType {
 export function SearchPage() {
   const { t, tn, number } = useI18n();
   const sources = useEnabledSources();
-  const viewMode = useSettingsStore((state) => state.viewMode);
+  const [viewMode] = useViewMode();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const recentSearches = useSearchStore((state) => state.recentSearches);

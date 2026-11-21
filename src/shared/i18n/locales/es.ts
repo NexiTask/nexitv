@@ -921,8 +921,8 @@ export const ES_MESSAGES: Record<string, string> = {
   Dark: 'Oscuro',
   Light: 'Claro',
   'Default Catalogue View': 'Vista de catálogo predeterminada',
-  'Layout used when opening movies, series, and live channels.':
-    'Diseño utilizado al abrir películas, series y canales en vivo.',
+  'Layout a section starts with. Each section remembers the view you pick there.':
+    'Vista con la que empieza cada sección. Cada sección recuerda la vista que elijas en ella.',
   Grid: 'Cuadrícula',
   List: 'Lista',
   'Accent Color': 'Color de acento',
