@@ -10,6 +10,11 @@ mod sources;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     perf::init();
+    let context = tauri::generate_context!();
+    #[cfg(all(target_os = "linux", not(feature = "desktop-e2e")))]
+    if context.config().identifier == app_data::linux_profile::APP_ID {
+        app_data::linux_profile::migrate().expect("could not migrate the Movena settings profile");
+    }
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -126,7 +131,7 @@ pub fn run() {
             metadata::imdb::schedule(_app.handle().clone());
             Ok(())
         })
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }
 

@@ -2637,6 +2637,7 @@ name = "movena"
 version = "0.1.32"
 dependencies = [
  "chrono",
+ "dirs",
  "encoding_rs",
  "flate2",
  "gtk",
