@@ -42,6 +42,8 @@ import { useDebugStore, debugLog } from '@/modules/diagnostics/public/store/useD
 import { promoteXtreamServer } from '../services/xtreamServerEvents';
 import { notify } from '@/shared/notifications/useNotificationStore';
 import { getErrorMessage } from '@/shared/lib/error';
+import { desktopApi } from '@/platform/desktop';
+import { tauriApi } from '@/platform/tauri';
 
 /** Provider requests fail quickly enough to keep modal and page states responsive. */
 export const PROVIDER_PRIMARY_TIMEOUT_MS = 5_000;
@@ -135,7 +137,7 @@ async function fetchSingleXC<T>(
     url.searchParams.append(key, value);
   }
 
-  const sanitizedUrl = url.toString().replace(/password=[^&]+/gi, 'password=***');
+  const sanitizedUrl = url.toString().replace(/(username|password)=[^&]+/gi, '$1=***');
   const actionName = extraParams.action || 'auth';
 
   const requestController = new AbortController();
@@ -150,7 +152,22 @@ async function fetchSingleXC<T>(
 
   let response: Response;
   try {
-    response = await fetch(url.toString(), { signal: requestController.signal });
+    try {
+      response = await fetch(url.toString(), { signal: requestController.signal });
+    } catch (error: unknown) {
+      const remainingMs = timeoutMs - (Date.now() - startTime);
+      if (
+        actionName !== 'get_simple_data_table' ||
+        !desktopApi.isDesktop() ||
+        requestController.signal.aborted ||
+        remainingMs <= 0
+      ) {
+        throw error;
+      }
+      const body = await tauriApi.xtreamChannelEpgFetch(url.toString(), remainingMs);
+      requestController.signal.throwIfAborted();
+      response = new Response(body);
+    }
   } catch (error: unknown) {
     const durationMs = Date.now() - startTime;
     const timeoutSeconds = Number.isInteger(timeoutMs / 1000)

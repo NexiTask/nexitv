@@ -394,23 +394,14 @@
   }
 }
 
-.laneEmptyRow {
-  position: absolute;
-  inset: 0;
+.guideError {
   display: flex;
   align-items: center;
-  padding: 0 var(--space-3);
-  overflow: hidden;
-}
-
-.laneEmptyRow span {
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-elevated);
   color: var(--color-error);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: var(--font-size-small);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  user-select: text;
 }
 
 /* ── Programme blocks ───────────────────────────────────── */

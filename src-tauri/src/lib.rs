@@ -37,6 +37,7 @@ pub fn run() {
             credentials::source::source_secret_load,
             credentials::source::source_secret_delete,
             sources::remote::m3u_fetch,
+            sources::remote::xtream_channel_epg_fetch,
             sources::remote::m3u_probe_stream,
             sources::xmltv::xmltv_fetch,
             metadata::intro_db::introdb_fetch_segments,

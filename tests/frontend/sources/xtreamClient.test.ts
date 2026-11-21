@@ -13,6 +13,8 @@ import {
 import { useAuthStore } from '@/modules/sources/public/store/useAuthStore';
 import type { XtreamCredentials } from '@/modules/sources/public/model/xtream';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
+import { desktopApi } from '@/platform/desktop';
+import { tauriApi } from '@/platform/tauri';
 
 const credentials: XtreamCredentials = {
   url: 'https://primary.test/',
@@ -27,6 +29,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -88,6 +91,23 @@ describe('Xtream API client', () => {
       ),
     );
     await expect(getChannelEPG({ ...credentials, alternativeUrls: [] }, 42)).resolves.toEqual([]);
+  });
+
+  it('loads a channel guide through the desktop when the webview rejects the request', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Load failed')));
+    vi.spyOn(desktopApi, 'isDesktop').mockReturnValue(true);
+    const listing = { id: 'listing-1' };
+    const nativeFetch = vi
+      .spyOn(tauriApi, 'xtreamChannelEpgFetch')
+      .mockResolvedValue(JSON.stringify({ epg_listings: [listing] }));
+
+    await expect(getChannelEPG(credentials, 42)).resolves.toEqual([listing]);
+    expect(nativeFetch).toHaveBeenCalledOnce();
+    const [url, timeout] = nativeFetch.mock.calls[0]!;
+    expect(new URL(url).searchParams.get('action')).toBe('get_simple_data_table');
+    expect(new URL(url).searchParams.get('stream_id')).toBe('42');
+    expect(timeout).toBeGreaterThan(0);
+    expect(timeout).toBeLessThanOrEqual(PROVIDER_PRIMARY_TIMEOUT_MS);
   });
 
   it('rejects HTML error pages even when the status is successful', async () => {

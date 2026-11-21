@@ -35,6 +35,7 @@ const useChannelEpg = vi.hoisted(() => {
     isError: false,
     isSuccess: true,
     canFetch: true,
+    refetch: vi.fn<() => Promise<unknown>>().mockResolvedValue(undefined),
   };
   return vi.fn(() => result);
 });
@@ -107,6 +108,7 @@ function renderEpg() {
 }
 
 beforeEach(() => {
+  useChannelEpg.mockReset();
   // Same viewport fake as channelsDrawer.test.tsx: the virtualizer reads
   // clientWidth/clientHeight, which happy-dom reports as zero.
   Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 600 });
@@ -140,6 +142,25 @@ describe('EPG TV Guide Features', () => {
     renderEpg();
 
     expect(screen.getAllByText('Cached News').length).toBeGreaterThan(0);
+  });
+
+  it('reports failed channels once and retries all visible failures', async () => {
+    const retryFirst = vi.fn<() => Promise<unknown>>().mockResolvedValue(undefined);
+    const retrySecond = vi.fn<() => Promise<unknown>>().mockResolvedValue(undefined);
+    useChannelEpg.mockImplementation((streamId?: string) => ({
+      data: [],
+      isLoading: false,
+      isError: true,
+      isSuccess: false,
+      canFetch: true,
+      refetch: streamId === 'ch-1' ? retryFirst : retrySecond,
+    }));
+
+    renderEpg();
+    expect(screen.getAllByText('Guide unavailable')).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(retryFirst).toHaveBeenCalledOnce();
+    expect(retrySecond).toHaveBeenCalledOnce();
   });
 
   it('allows searching channels to filter the grid display', async () => {
