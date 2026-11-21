@@ -118,3 +118,10 @@
   font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
 }
+
+/* The Filters button: bordered like the header's other controls, so it reads
+   as a button at every width, not as loose text. */
+.filtersButton {
+  border-color: var(--border-subtle);
+  min-height: var(--control-height-md);
+}

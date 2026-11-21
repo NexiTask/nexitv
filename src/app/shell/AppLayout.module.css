@@ -278,50 +278,21 @@
   }
 }
 
-/* Once the action row can no longer hold search + sort + view mode, keep the
-   search on its own row and let the select absorb the remaining width beside
-   the view toggle. The select owns an inline desktop width, hence the scoped
-   override here. */
+/* Once the action row can no longer hold everything, the search takes a line
+   of its own and the other controls wrap at their natural sizes beneath it
+   (the Movies/Series headers carry six controls, Live TV three). */
 @container catalog-main (max-width: 660px) {
   .headerActions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
+    justify-content: flex-start;
   }
 
   .headerActions > :first-child {
-    grid-column: 1 / -1;
-    width: 100%;
+    flex: 1 1 100%;
     min-width: 0;
-  }
-
-  .headerActions > :nth-child(2) {
-    width: 100% !important;
-    min-width: 0 !important;
-  }
-
-  .headerActions > :last-child {
-    justify-self: end;
   }
 
   .headerActions > :first-child form {
     width: 100%;
-  }
-}
-
-@container catalog-main (max-width: 360px) {
-  .headerActions {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .headerActions > :first-child,
-  .headerActions > :nth-child(2),
-  .headerActions > :last-child {
-    grid-column: 1;
-  }
-
-  .headerActions > :last-child {
-    justify-self: start;
   }
 }
 

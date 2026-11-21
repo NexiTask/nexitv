@@ -444,7 +444,7 @@ export function CatalogPage({
               {filterKind && (
                 <button
                   type="button"
-                  className={`${filterBarStyles.chip} ${
+                  className={`${filterBarStyles.chip} ${filterPanelStyles.filtersButton} ${
                     filtersOpen || filterCount > 0 ? filterBarStyles.activeChip : ''
                   }`}
                   aria-expanded={filtersOpen}
