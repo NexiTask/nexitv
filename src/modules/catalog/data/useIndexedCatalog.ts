@@ -13,6 +13,7 @@ import {
   type ImdbFacts,
 } from '@/platform/tauri';
 import { perfAsync, perfSync } from '@/platform/perf';
+import { useHiddenOriginCategoryIds } from './useCategories';
 import type { CatalogFilters } from '@/modules/settings/public/store/useSettingsStore';
 import {
   useEnabledSources,
@@ -272,6 +273,11 @@ export interface IndexedPage {
   rowsVersion: number;
 }
 
+/** Adds the origin lists a page's hidden countries imply (see catalog_query.rs). */
+function withOrigin(query: CatalogPageQuery, origin: ReadonlySet<string>): CatalogPageQuery {
+  return origin.size > 0 ? { ...query, originCategoryIds: [...origin].sort() } : query;
+}
+
 /** One catalogue page from the index: its ordered keys, and rows on demand. */
 export function useIndexedCatalogPage(
   type: 'live' | 'vod' | 'series',
@@ -280,7 +286,8 @@ export function useIndexedCatalogPage(
 ): IndexedPage {
   const sources = useEnabledSources();
   const kind = isPageKind(type) ? type : 'vod';
-  const query = useMemo(() => buildCatalogPageQuery(params), [params]);
+  const origin = useHiddenOriginCategoryIds(kind);
+  const query = useMemo(() => withOrigin(buildCatalogPageQuery(params), origin), [params, origin]);
   const signature = useMemo(() => catalogQuerySignature(query), [query]);
   const requestSources = useMemo(() => pageSources(sources), [sources]);
 
@@ -421,9 +428,11 @@ export function useIndexedCatalogStats(
 ): CatalogPageStats | undefined {
   const sources = useEnabledSources();
   const kind = isPageKind(type) ? type : 'vod';
+  const origin = useHiddenOriginCategoryIds(kind);
   const query = useMemo<CatalogPageQuery>(
     () => ({
       hiddenCategoryIds: [...params.hiddenCategoryIds].sort(),
+      ...(origin.size > 0 ? { originCategoryIds: [...origin].sort() } : {}),
       category: null,
       targetCategoryIds: null,
       favoriteIds: params.favorites.map((favorite) => favorite.id),
@@ -436,7 +445,14 @@ export function useIndexedCatalogStats(
       fold: params.fold,
       groupTitles: params.groupTitles ?? false,
     }),
-    [params.favorites, params.fold, params.hiddenCategoryIds, params.ultraHd, params.groupTitles],
+    [
+      params.favorites,
+      params.fold,
+      params.hiddenCategoryIds,
+      params.ultraHd,
+      params.groupTitles,
+      origin,
+    ],
   );
   const signature = useMemo(() => catalogQuerySignature(query), [query]);
   const stats = useQuery({
@@ -464,15 +480,19 @@ export function useIndexedRatingHead(
   const kind = isPageKind(type) ? type : 'vod';
   // The pool is the category judged on provider data, so its scope leaves
   // TMDB's verdicts, the genre and the sort out.
+  const origin = useHiddenOriginCategoryIds(kind);
   const baseQuery = useMemo(
     () =>
-      buildCatalogPageQuery({
-        ...params,
-        ratingLookups: new Map(),
-        genre: null,
-        sort: 'rating',
-      }),
-    [params],
+      withOrigin(
+        buildCatalogPageQuery({
+          ...params,
+          ratingLookups: new Map(),
+          genre: null,
+          sort: 'rating',
+        }),
+        origin,
+      ),
+    [params, origin],
   );
   const scope = useMemo(
     () => `index-${generation}-${catalogQuerySignature(baseQuery)}`,
@@ -598,9 +618,19 @@ export function useIndexedSearch(
     () => [...options.hiddenCategoryIds].sort(),
     [options.hiddenCategoryIds],
   );
+  const origin = useHiddenOriginCategoryIds(type, { enabled: options.enabled });
+  const originKey = useMemo(() => [...origin].sort(), [origin]);
   const trimmed = text.trim();
   const search = useQuery({
-    queryKey: [SEARCH_ROOT, type, sources.queryScope, trimmed, options.fold, hiddenKey.join('|')],
+    queryKey: [
+      SEARCH_ROOT,
+      type,
+      sources.queryScope,
+      trimmed,
+      options.fold,
+      hiddenKey.join('|'),
+      originKey.join('|'),
+    ],
     queryFn: async () => {
       const answer = await perfAsync(`index:search:${type}`, () =>
         tauriApi.catalogIndexSearch(
@@ -608,6 +638,7 @@ export function useIndexedSearch(
           requestSources,
           {
             hiddenCategoryIds: hiddenKey,
+            ...(originKey.length > 0 ? { originCategoryIds: originKey } : {}),
             category: null,
             targetCategoryIds: null,
             favoriteIds: [],

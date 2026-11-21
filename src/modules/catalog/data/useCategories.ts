@@ -12,7 +12,7 @@ import {
   useSettingsStore,
   type CatalogType,
 } from '@/modules/settings/public/store/useSettingsStore';
-import { parseProviderCategoryName } from '@/shared/lib/categoryName';
+import { categoryTopicCountry, parseProviderCategoryName } from '@/shared/lib/categoryName';
 import { useCatalogByType } from './useCatalog';
 import { CATALOG_FRESH_MS } from './catalogFreshness';
 import { queryKeys } from '@/modules/sources/public/model/queryKeys';
@@ -192,7 +192,15 @@ export interface HiddenCategoryState {
    * back until then, or they would show exactly what the user hid.
    */
   isResolved: boolean;
+  /**
+   * Hidden categories that mark a title's origin from another market
+   * ("|AR| أفلام هندية" while India is hidden): one copy in such a list hides
+   * the whole title, whatever its other copies (see catalog_query.rs).
+   */
+  originIds: Set<string>;
 }
+
+const NO_IDS: ReadonlySet<string> = new Set();
 
 export function useHiddenCategoryState(
   type: CatalogType,
@@ -211,25 +219,35 @@ export function useHiddenCategoryState(
     const keywords =
       type === 'live' ? [] : (hiddenKeywords ?? []).map((keyword) => keyword.toLowerCase());
     const ids = new Set(hidden);
+    const originIds = new Set<string>();
     // Direct ids need no lookup, so nothing is pending unless a country or a
     // keyword is hidden.
-    if (hiddenCountries.length === 0 && keywords.length === 0) return { ids, isResolved: true };
+    if (hiddenCountries.length === 0 && keywords.length === 0) {
+      return { ids, originIds, isResolved: true };
+    }
 
     const hiddenCountrySet = new Set(hiddenCountries);
     for (const cat of categories ?? EMPTY_LIST) {
       const name = cat.category_name || '';
       const { country } = parseProviderCategoryName(name);
       const lowered = name.toLowerCase();
-      if (
+      // A category about a hidden country's cinema, filed under another
+      // market, hides like that country's own and marks its titles' origin.
+      const topic = categoryTopicCountry(name, country);
+      const id = String(cat.category_id);
+      if (topic && hiddenCountrySet.has(topic)) {
+        ids.add(id);
+        originIds.add(id);
+      } else if (
         hiddenCountrySet.has(country ?? 'other') ||
         keywords.some((keyword) => lowered.includes(keyword))
       ) {
-        ids.add(String(cat.category_id));
+        ids.add(id);
       }
     }
     // A failed category request is as resolved as it will get: fall back to the
     // ids we do know rather than leaving every surface permanently empty.
-    return { ids, isResolved: settled };
+    return { ids, originIds, isResolved: settled };
   }, [categories, categoryPrefs, hiddenKeywords, settled, type]);
 }
 
@@ -242,6 +260,14 @@ export function useHiddenCategoryState(
  * channels carried on appearing under "All". The rule lives in one place now, so
  * the list and what it filters cannot disagree.
  */
+/** Hidden categories that mark a title's origin (see HiddenCategoryState). */
+export function useHiddenOriginCategoryIds(
+  type: CatalogType,
+  options?: { enabled?: boolean | undefined },
+): ReadonlySet<string> {
+  return useHiddenCategoryState(type, options).originIds ?? NO_IDS;
+}
+
 export function useHiddenCategoryIds(
   type: CatalogType,
   options?: { enabled?: boolean | undefined },

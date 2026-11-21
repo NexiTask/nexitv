@@ -476,3 +476,60 @@ export function parseCategoryName(name: string): ParsedCategory {
     cluster,
   };
 }
+
+/**
+ * Words that mark a category as being about one country's cinema even when a
+ * provider files it under another market: "|AR| أفلام هندية" (Arabic for
+ * "Indian films") or "|DE| BOLLYWOOD" are Indian film lists. Lower case,
+ * matched as substrings of the lower-cased category name.
+ */
+export const COUNTRY_TOPIC_WORDS: Readonly<Record<string, readonly string[]>> = {
+  IN: [
+    'bollywood',
+    'tollywood',
+    'kollywood',
+    'mollywood',
+    'sandalwood',
+    'hindi',
+    'tamil',
+    'telugu',
+    'telegu',
+    'malayalam',
+    'kannada',
+    'punjabi',
+    'marathi',
+    'gujarati',
+    'bengali',
+    'bangla',
+    'desi',
+    'indian',
+    'indien',
+    'indisch',
+    'indiano',
+    'indiani',
+    'indyjsk',
+    'hint film',
+    'هندي',
+    'هندية',
+    'هندى',
+  ],
+  TR: ['turkish', 'türk', 'turkse', 'turco', 'turca', 'turque', 'turecki', 'تركي', 'تركية'],
+  PK: ['pakistani', 'urdu', 'lollywood', 'باكستاني'],
+  KR: ['korean', 'k-drama', 'kdrama', 'coréen', 'koreanisch', 'كوري'],
+  CN: ['chinese', 'mandarin', 'cantonese', 'chinois', 'chinesisch', 'صيني'],
+};
+
+/** Labels a provider gives copies of foreign titles: dubbed or subtitled
+ * lists say which language a copy is in, not where the title is from. */
+const DUB_OR_SUB = /\b(dub|dubbed|dubs|sub|subs|subbed|subtitled)\b/i;
+
+/** The country a category is about by its topic words, when that differs
+ * from the market it is filed under and it is not a dub/sub list. */
+export function categoryTopicCountry(name: string, country: string | null): string | null {
+  const lowered = name.toLowerCase();
+  if (DUB_OR_SUB.test(lowered)) return null;
+  for (const [topic, words] of Object.entries(COUNTRY_TOPIC_WORDS)) {
+    if (topic !== country && words.some((word) => lowered.includes(word))) return topic;
+  }
+  return null;
+}

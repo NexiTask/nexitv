@@ -86,6 +86,8 @@ export interface CatalogPageStatus {
 /** What a catalogue page shows, in the frontend's own terms (see catalog_query.rs). */
 export interface CatalogPageQuery {
   hiddenCategoryIds: string[];
+  /** Hidden categories that mark a title's origin: one copy there hides the title. */
+  originCategoryIds?: string[] | undefined;
   category: string | null;
   targetCategoryIds: string[] | null;
   favoriteIds: string[];

@@ -93,6 +93,9 @@ pub struct RatingOverride {
 pub struct CatalogQuery {
     /// Movena's (source-prefixed) category ids.
     pub hidden_category_ids: Vec<String>,
+    /// Hidden categories that mark where a title is from ("Indian films"
+    /// filed under another market): one copy there hides the whole title.
+    pub origin_category_ids: Vec<String>,
     /// The page's active category: null, a `smart:` id, a `country:` id or a
     /// provider category id.
     pub category: Option<String>,
@@ -210,6 +213,7 @@ struct Entry {
 /// Per-source category facts resolved once per query.
 struct CategoryFacts {
     hidden: Vec<bool>,
+    origin: Vec<bool>,
     target: Vec<bool>,
     genres: Vec<u16>,
 }
@@ -284,6 +288,8 @@ struct Context<'a> {
     has_imdb: bool,
     /// Present while the watch filter is on.
     watch: Option<WatchState<'a>>,
+    /// IMDb titles hidden as a whole (see `with_hidden_titles`).
+    hidden_titles: HashSet<&'a str>,
 }
 
 type Rating = Option<(f64, f64)>;
@@ -343,6 +349,11 @@ impl<'a> Context<'a> {
             .iter()
             .map(String::as_str)
             .collect();
+        let origin: HashSet<&str> = query
+            .origin_category_ids
+            .iter()
+            .map(String::as_str)
+            .collect();
         let target: Option<HashSet<&str>> = query
             .target_category_ids
             .as_ref()
@@ -353,6 +364,7 @@ impl<'a> Context<'a> {
                 let names = &source.categories;
                 CategoryFacts {
                     hidden: names.iter().map(|c| hidden.contains(&**c)).collect(),
+                    origin: names.iter().map(|c| origin.contains(&**c)).collect(),
                     target: names
                         .iter()
                         .map(|c| target.as_ref().is_some_and(|t| t.contains(&**c)))
@@ -375,7 +387,41 @@ impl<'a> Context<'a> {
                 .iter()
                 .any(|source| source.rows.iter().any(|row| row.imdb_rating.is_some())),
             watch: query.watch.as_ref().map(|_| watch_state(sources, query)),
+            hidden_titles: HashSet::new(),
         }
+        .with_hidden_titles()
+    }
+
+    /// A title is hidden as a whole when most of its provider copies sit in
+    /// hidden categories, or any one sits in an origin list: hiding India
+    /// must not leave Indian films behind through one copy filed under
+    /// "Netflix" or another market. A foreign film with a few dubbed copies
+    /// among many stays.
+    fn with_hidden_titles(mut self) -> Self {
+        if self.query.hidden_category_ids.is_empty() {
+            return self;
+        }
+        let mut counts: HashMap<&'a str, (u32, u32, bool)> = HashMap::new();
+        for (source, facets) in self.sources.iter().enumerate() {
+            let facts = &self.categories[source];
+            for row in &facets.rows {
+                let Some(identity) = row.imdb_tconst.as_deref() else {
+                    continue;
+                };
+                let entry = counts.entry(identity).or_default();
+                entry.1 += 1;
+                if let Some(category) = row.category {
+                    entry.0 += u32::from(facts.hidden[category as usize]);
+                    entry.2 |= facts.origin[category as usize];
+                }
+            }
+        }
+        self.hidden_titles = counts
+            .into_iter()
+            .filter(|(_, (hidden, total, origin))| *origin || hidden * 2 > *total)
+            .map(|(identity, _)| identity)
+            .collect();
+        self
     }
 
     fn row(&self, entry: Entry) -> &'a FacetRow {
@@ -386,6 +432,10 @@ impl<'a> Context<'a> {
         let row = self.row(entry);
         row.category
             .is_some_and(|c| self.categories[entry.source as usize].hidden[c as usize])
+            || row
+                .imdb_tconst
+                .as_deref()
+                .is_some_and(|identity| self.hidden_titles.contains(identity))
     }
 
     fn is_target(&self, entry: Entry) -> bool {
@@ -1607,6 +1657,64 @@ mod tests {
         ]);
         assert_eq!(keys(&page(&[&legacy], &q)), vec![1, 0]);
         assert_eq!(stats(&[&legacy], &q).top_rated, 2);
+    }
+
+    #[test]
+    fn hidden_copies_hide_their_title_by_majority_or_origin_list() {
+        let facets = source(vec![
+            // An Indian film: two hidden copies, one filed under Netflix.
+            Title {
+                imdb_tconst: Some("tt-in"),
+                category: Some("s:category:in"),
+                ..title("in-1")
+            },
+            Title {
+                imdb_tconst: Some("tt-in"),
+                category: Some("s:category:in"),
+                ..title("in-2")
+            },
+            Title {
+                imdb_tconst: Some("tt-in"),
+                category: Some("s:category:netflix"),
+                ..title("in-netflix")
+            },
+            // A foreign film with one Hindi-dubbed copy among three stays.
+            Title {
+                imdb_tconst: Some("tt-us"),
+                category: Some("s:category:in"),
+                ..title("us-dub")
+            },
+            Title {
+                imdb_tconst: Some("tt-us"),
+                category: Some("s:category:netflix"),
+                ..title("us-1")
+            },
+            Title {
+                imdb_tconst: Some("tt-us"),
+                category: Some("s:category:netflix"),
+                ..title("us-2")
+            },
+            // One copy in an origin list hides a title outvoted elsewhere.
+            Title {
+                imdb_tconst: Some("tt-ar"),
+                category: Some("s:category:ar-indian"),
+                ..title("ar-indian")
+            },
+            Title {
+                imdb_tconst: Some("tt-ar"),
+                category: Some("s:category:netflix"),
+                ..title("ar-1")
+            },
+            Title {
+                imdb_tconst: Some("tt-ar"),
+                category: Some("s:category:netflix"),
+                ..title("ar-2")
+            },
+        ]);
+        let mut q = query("default");
+        q.hidden_category_ids = vec!["s:category:in".into(), "s:category:ar-indian".into()];
+        q.origin_category_ids = vec!["s:category:ar-indian".into()];
+        assert_eq!(keys(&page(&[&facets], &q)), vec![4, 5]);
     }
 
     #[test]
