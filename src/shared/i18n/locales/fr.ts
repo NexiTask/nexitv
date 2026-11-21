@@ -238,6 +238,14 @@ export const FR_MESSAGES: Record<string, string> = {
   'Search for a category or country and pin it to keep it here.':
     'Recherchez une catégorie ou un pays et épinglez-le pour le garder ici.',
   'Browse all categories': 'Parcourir toutes les catégories',
+  'IMDb quality': 'Qualité IMDb',
+  'Quality: All': 'Qualité : Tout',
+  'IMDb ≥ 7.0 · 1k+ votes': 'IMDb ≥ 7,0 · 1 k+ votes',
+  'IMDb ≥ 6.5 · 5k+ votes': 'IMDb ≥ 6,5 · 5 k+ votes',
+  'IMDb ≥ 6.0 · 10k+ votes': 'IMDb ≥ 6,0 · 10 k+ votes',
+  'Adult hidden': 'Adultes masqués',
+  'Adult shown': 'Adultes affichés',
+  'IMDb Rating': 'Note IMDb',
   'Browse all categories, {count} available':
     'Parcourir toutes les catégories, {count} disponibles',
   'Show fewer categories': 'Afficher moins de catégories',

@@ -8,11 +8,17 @@ import { GridSkeleton } from '@/shared/ui/Skeleton';
 import { CatalogViewToggle } from './CatalogViewToggle';
 import { CatalogSortSelect } from './CatalogSortSelect';
 import { GenreFilterBar } from './GenreFilterBar';
+import filterBarStyles from './GenreFilterBar.module.css';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { HeaderSearch } from '@/modules/search/public/components/HeaderSearch';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { CatalogPageHeader } from './CatalogPageHeader';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
+import {
+  IMDB_QUALITY_PRESETS,
+  type ImdbQualityPreset,
+} from '@/modules/settings/public/store/useSettingsStore';
+import { Select } from '@/shared/ui/Select';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import { useEnabledSources } from '@/modules/sources/public/hooks/useEnabledSources';
 import { useVerifiedResolutionMap } from '@/modules/sources/public/store/useStreamVerificationStore';
@@ -74,25 +80,35 @@ export function CatalogPage({
   const setCatalogSort = useSettingsStore((state) => state.setCatalogSort);
   const badgeVisibility = useSettingsStore((state) => state.badgeVisibility);
   const streamFoldingEnabled = useSettingsStore((state) => state.streamFoldingEnabled);
+  const catalogImdbQuality = useSettingsStore((state) => state.catalogImdbQuality);
+  const setCatalogImdbQuality = useSettingsStore((state) => state.updateSetting);
+  const catalogHideAdult = useSettingsStore((state) => state.catalogHideAdult);
+  const setCatalogHideAdult = useSettingsStore((state) => state.updateSetting);
   const verifiedResolutions = useVerifiedResolutionMap(badgeVisibility?.verified ?? true);
   const navigate = useNavigate();
   const [activeCategoryId, setActiveCategoryId] = useCatalogCategorySelection(type);
   // Top Rated is a ranking: whatever order the catalogue is set to, the best
   // rating comes first there.
   const isTopRated = activeCategoryId === 'smart:top-rated';
-  const currentSortMode = isTopRated ? 'rating' : (catalogSortModes?.[type] ?? 'default');
+  // Movies and Series come from the catalogue index when it can serve them;
+  // otherwise, and for Live TV, from the full catalogue in memory.
+  const { mode, fallBack } = useCatalogPageMode(type);
+  const isLegacy = mode === 'legacy';
+  const isIndexed = mode === 'index';
+  const settingsSortMode = catalogSortModes?.[type] ?? 'default';
+  // The index sorts by IMDb; the legacy full-catalogue path cannot, so it
+  // keeps the default order there.
+  const currentSortMode = isTopRated
+    ? 'rating'
+    : isLegacy && settingsSortMode === 'imdb'
+      ? 'default'
+      : settingsSortMode;
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 
   // Reset genre when category changes
   useEffect(() => {
     setSelectedGenre(null);
   }, [activeCategoryId]);
-
-  // Movies and Series come from the catalogue index when it can serve them;
-  // otherwise, and for Live TV, from the full catalogue in memory.
-  const { mode, fallBack } = useCatalogPageMode(type);
-  const isLegacy = mode === 'legacy';
-  const isIndexed = mode === 'index';
 
   const {
     data: legacyItems,
@@ -161,6 +177,16 @@ export function CatalogPage({
     () => (isIndexed ? ultraHdOverrides(verifiedResolutions) : NO_OVERRIDES),
     [isIndexed, verifiedResolutions],
   );
+  // The quality view is an index query: the legacy full-catalogue path has no
+  // IMDb data to filter by (its control stays disabled until the index serves
+  // the page).
+  const imdbQuality: ImdbQualityPreset = isIndexed && type !== 'live' ? catalogImdbQuality : 'all';
+  const imdbQualityParams = useMemo(() => {
+    if (imdbQuality === 'all') return {};
+    const preset = IMDB_QUALITY_PRESETS[imdbQuality];
+    return { imdbMinRating: preset.minRating, imdbMinVotes: preset.minVotes };
+  }, [imdbQuality]);
+  const excludeAdult = isIndexed && type !== 'live' && catalogHideAdult;
   const categoryGenres = useMemo(
     () => (isIndexed ? categoryGenreMasks(categories, categoryNameMap) : NO_OVERRIDES),
     [isIndexed, categories, categoryNameMap],
@@ -177,6 +203,8 @@ export function CatalogPage({
       sort: currentSortMode,
       fold: type === 'live' && streamFoldingEnabled,
       recentChannelIds,
+      ...imdbQualityParams,
+      excludeAdult,
     }),
     [
       activeCategoryId,
@@ -190,6 +218,8 @@ export function CatalogPage({
       type,
       streamFoldingEnabled,
       recentChannelIds,
+      imdbQualityParams,
+      excludeAdult,
     ],
   );
   const headParams = useMemo<IndexedPageParams>(
@@ -323,6 +353,34 @@ export function CatalogPage({
           actions={
             <>
               <HeaderSearch onItemClick={onItemClick} />
+              {type !== 'live' && (
+                <Select
+                  value={imdbQuality}
+                  onChange={(value) => setCatalogImdbQuality('catalogImdbQuality', value)}
+                  disabled={isLegacy}
+                  width={175}
+                  ariaLabel={t('IMDb quality')}
+                  options={[
+                    { value: 'all', label: t('Quality: All') },
+                    { value: 'imdb-7-1k', label: t('IMDb ≥ 7.0 · 1k+ votes') },
+                    { value: 'imdb-65-5k', label: t('IMDb ≥ 6.5 · 5k+ votes') },
+                    { value: 'imdb-6-10k', label: t('IMDb ≥ 6.0 · 10k+ votes') },
+                  ]}
+                />
+              )}
+              {type !== 'live' && (
+                <button
+                  type="button"
+                  className={`${filterBarStyles.chip} ${
+                    catalogHideAdult ? filterBarStyles.activeChip : ''
+                  }`}
+                  aria-pressed={catalogHideAdult}
+                  disabled={isLegacy}
+                  onClick={() => setCatalogHideAdult('catalogHideAdult', !catalogHideAdult)}
+                >
+                  {catalogHideAdult ? t('Adult hidden') : t('Adult shown')}
+                </button>
+              )}
               <CatalogSortSelect
                 value={currentSortMode}
                 onChange={(sort) => setCatalogSort(type, sort)}

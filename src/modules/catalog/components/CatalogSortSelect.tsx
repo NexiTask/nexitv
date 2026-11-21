@@ -35,6 +35,7 @@ export function CatalogSortSelect({
       { value: 'year-desc', label: t('Release Year (Newest)') },
       { value: 'year-asc', label: t('Release Year (Oldest)') },
       { value: 'rating', label: t('Top Rated') },
+      { value: 'imdb', label: t('IMDb Rating') },
       { value: 'name-asc', label: t('Name (A to Z)') },
       { value: 'name-desc', label: t('Name (Z to A)') },
     ];

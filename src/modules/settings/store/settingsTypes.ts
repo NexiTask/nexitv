@@ -39,9 +39,31 @@ export interface CategoryPrefs {
 export type SelectedCategoryIds = Record<CatalogType, string | null>;
 
 export type CatalogSortMode =
-  'default' | 'recently-added' | 'year-desc' | 'year-asc' | 'rating' | 'name-asc' | 'name-desc';
+  | 'default'
+  | 'recently-added'
+  | 'year-desc'
+  | 'year-asc'
+  | 'rating'
+  | 'name-asc'
+  | 'name-desc'
+  | 'imdb';
 
 export type CatalogSortModes = Record<CatalogType, CatalogSortMode>;
+
+/**
+ * The Movies/Series quality view: an IMDb rating floor with the vote count
+ * that makes the average worth something (see NTV-2 step 0).
+ */
+export type ImdbQualityPreset = 'all' | 'imdb-7-1k' | 'imdb-65-5k' | 'imdb-6-10k';
+
+export const IMDB_QUALITY_PRESETS: Record<
+  Exclude<ImdbQualityPreset, 'all'>,
+  { minRating: number; minVotes: number }
+> = {
+  'imdb-7-1k': { minRating: 7, minVotes: 1000 },
+  'imdb-65-5k': { minRating: 6.5, minVotes: 5000 },
+  'imdb-6-10k': { minRating: 6, minVotes: 10000 },
+};
 
 export interface SettingsState {
   // Playback (mpv)
@@ -121,6 +143,10 @@ export interface SettingsState {
   // Category list, per catalogue type
   categoryPrefs: CategoryPrefs;
   selectedCategoryIds: SelectedCategoryIds;
+  /** The Movies/Series quality view: the IMDb floor, 'all' for none. */
+  catalogImdbQuality: ImdbQualityPreset;
+  /** Movies/Series leave out the titles the provider flags as adult. */
+  catalogHideAdult: boolean;
   catalogSortModes: CatalogSortModes;
 
   // UI & Desktop
@@ -255,6 +281,8 @@ export const SETTINGS_SNAPSHOT_KEYS = [
   'streamFoldingEnabled',
   'customTitleRules',
   'badgeVisibility',
+  'catalogImdbQuality',
+  'catalogHideAdult',
   'smartLogoAspectMode',
   'imageSharpness',
   'imageBrightness',

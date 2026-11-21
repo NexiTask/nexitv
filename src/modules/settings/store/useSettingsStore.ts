@@ -22,9 +22,11 @@ import {
   type SmartLogoAspectMode,
   type ThemePreference,
   type UpcomingHistoryDays,
+  IMDB_QUALITY_PRESETS,
+  type ImdbQualityPreset,
 } from './settingsTypes';
 
-export { SETTINGS_SNAPSHOT_KEYS } from './settingsTypes';
+export { SETTINGS_SNAPSHOT_KEYS, IMDB_QUALITY_PRESETS } from './settingsTypes';
 export type {
   BadgeVisibilitySettings,
   CatalogSortMode,
@@ -34,6 +36,7 @@ export type {
   ChannelLogoAspect,
   HdrMode,
   HwdecMode,
+  ImdbQualityPreset,
   LiveStreamFormat,
   MotionPreference,
   ThemePreference,
@@ -85,6 +88,7 @@ const normalizeCatalogSortModes = (value: unknown): CatalogSortModes => {
     'rating',
     'name-asc',
     'name-desc',
+    'imdb',
   ]);
   const normalize = (mode: unknown): CatalogSortMode =>
     typeof mode === 'string' && validModes.has(mode as CatalogSortMode)
@@ -229,6 +233,8 @@ const DEFAULT_SETTINGS = {
 
   categoryPrefs: emptyCategoryPrefs(),
   selectedCategoryIds: emptySelectedCategoryIds(),
+  catalogImdbQuality: 'all' as ImdbQualityPreset,
+  catalogHideAdult: true,
   catalogSortModes: emptyCatalogSortModes(),
   sidebarWidth: 260,
   viewMode: 'grid' as const,
@@ -445,6 +451,12 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
       typeof state.notifyDownloadEvents === 'boolean' ? state.notifyDownloadEvents : true,
     categoryPrefs: normalizeCategoryPrefs(state.categoryPrefs),
     selectedCategoryIds: normalizeSelectedCategoryIds(state.selectedCategoryIds),
+    catalogImdbQuality:
+      typeof state.catalogImdbQuality === 'string' &&
+      (state.catalogImdbQuality === 'all' || state.catalogImdbQuality in IMDB_QUALITY_PRESETS)
+        ? (state.catalogImdbQuality as ImdbQualityPreset)
+        : 'all',
+    catalogHideAdult: typeof state.catalogHideAdult === 'boolean' ? state.catalogHideAdult : true,
     catalogSortModes: normalizeCatalogSortModes(state.catalogSortModes),
     lastCollectionId:
       typeof state.lastCollectionId === 'string' && state.lastCollectionId.length <= 512

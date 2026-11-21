@@ -53,6 +53,8 @@ export const FACET_KIDS = 8;
 export const FACET_TITLE_UHD = 16;
 /** The quality badges this variant brings to a folded channel declare 4K or 8K. */
 export const FACET_BADGE_UHD = 32;
+/** The provider flags the title as adult (its own `is_adult`). */
+export const FACET_ADULT = 64;
 
 const isUltraHdTag = (tags: readonly string[]) => tags.includes('4K') || tags.includes('8K');
 
@@ -70,6 +72,7 @@ export function catalogItemFacets(ord: number, item: CatalogItem): CatalogFacetR
     if (isUltraHdTag(mergeMediaTags(...fold.qualityBadges))) flags |= FACET_BADGE_UHD;
   }
   if (isUltraHdQuality(item)) flags |= FACET_ULTRA_HD;
+  if (item.adult) flags |= FACET_ADULT;
   if (SMART_TITLE_PATTERNS['smart:sports'].test(item.title)) flags |= FACET_SPORTS;
   if (SMART_TITLE_PATTERNS['smart:news'].test(item.title)) flags |= FACET_NEWS;
   if (SMART_TITLE_PATTERNS['smart:kids'].test(item.title)) flags |= FACET_KIDS;

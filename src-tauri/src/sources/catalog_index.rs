@@ -668,6 +668,12 @@ fn facet_cache_put(source_id: &str, kind: &str, facets: Arc<SourceFacets>) {
         .insert((source_id.to_string(), kind.to_string()), facets);
 }
 
+/// Drop the cached facets so the next page read reloads them with the IMDb
+/// columns the backfill just filled.
+pub(crate) fn invalidate_imdb_facets() {
+    *FACETS.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
+
 fn list_generation(
     connection: &Connection,
     source_id: &str,
@@ -711,7 +717,7 @@ fn read_source_facets(
     }
     let mut statement = transaction.prepare(
         "SELECT ord, f_id, f_category, f_added, f_has_added, f_year, f_rating, f_flags,
-            f_genres, f_rank, f_fold_key, f_fold_rank, f_title
+            f_genres, f_rank, f_fold_key, f_fold_rank, f_title, imdb_rating, imdb_votes
          FROM items WHERE source_id = ?1 AND kind = ?2 ORDER BY ord",
     )?;
     let mut categories: Vec<Box<str>> = Vec::new();
@@ -747,6 +753,8 @@ fn read_source_facets(
             fold_rank: row.get::<_, Option<i64>>(11)?.unwrap_or(0) as u8,
             search_title: normalize_text(&row.get::<_, Option<String>>(12)?.unwrap_or_default())
                 .into(),
+            imdb_rating: row.get(13)?,
+            imdb_votes: row.get::<_, Option<i64>>(14)?.map(|votes| votes as f64),
         });
     }
     drop(query);

@@ -644,6 +644,10 @@ fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
         meta_set(connection, "last_backfill", now_secs());
         Ok(())
     })?;
+    catalog_index::invalidate_imdb_facets();
+    // Index-backed pages reload with the new matches (a full refresh emits
+    // its own 'done' after this one; an extra invalidation is harmless).
+    emit(app, "done", None);
     crate::perf::log(
         "imdb:backfill",
         Some(start.elapsed().as_millis()),
@@ -663,6 +667,7 @@ fn emit(app: &tauri::AppHandle, stage: &str, progress: Option<u64>) {
 #[serde(rename_all = "camelCase")]
 pub struct RefreshStatus {
     pub running: bool,
+    pub enabled: bool,
     pub last_refresh: Option<u64>,
     pub titles: Option<u64>,
     pub matched: u64,
@@ -670,10 +675,11 @@ pub struct RefreshStatus {
 }
 
 fn status(app: &tauri::AppHandle) -> Result<RefreshStatus, String> {
-    let (last_refresh, titles) = with_connection(app, |connection| {
+    let (last_refresh, titles, enabled) = with_connection(app, |connection| {
         Ok((
             meta_get(connection, "last_refresh"),
             meta_get(connection, "titles"),
+            meta_get(connection, "enabled").map(|value| value != 0).unwrap_or(true),
         ))
     })?;
     let (matched, total) = catalog_index::with_reader(app, |connection| {
@@ -694,6 +700,7 @@ fn status(app: &tauri::AppHandle) -> Result<RefreshStatus, String> {
     let (matched, total) = (matched as u64, total as u64);
     Ok(RefreshStatus {
         running: RUNNING.load(Ordering::SeqCst),
+        enabled,
         last_refresh,
         titles,
         matched,
@@ -706,6 +713,15 @@ pub fn imdb_refresh_status(app: tauri::AppHandle) -> Result<RefreshStatus, Strin
     status(&app)
 }
 
+/// Settings' automatic-refresh toggle; a manual update always runs.
+#[tauri::command(async)]
+pub fn imdb_refresh_set_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    with_connection(&app, |connection| {
+        meta_set(connection, "enabled", u64::from(enabled));
+        Ok(())
+    })
+}
+
 /// Settings' manual update; runs regardless of the weekly gate.
 #[tauri::command(async)]
 pub async fn imdb_refresh_start(app: tauri::AppHandle) -> Result<RefreshStatus, String> {
@@ -715,26 +731,36 @@ pub async fn imdb_refresh_start(app: tauri::AppHandle) -> Result<RefreshStatus, 
 
 /// The recurring process: shortly after startup and then on a slow tick,
 /// refresh stale dumps and match lists that arrived since the last pass.
+/// The Settings toggle turns the automatic half off; a manual update always
+/// runs.
 pub(crate) fn schedule(app: tauri::AppHandle) {
     std::thread::spawn(move || {
         std::thread::sleep(STARTUP_DELAY);
         loop {
-            let due = with_connection(&app, |connection| {
-                let refresh = age_secs(connection, "last_refresh")
-                    .map(|age| age >= REFRESH_AFTER.as_secs())
-                    .unwrap_or(true);
-                let backfill = age_secs(connection, "last_backfill")
-                    .map(|age| age >= BACKFILL_AFTER.as_secs())
-                    .unwrap_or(true);
-                Ok((refresh, backfill))
+            let automatic = with_connection(&app, |connection| {
+                Ok(meta_get(connection, "enabled").map(|value| value != 0).unwrap_or(true))
             })
-            .unwrap_or((false, false));
-            let outcome = if due.0 {
-                tauri::async_runtime::block_on(run_refresh(app.clone(), false))
-            } else if due.1 {
-                backfill(&app)
-            } else {
+            .unwrap_or(true);
+            let outcome = if !automatic {
                 Ok(0)
+            } else {
+                let due = with_connection(&app, |connection| {
+                    let refresh = age_secs(connection, "last_refresh")
+                        .map(|age| age >= REFRESH_AFTER.as_secs())
+                        .unwrap_or(true);
+                    let backfill = age_secs(connection, "last_backfill")
+                        .map(|age| age >= BACKFILL_AFTER.as_secs())
+                        .unwrap_or(true);
+                    Ok((refresh, backfill))
+                })
+                .unwrap_or((false, false));
+                if due.0 {
+                    tauri::async_runtime::block_on(run_refresh(app.clone(), false))
+                } else if due.1 {
+                    backfill(&app)
+                } else {
+                    Ok(0)
+                }
             };
             if let Err(error) = outcome {
                 // A failed download keeps the old data and retries next tick.

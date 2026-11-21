@@ -42,6 +42,7 @@ pub fn run() {
             metadata::intro_db::introdb_fetch_segments,
             metadata::imdb::imdb_refresh_status,
             metadata::imdb::imdb_refresh_start,
+            metadata::imdb::imdb_refresh_set_enabled,
             downloads::download_media_start,
             downloads::download_media_pause,
             downloads::download_media_resume,

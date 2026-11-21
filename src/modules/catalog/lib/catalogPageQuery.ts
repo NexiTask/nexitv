@@ -78,6 +78,10 @@ export interface CatalogPageQueryInput {
   titleFilter?: string | null | undefined;
   /** The library's recently played channels, for the recent-channels hub. */
   recentChannelIds?: readonly string[] | undefined;
+  /** The quality view, served by the index only (see CatalogPage). */
+  imdbMinRating?: number | null | undefined;
+  imdbMinVotes?: number | null | undefined;
+  excludeAdult?: boolean | undefined;
 }
 
 /** The index query for exactly what CatalogPage would compute in memory. */
@@ -103,6 +107,9 @@ export function buildCatalogPageQuery(input: CatalogPageQueryInput): CatalogPage
         ? { orderedIds: [...(input.recentChannelIds ?? [])] }
         : {}),
     ...(input.titleFilter?.trim() ? { titleFilter: input.titleFilter } : {}),
+    ...(input.imdbMinRating != null ? { imdbMinRating: input.imdbMinRating } : {}),
+    ...(input.imdbMinRating != null ? { imdbMinVotes: input.imdbMinVotes ?? 0 } : {}),
+    ...(input.excludeAdult ? { excludeAdult: true } : {}),
     ...lookupOverrides(input.ratingLookups),
   };
 }

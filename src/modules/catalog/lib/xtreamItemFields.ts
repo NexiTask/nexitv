@@ -31,6 +31,7 @@ export function xtreamVodFields(
     posterUrl: stream.stream_icon || '',
     type: 'vod',
     rating,
+    adult: stream.is_adult !== undefined && String(stream.is_adult) === '1',
     year: metadata.releaseYear || undefined,
     added: stream.added,
     categoryId: xtreamCategoryId(sourceId, stream.category_id),

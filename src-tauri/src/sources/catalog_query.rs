@@ -25,6 +25,8 @@ pub(crate) const FLAG_KIDS: u8 = 8;
 pub(crate) const FLAG_TITLE_UHD: u8 = 16;
 /// A channel variant's quality badges declare 4K/8K.
 pub(crate) const FLAG_BADGE_UHD: u8 = 32;
+/// The provider flags the title as adult (its own `is_adult`).
+pub(crate) const FLAG_ADULT: u8 = 64;
 /// `TOP_RATED_MIN_RATING` in rating.ts.
 const TOP_RATED_MIN_RATING: f64 = 7.0;
 /// `CATALOG_GENRES.length` in smartCatalogFilter.ts.
@@ -51,6 +53,10 @@ pub(crate) struct FacetRow {
     /// Live channels: the stream-folding group and quality rank.
     pub fold_key: Option<Box<str>>,
     pub fold_rank: u8,
+    /// IMDb's rating and vote count for the matched title, when the pipeline
+    /// matched one (null while unmatched — the title may simply be off-IMDb).
+    pub imdb_rating: Option<f64>,
+    pub imdb_votes: Option<f64>,
     /// The title as search compares it (`normalizeText`).
     pub search_title: Box<str>,
 }
@@ -101,6 +107,13 @@ pub struct CatalogQuery {
     pub ordered_ids: Option<Vec<String>>,
     /// Keep only titles whose normalized title contains this text.
     pub title_filter: Option<String>,
+    /// The quality view: an IMDb rating floor that only titles with at least
+    /// this many votes can satisfy (step 0: "≥ 7.0 with ≥ 1k votes" is the
+    /// junk killer). Both null: every title passes.
+    pub imdb_min_rating: Option<f64>,
+    pub imdb_min_votes: Option<f64>,
+    /// Leave out the titles the provider flags as adult.
+    pub exclude_adult: bool,
 }
 
 #[derive(Debug, Default, Serialize, PartialEq)]
@@ -468,10 +481,47 @@ impl<'a> Context<'a> {
                         .then_with(|| by_title(a, b))
                 });
             }
+            "imdb" => {
+                let ratings: HashMap<(u32, u32), Rating> = entries
+                    .iter()
+                    .map(|&entry| {
+                        let row = self.row(entry);
+                        (
+                            (entry.source, entry.row),
+                            row.imdb_rating.map(|value| (value, row.imdb_votes.unwrap_or(0.0))),
+                        )
+                    })
+                    .collect();
+                let rating = |entry: Entry| ratings[&(entry.source, entry.row)];
+                entries.sort_by(|&a, &b| {
+                    compare_ratings(rating(a), rating(b))
+                        .then_with(|| js(year(b) - year(a)))
+                        .then_with(|| by_title(a, b))
+                });
+            }
             "name-asc" => entries.sort_by(|&a, &b| by_title(a, b)),
             "name-desc" => entries.sort_by(|&a, &b| by_title(b, a)),
             _ => {}
         }
+    }
+
+    /// The quality view: adult titles out, and an IMDb floor that an
+    /// unmatched title cannot sit under.
+    fn passes_quality(&self, entry: Entry) -> bool {
+        let row = self.row(entry);
+        if self.query.exclude_adult && row.flags & FLAG_ADULT != 0 {
+            return false;
+        }
+        if let Some(min_rating) = self.query.imdb_min_rating {
+            let votes = row.imdb_votes.unwrap_or(0.0);
+            if votes < self.query.imdb_min_votes.unwrap_or(0.0) {
+                return false;
+            }
+            if row.imdb_rating.unwrap_or(0.0) < min_rating {
+                return false;
+            }
+        }
+        true
     }
 
     fn key(&self, entry: Entry) -> u32 {
@@ -482,7 +532,13 @@ impl<'a> Context<'a> {
 /// The ordered keys of one catalogue page, with its genre bar's counts.
 pub(crate) fn page(sources: &[&SourceFacets], query: &CatalogQuery) -> PageResult {
     let context = Context::new(sources, query, true);
-    let category = context.smart_filter();
+    // The quality view applies before the counts, so the genre bar and the
+    // header's total say what the page can actually show.
+    let category: Vec<Entry> = context
+        .smart_filter()
+        .into_iter()
+        .filter(|&entry| context.passes_quality(entry))
+        .collect();
     let mut genre_counts = [0u32; GENRE_COUNT];
     for &entry in &category {
         let mask = context.genre_mask(entry);
@@ -664,6 +720,8 @@ mod tests {
         rank: u32,
         fold_key: Option<&'static str>,
         fold_rank: u8,
+        imdb_rating: Option<f64>,
+        imdb_votes: Option<f64>,
     }
 
     fn title(id: &'static str) -> Title {
@@ -679,6 +737,8 @@ mod tests {
             rank: 0,
             fold_key: None,
             fold_rank: 0,
+            imdb_rating: None,
+            imdb_votes: None,
         }
     }
 
@@ -710,6 +770,8 @@ mod tests {
                     rank: t.rank,
                     fold_key: t.fold_key.map(Into::into),
                     fold_rank: t.fold_rank,
+                    imdb_rating: t.imdb_rating,
+                    imdb_votes: t.imdb_votes,
                     search_title: normalize_text(t.id).into(),
                 }
             })
@@ -1134,6 +1196,65 @@ mod tests {
         assert_eq!(
             compare_ratings(Some((7.0, 10.0)), Some((7.0, 20.0))),
             Ordering::Greater
+        );
+    }
+
+    fn rated(id: &'static str, imdb: Option<(f64, f64)>, adult: bool) -> Title {
+        Title {
+            imdb_rating: imdb.map(|(value, _)| value),
+            imdb_votes: imdb.map(|(_, votes)| votes),
+            flags: if adult { FLAG_ADULT } else { 0 },
+            ..title(id)
+        }
+    }
+
+    #[test]
+    fn the_quality_floor_hides_unmatched_low_vote_and_adult_titles() {
+        let facets = source(vec![
+            rated("good", Some((7.4, 2_000.0)), false),
+            rated("lowscore", Some((5.9, 40_000.0)), false),
+            rated("lowvotes", Some((9.0, 40.0)), false),
+            rated("unmatched", None, false),
+            rated("adult", Some((8.2, 50_000.0)), true),
+        ]);
+        let mut q = query("default");
+        q.imdb_min_rating = Some(7.0);
+        q.imdb_min_votes = Some(1_000.0);
+        assert_eq!(
+            keys(&page(&[&facets], &q)),
+            vec![0, 4],
+            "the floor keeps 'good' and the adult title"
+        );
+        q.exclude_adult = true;
+        assert_eq!(keys(&page(&[&facets], &q)), vec![0]);
+    }
+
+    #[test]
+    fn the_quality_floor_leaves_the_counts_consistent() {
+        let facets = source(vec![
+            rated("good", Some((7.4, 2_000.0)), false),
+            rated("lowscore", Some((5.9, 40_000.0)), false),
+        ]);
+        let mut q = query("default");
+        q.imdb_min_rating = Some(7.0);
+        q.imdb_min_votes = Some(1_000.0);
+        let result = page(&[&facets], &q);
+        assert_eq!(result.category_total, 1);
+        assert_eq!(result.keys, vec![0]);
+    }
+
+    #[test]
+    fn imdb_sort_orders_by_rating_then_votes() {
+        let facets = source(vec![
+            rated("low", Some((6.0, 90_000.0)), false),
+            rated("highfew", Some((8.9, 300.0)), false),
+            rated("highmany", Some((8.9, 12_000.0)), false),
+            rated("unmatched", None, false),
+        ]);
+        assert_eq!(
+            keys(&page(&[&facets], &query("imdb"))),
+            vec![2, 1, 0, 3],
+            "highmany, highfew, low, and the unmatched title last"
         );
     }
 }

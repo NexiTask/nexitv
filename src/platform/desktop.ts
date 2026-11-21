@@ -89,6 +89,11 @@ export const desktopApi = {
   onPointerMoved: (handler: () => void) => listen('pointer-moved', handler),
   onCatalogIndexUpdated: (handler: (kind: string) => void) =>
     listen<string>('catalog-index-updated', ({ payload }) => handler(payload)),
+  /** The IMDb pipeline finished a refresh or backfill; index views may change. */
+  onImdbRefreshed: (handler: () => void) =>
+    listen<{ stage: string }>('imdb://refresh', ({ payload }) => {
+      if (payload.stage === 'done') handler();
+    }),
 
   minimizeWindow: () => getCurrentWindow().minimize(),
   toggleMaximizeWindow: () => getCurrentWindow().toggleMaximize(),

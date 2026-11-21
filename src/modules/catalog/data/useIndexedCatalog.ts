@@ -78,6 +78,7 @@ function useIndexInvalidation(kind: CatalogPageKind | null) {
     };
     const stopBuilt = onCatalogFacetsBuilt(invalidate);
     let unlisten: (() => void) | undefined;
+    let unlistenImdb: (() => void) | undefined;
     let cancelled = false;
     void desktopApi
       .onCatalogIndexUpdated(invalidate)
@@ -86,8 +87,18 @@ function useIndexInvalidation(kind: CatalogPageKind | null) {
         else unlisten = stop;
       })
       .catch(() => undefined);
+    // An IMDb refresh or backfill changes what the pages filter and sort by.
+    void desktopApi
+      .onImdbRefreshed(() => invalidate(kind))
+      .then((stop) => {
+        if (cancelled) stop();
+        else unlistenImdb = stop;
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
+      unlisten?.();
+      unlistenImdb?.();
       stopBuilt();
       unlisten?.();
     };
