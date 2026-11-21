@@ -138,10 +138,6 @@
   transition: width var(--duration-normal) var(--ease-standard);
 }
 
-.itemWrapper:hover {
-  z-index: 20;
-}
-
 /* Responsive Carousels */
 @media (max-width: 1200px) {
   .itemWrapper {

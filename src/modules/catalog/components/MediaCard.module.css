@@ -4,14 +4,26 @@
   gap: var(--space-3);
   cursor: pointer;
   position: relative;
-  transition: transform var(--duration-fast) var(--ease-standard);
   z-index: 1;
 }
 
-.cardContainer:hover,
-.cardContainer:focus-within {
-  transform: scale(1.02);
-  z-index: 20;
+/*
+ * Hover effects on cards avoid anything that makes WebKitGTK create or drop a
+ * compositing layer (scale, z-index changes, opacity transitions). Those made
+ * the overlay blink: shown, hidden and shown again on enter, and the reverse
+ * on leave. Hover changes are instant, and the overlay is shown with
+ * `visibility`, not `opacity`: a non-opaque overlay is painted through an
+ * offscreen buffer, which cost about 100 ms per hover on a wide window.
+ */
+@property --card-action-scale {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 1;
+}
+
+.cardContainer:hover .posterWrapper,
+.cardContainer:focus-within .posterWrapper {
+  border-color: var(--border-strong);
 }
 
 .posterWrapper {
@@ -23,7 +35,7 @@
   background-color: var(--surface-control);
   border: 1px solid var(--border-grid);
   box-sizing: border-box;
-  box-shadow: var(--shadow-card);
+  /* No box-shadow: WebKitGTK re-blurs it on every repaint of the card. */
 }
 
 .poster {
@@ -69,16 +81,11 @@
 .placeholderIcon {
   color: var(--text-muted);
   opacity: var(--alpha-75);
-  transition:
-    transform var(--duration-normal) var(--ease-standard),
-    color var(--duration-normal) var(--ease-standard),
-    opacity var(--duration-normal) var(--ease-standard);
 }
 
 .providerLogo {
   width: 42px;
   height: 42px;
-  transition: transform var(--duration-normal) var(--ease-standard);
 }
 
 .providerLogoYoutube {
@@ -93,12 +100,6 @@
 .cardContainer:focus-within .placeholderIcon {
   color: var(--accent-foreground);
   opacity: var(--alpha-90);
-  transform: scale(1.1);
-}
-
-.cardContainer:hover .providerLogo,
-.cardContainer:focus-within .providerLogo {
-  transform: scale(1.08);
 }
 
 .placeholderTitle {
@@ -122,8 +123,7 @@
     rgba(var(--neutral-black-rgb), var(--alpha-0)) 50%,
     rgba(var(--neutral-black-rgb), var(--alpha-40)) 100%
   );
-  opacity: 0;
-  transition: opacity var(--duration-normal) var(--ease-standard);
+  visibility: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -133,7 +133,7 @@
 
 .cardContainer:hover .overlay,
 .cardContainer:focus-within .overlay {
-  opacity: 1;
+  visibility: visible;
 }
 
 .topActions {
@@ -153,7 +153,6 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background var(--duration-normal) var(--ease-standard);
 }
 
 .iconBtn:hover {
@@ -164,7 +163,7 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(var(--card-action-scale));
   background: var(--text-media-primary);
   color: var(--neutral-black);
   width: 44px;
@@ -175,12 +174,10 @@
   justify-content: center;
   border: none;
   cursor: pointer;
-  box-shadow: var(--shadow-card-strong);
-  transition: transform var(--duration-normal) var(--ease-standard);
 }
 
 .actionBtn:hover {
-  transform: translate(-50%, -50%) scale(1.1);
+  --card-action-scale: 1.1;
 }
 
 .progressBar {
@@ -341,7 +338,6 @@
   gap: var(--space-3);
   align-items: center;
   box-sizing: border-box;
-  transition: background-color var(--duration-normal) var(--ease-standard);
   will-change: auto;
 }
 
@@ -395,7 +391,6 @@
   font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-semibold);
   text-align: right;
-  transition: color var(--duration-normal) var(--ease-standard);
 }
 
 .listView:hover .listChannelNumber {
@@ -534,7 +529,6 @@
   gap: var(--space-1);
   flex: 0 0 68px;
   opacity: 0;
-  transition: opacity var(--duration-normal) var(--ease-standard);
 }
 
 .listView:hover .listActions,
@@ -555,10 +549,6 @@
   border: 1px solid transparent;
   border-radius: var(--radius-full);
   cursor: pointer;
-  transition:
-    color var(--duration-normal) var(--ease-standard),
-    background-color var(--duration-normal) var(--ease-standard),
-    border-color var(--duration-normal) var(--ease-standard);
 }
 
 .listPlayBtn:hover,
@@ -623,9 +613,6 @@
   text-align: left;
   width: 100%;
   box-sizing: border-box;
-  transition:
-    background var(--duration-normal) var(--ease-standard),
-    color var(--duration-normal) var(--ease-standard);
 }
 
 .menuItem:hover {
@@ -765,13 +752,12 @@
   gap: var(--space-0-75);
   align-items: flex-end;
   z-index: 2;
-  transition: opacity var(--duration-normal) var(--ease-standard);
 }
 
 /* Hide static poster quality badges on card hover so overlay action buttons (favorite & options) never overlap */
 .cardContainer:hover .posterBadgesRight,
 .cardContainer:focus-within .posterBadgesRight {
-  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 

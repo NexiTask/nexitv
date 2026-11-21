@@ -7,6 +7,11 @@
 //! API into a `GtkGLArea` that sits *under* the transparent webview inside a
 //! `GtkOverlay`. GTK composites both layers itself, which works the same on
 //! X11 and on native Wayland.
+//!
+//! A see-through webview over a GL surface makes WebKitGTK and GTK3 take a
+//! slower drawing path for every repaint, which made hover effects lag. So the
+//! layer only exists while something plays: when idle the GLArea is hidden and
+//! the webview is opaque, and `start`/`detach` switch between the two.
 
 use std::cell::RefCell;
 use std::ffi::{c_void, CStr, CString};
@@ -35,6 +40,41 @@ const MAIN_THREAD_TIMEOUT: Duration = Duration::from_secs(10);
 thread_local! {
     /// The video layer. GTK widgets are main-thread only, so it lives here.
     static AREA: RefCell<Option<gtk::GLArea>> = const { RefCell::new(None) };
+    /// The WebKitWebView widget above it.
+    static WEBVIEW: RefCell<Option<gtk::Widget>> = const { RefCell::new(None) };
+}
+
+extern "C" {
+    // From libwebkit2gtk-4.1, which wry already links.
+    fn webkit_web_view_set_background_color(
+        web_view: *mut gtk::ffi::GtkWidget,
+        rgba: *const gtk::gdk::ffi::GdkRGBA,
+    );
+}
+
+/// Show the video layer and make the webview see-through, or hide the layer
+/// and make the webview opaque again. Main thread only.
+fn set_video_visible(visible: bool) {
+    AREA.with(|area| {
+        if let Some(area) = area.borrow().as_ref() {
+            if visible {
+                area.show();
+            } else {
+                area.hide();
+            }
+        }
+    });
+    WEBVIEW.with(|webview| {
+        if let Some(webview) = webview.borrow().as_ref() {
+            let alpha = if visible { 0.0 } else { 1.0 };
+            let color = gtk::gdk::RGBA::new(0.0, 0.0, 0.0, alpha);
+            unsafe {
+                use gtk::glib::translate::ToGlibPtr;
+                let widget: *mut gtk::ffi::GtkWidget = webview.to_glib_none().0;
+                webkit_web_view_set_background_color(widget, color.to_glib_none().0);
+            }
+        }
+    });
 }
 
 /// `*mut mpv_render_context`, or 0. Only the main thread renders or frees it.
@@ -244,6 +284,10 @@ pub fn prepare_main_window(app: &AppHandle) {
     overlay.show_all();
 
     AREA.with(|slot| *slot.borrow_mut() = Some(area));
+    WEBVIEW.with(|slot| *slot.borrow_mut() = Some(webview));
+    if std::env::var_os("MOVENA_ALWAYS_TRANSPARENT").is_none() {
+        set_video_visible(false);
+    }
 }
 
 fn on_main<T, F>(app: &AppHandle, f: F) -> Option<T>
@@ -266,6 +310,7 @@ unsafe fn create_context(mpv: *mut mpv_handle) -> Result<(), String> {
     let area = AREA
         .with(|area| area.borrow().clone())
         .ok_or("Video layer is not available")?;
+    set_video_visible(true);
     if !area.is_realized() {
         area.realize();
     }
@@ -338,6 +383,9 @@ pub fn detach(app: &AppHandle) {
         unsafe { mpv_render_context_free(context as *mut mpv_render_context) };
         if let Some(area) = area {
             area.queue_render();
+        }
+        if std::env::var_os("MOVENA_ALWAYS_TRANSPARENT").is_none() {
+            set_video_visible(false);
         }
     });
     if freed.is_none() {
