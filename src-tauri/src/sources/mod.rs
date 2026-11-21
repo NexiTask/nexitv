@@ -1,6 +1,7 @@
 pub(crate) mod cache;
 pub(crate) mod catalog_cache;
 pub(crate) mod catalog_index;
+pub(crate) mod catalog_query;
 pub(crate) mod remote;
 pub(crate) mod xmltv;
 

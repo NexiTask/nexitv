@@ -323,3 +323,41 @@ describe('category sidebar "hide all countries except" action', () => {
     expect(kept).not.toHaveBeenCalled();
   });
 });
+
+describe('category sidebar counts from the catalogue index', () => {
+  it('shows the index counts and does not load the full catalogue', () => {
+    render(
+      <CategorySidebar
+        type="live"
+        activeCategoryId={null}
+        onSelectCategory={vi.fn()}
+        indexStats={{
+          categoryCounts: { 'm3u-category-ar': 7 },
+          visibleTotal: 7,
+          favorites: 0,
+          recent: 0,
+          topRated: 0,
+          fourK: 3,
+        }}
+      />,
+    );
+
+    expect(vi.mocked(useCatalogByType)).toHaveBeenCalledWith('live', { enabled: false });
+    expect(screen.getAllByRole('button', { name: 'Argentina, 7 channels' })).toHaveLength(1);
+    expect(screen.getByText('4K Ultra HD')).toBeTruthy();
+  });
+
+  it('shows no counts while the index counts are still pending', () => {
+    render(
+      <CategorySidebar
+        type="live"
+        activeCategoryId={null}
+        onSelectCategory={vi.fn()}
+        indexStats={null}
+      />,
+    );
+
+    expect(vi.mocked(useCatalogByType)).toHaveBeenCalledWith('live', { enabled: false });
+    expect(screen.queryByRole('button', { name: 'Argentina, 2 channels' })).toBeNull();
+  });
+});

@@ -13,10 +13,9 @@ import { desktopApi } from '@/platform/desktop';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 import { loadProviderList, rememberProviderList } from './catalogDiskCache';
 import { CATALOG_FRESH_MS } from './catalogFreshness';
-import type { MediaItem } from '../model/media';
 import { perfAsync, perfSync } from '@/platform/perf';
 import { queryKeys } from '@/modules/sources/public/model/queryKeys';
-import { parseLiveChannelTitle, parseMediaDisplayTitle, parseMediaTitle } from '../lib/titleParser';
+import { parseLiveChannelTitle, parseMediaTitle } from '../lib/titleParser';
 import {
   useEnabledSources,
   type EnabledSourcesSnapshot,
@@ -32,29 +31,11 @@ import { foldLiveChannels } from '../lib/streamFolding';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import { notify } from '@/shared/notifications/useNotificationStore';
 import { getErrorMessage } from '@/shared/lib/error';
-import { parseProviderRating } from '@/shared/lib/rating';
 
-export interface CatalogItem extends MediaItem {
-  categoryId?: string | undefined;
-  /** The source's guide id for a channel — how XMLTV listings are matched. */
-  epgChannelId?: string | undefined;
-  radio?: boolean | undefined;
-  radioMetadata?:
-    | {
-        title: string;
-        artist?: string | undefined;
-        album?: string | undefined;
-        genre?: string | undefined;
-        channelNumber?: string | undefined;
-        logoUrl?: string | undefined;
-      }
-    | undefined;
-  catchup?: string | undefined;
-  catchupSource?: string | undefined;
-  catchupDays?: number | undefined;
-  fallbacks?:
-    Array<{ streamUrl: string; httpHeaders?: Record<string, string> | undefined }> | undefined;
-}
+import type { CatalogItem } from '../model/catalogItem';
+import { xtreamSeriesItem, xtreamVodFields } from '../lib/xtreamItemFields';
+
+export type { CatalogItem } from '../model/catalogItem';
 
 const foldedLiveCatalogs = new WeakMap<CatalogItem[], CatalogItem[]>();
 
@@ -394,61 +375,21 @@ function mapXtreamLive(source: EnabledXtreamSource, response: XtreamLiveStream[]
 function mapXtreamVod(source: EnabledXtreamSource, streams: XtreamVodStream[]): CatalogItem[] {
   const credentials = source.credentials!;
   return streams.map((stream, index) => {
-    const title = stream.name || 'Unknown Movie';
-    const metadata = parseMediaDisplayTitle(title);
-    const providerId = (stream.stream_id ?? stream.num ?? `movie-${index}`).toString();
-    const rating = parseProviderRating(stream.rating, stream.rating_5based);
+    const fields = xtreamVodFields(source.id, source.profile.name, stream, index);
     return {
-      id: xtreamItemId(source.id, 'vod', providerId),
-      sourceItemId: providerId,
-      title,
-      posterUrl: stream.stream_icon || '',
-      type: 'vod',
-      rating,
-      year: metadata.releaseYear || undefined,
-      added: stream.added,
-      categoryId: xtreamCategoryId(source.id, stream.category_id),
-      tags: metadata.tags,
-      country: metadata.country,
+      ...fields,
       streamUrl:
         stream.direct_source ||
-        getStreamUrl(credentials, 'vod', providerId, stream.container_extension || 'mp4'),
+        getStreamUrl(credentials, 'vod', fields.sourceItemId!, stream.container_extension || 'mp4'),
       containerExtension: stream.container_extension,
-      sourceId: source.id,
-      subtitle: source.profile.name,
     };
   });
 }
 
 function mapXtreamSeries(source: EnabledXtreamSource, streams: XtreamSeries[]): CatalogItem[] {
-  return streams.map((stream, index) => {
-    let year: string | undefined;
-    if (stream.releaseDate) {
-      const parsed = new Date(stream.releaseDate).getFullYear();
-      if (!Number.isNaN(parsed)) year = parsed.toString();
-    }
-    const title = stream.name || 'Unknown Series';
-    const metadata = parseMediaDisplayTitle(title, year);
-    const providerId = (stream.series_id ?? stream.num ?? `series-${index}`).toString();
-    const rating = parseProviderRating(stream.rating, stream.rating_5based);
-    return {
-      id: xtreamItemId(source.id, 'series', providerId),
-      sourceItemId: providerId,
-      title,
-      posterUrl: stream.cover || '',
-      type: 'series',
-      rating,
-      year: year ?? metadata.releaseYear ?? undefined,
-      added: stream.last_modified,
-      categoryId: xtreamCategoryId(source.id, stream.category_id),
-      tags: metadata.tags,
-      country: metadata.country,
-      genre: stream.genre,
-      sourceId: source.id,
-      subtitle: source.profile.name,
-      description: stream.plot,
-    };
-  });
+  return streams.map((stream, index) =>
+    xtreamSeriesItem(source.id, source.profile.name, stream, index),
+  );
 }
 
 export function useLiveStreams(options?: { enabled?: boolean | undefined }) {

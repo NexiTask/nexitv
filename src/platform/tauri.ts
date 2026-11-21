@@ -55,6 +55,73 @@ export interface CatalogIndexRows {
   rows: { sourceId: string; raw: unknown }[];
 }
 
+/** The catalogue kinds the Movies and Series pages are served for. */
+export type CatalogPageKind = 'vod' | 'series';
+
+export interface CatalogPageSource {
+  sourceId: string;
+  scope: string;
+}
+
+export interface CatalogPageStatus {
+  /** `building` while facets or name ranks are still being derived. */
+  state: 'ready' | 'building' | 'unavailable';
+  pending: number;
+  total: number;
+}
+
+/** What a catalogue page shows, in the frontend's own terms (see catalog_query.rs). */
+export interface CatalogPageQuery {
+  hiddenCategoryIds: string[];
+  category: string | null;
+  targetCategoryIds: string[] | null;
+  favoriteIds: string[];
+  ultraHd: Record<string, boolean>;
+  ratings: Record<string, { value: number | null; votes: number }>;
+  tmdbGenres: Record<string, number>;
+  categoryGenres: Record<string, number>;
+  genre: number | null;
+  sort: string;
+}
+
+export interface CatalogKeyRow {
+  key: number;
+  raw: unknown;
+}
+
+export interface CatalogPageResult {
+  ready: boolean;
+  status: CatalogPageStatus | null;
+  /** Identifies the index state the keys belong to; rows are asked for under it. */
+  generation: string;
+  total: number;
+  categoryTotal: number;
+  genreCounts: number[];
+  head: CatalogKeyRow[];
+  /** `source position << 23 | provider list position`, in page order. */
+  keys: Uint32Array;
+}
+
+export interface CatalogPageStats {
+  categoryCounts: Record<string, number>;
+  visibleTotal: number;
+  favorites: number;
+  recent: number;
+  topRated: number;
+  fourK: number;
+}
+
+/** Decodes `[u32 header length][header JSON][padding][u32 keys]` (little endian). */
+export function decodeCatalogPage(buffer: ArrayBuffer): CatalogPageResult {
+  const headerLength = new DataView(buffer).getUint32(0, true);
+  const header = JSON.parse(
+    new TextDecoder().decode(new Uint8Array(buffer, 4, headerLength)),
+  ) as Omit<CatalogPageResult, 'keys'>;
+  const offset = Math.ceil((4 + headerLength) / 4) * 4;
+  const keys = new Uint32Array(buffer, offset, Math.max(0, (buffer.byteLength - offset) / 4));
+  return { ...header, keys };
+}
+
 export interface CatalogCacheEntry {
   /** The provider's JSON list, exactly as it was received. */
   content: string;
@@ -248,6 +315,74 @@ export const tauriApi = {
     order: CatalogIndexOrder,
     limit: number,
   ) => invoke<CatalogIndexRows>('catalog_index_rows', { kind, sources, order, limit }),
+
+  /** Whether the Movies or Series page can be served from the catalogue index. */
+  catalogIndexPageStatus: (kind: CatalogPageKind, sources: CatalogPageSource[]) =>
+    invoke<CatalogPageStatus>('catalog_index_page_status', { kind, sources }),
+
+  /** One catalogue page's ordered keys, genre counts and first rows. */
+  catalogIndexPage: async (
+    kind: CatalogPageKind,
+    sources: CatalogPageSource[],
+    query: CatalogPageQuery,
+  ) => decodeCatalogPage(await invoke<ArrayBuffer>('catalog_index_page', { kind, sources, query })),
+
+  /** Raw provider rows for page keys; `stale` when the index changed since `generation`. */
+  catalogIndexPageRows: (
+    kind: CatalogPageKind,
+    sources: CatalogPageSource[],
+    generation: string,
+    keys: number[],
+  ) =>
+    invoke<{ stale: boolean; rows: CatalogKeyRow[] }>('catalog_index_page_rows', {
+      kind,
+      sources,
+      generation,
+      keys,
+    }),
+
+  /** The category sidebar's counts, or null while the index cannot serve the page. */
+  catalogIndexPageStats: (
+    kind: CatalogPageKind,
+    sources: CatalogPageSource[],
+    query: CatalogPageQuery,
+  ) => invoke<CatalogPageStats | null>('catalog_index_page_stats', { kind, sources, query }),
+
+  /** The next head of a rating ranking for the TMDB checks. */
+  catalogIndexRatingHead: (
+    kind: CatalogPageKind,
+    sources: CatalogPageSource[],
+    query: CatalogPageQuery,
+    checkedIds: string[],
+    limit: number,
+  ) =>
+    invoke<{ ready: boolean; rows: CatalogKeyRow[] }>('catalog_index_rating_head', {
+      kind,
+      sources,
+      query,
+      checkedIds,
+      limit,
+    }),
+
+  /** Rows still waiting for facets, as JSON bytes for the facet worker. */
+  catalogIndexFacetBatch: (sourceId: string, kind: CatalogPageKind, scope: string, limit: number) =>
+    invoke<ArrayBuffer>('catalog_index_facet_batch', { sourceId, kind, scope, limit }),
+
+  /** Store worker-derived facet rows; false when the list changed meanwhile. */
+  catalogIndexStoreFacets: (
+    sourceId: string,
+    kind: CatalogPageKind,
+    generation: number,
+    facets: unknown[],
+  ) => invoke<boolean>('catalog_index_store_facets', { sourceId, kind, generation, facets }),
+
+  /** Every faceted title of a kind when some lack a name rank, as JSON bytes. */
+  catalogIndexTitles: (kind: CatalogPageKind) =>
+    invoke<ArrayBuffer>('catalog_index_titles', { kind }),
+
+  /** Store name ranks in `catalogIndexTitles` order; false when anything changed meanwhile. */
+  catalogIndexStoreRanks: (kind: CatalogPageKind, token: string, ranks: number[]) =>
+    invoke<boolean>('catalog_index_store_ranks', { kind, token, ranks }),
 
   /** Remove every stored catalogue list of one source. */
   catalogCacheDelete: (sourceId: string) => invoke<void>('catalog_cache_delete', { sourceId }),

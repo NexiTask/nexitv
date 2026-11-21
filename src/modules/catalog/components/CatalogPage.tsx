@@ -17,17 +17,32 @@ import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore'
 import { useEnabledSources } from '@/modules/sources/public/hooks/useEnabledSources';
 import { useVerifiedResolutionMap } from '@/modules/sources/public/store/useStreamVerificationStore';
 import { useCatalogCategorySelection } from '../hooks/useCatalogCategorySelection';
-import { useCatalogByType } from '../data/useCatalog';
-import { useTmdbRatingChecks } from '../data/useTmdbRatingChecks';
+import { useCatalogByType, type CatalogItem } from '../data/useCatalog';
+import { useTmdbRatingChecks, useTmdbRatingChecksFrom } from '../data/useTmdbRatingChecks';
 import { useCategories, useHiddenCategoryIds } from '../data/useCategories';
 import {
+  useCatalogPageMode,
+  useIndexedCatalogPage,
+  useIndexedCatalogStats,
+  useIndexedRatingHead,
+  type IndexedPageParams,
+} from '../data/useIndexedCatalog';
+import {
+  CATALOG_GENRES,
   filterItemsBySmartCategory,
   filterItemsByGenre,
   sortCatalogItems,
+  type RatingLookups,
 } from '../lib/smartCatalogFilter';
+import { categoryGenreMasks, ultraHdOverrides } from '../lib/catalogPageQuery';
+import type { GenreCounts } from './GenreFilterBar';
 import { getCombinedErrorMessage, getErrorPresentation } from '@/shared/lib/error';
 import { useI18n } from '@/shared/i18n/i18n';
 import styles from '@/app/shell/AppLayout.module.css';
+
+const NO_ITEMS: CatalogItem[] = [];
+const NO_OVERRIDES: Record<string, never> = {};
+const NO_LOOKUPS: RatingLookups = new Map();
 
 export interface CatalogPageProps {
   type: 'vod' | 'series' | 'live';
@@ -72,14 +87,22 @@ export function CatalogPage({
     setSelectedGenre(null);
   }, [activeCategoryId]);
 
+  // Movies and Series come from the catalogue index when it can serve them;
+  // otherwise, and for Live TV, from the full catalogue in memory.
+  const { mode, fallBack } = useCatalogPageMode(type);
+  const isLegacy = mode === 'legacy';
+  const isIndexed = mode === 'index';
+
   const {
-    data: allItems = [],
-    isLoading,
+    data: legacyItems,
+    isLoading: isLegacyLoading,
     isError,
     error,
     isFetching,
     refetch,
-  } = useCatalogByType(type);
+  } = useCatalogByType(type, { enabled: isLegacy });
+  // A cached full catalogue is ignored while the index serves the page.
+  const allItems = isLegacy ? (legacyItems ?? NO_ITEMS) : NO_ITEMS;
 
   const {
     data: categories = [],
@@ -125,11 +148,73 @@ export function CatalogPage({
     categories,
     verifiedResolutions,
   ]);
-  const ratingLookups = useTmdbRatingChecks(ratingCandidates, type === 'series' ? 'tv' : 'movie', {
-    enabled: isRatingRanked,
+  const mediaType = type === 'series' ? 'tv' : 'movie';
+  const legacyLookups = useTmdbRatingChecks(ratingCandidates, mediaType, {
+    enabled: isRatingRanked && isLegacy,
     genre: selectedGenre,
     categoryNameMap,
   });
+
+  const ultraHd = useMemo(
+    () => (isIndexed ? ultraHdOverrides(verifiedResolutions) : NO_OVERRIDES),
+    [isIndexed, verifiedResolutions],
+  );
+  const categoryGenres = useMemo(
+    () => (isIndexed ? categoryGenreMasks(categories, categoryNameMap) : NO_OVERRIDES),
+    [isIndexed, categories, categoryNameMap],
+  );
+  const baseIndexParams = useMemo<Omit<IndexedPageParams, 'ratingLookups'>>(
+    () => ({
+      activeCategoryId,
+      hiddenCategoryIds,
+      favorites,
+      categories,
+      categoryGenres,
+      ultraHd,
+      genre: selectedGenre,
+      sort: currentSortMode,
+    }),
+    [
+      activeCategoryId,
+      hiddenCategoryIds,
+      favorites,
+      categories,
+      categoryGenres,
+      ultraHd,
+      selectedGenre,
+      currentSortMode,
+    ],
+  );
+  const headParams = useMemo<IndexedPageParams>(
+    () => ({ ...baseIndexParams, ratingLookups: NO_LOOKUPS }),
+    [baseIndexParams],
+  );
+  const [indexGeneration, setIndexGeneration] = useState('');
+  const indexHead = useIndexedRatingHead(type, headParams, indexGeneration);
+  const indexLookups = useTmdbRatingChecksFrom(indexHead, mediaType, {
+    enabled: isRatingRanked && isIndexed,
+    genre: selectedGenre,
+  });
+  const ratingLookups = isIndexed ? indexLookups : legacyLookups;
+
+  const indexParams = useMemo<IndexedPageParams>(
+    () => ({ ...baseIndexParams, ratingLookups: isRatingRanked ? indexLookups : NO_LOOKUPS }),
+    [baseIndexParams, indexLookups, isRatingRanked],
+  );
+  const indexed = useIndexedCatalogPage(type, indexParams, isIndexed);
+  const indexStats = useIndexedCatalogStats(
+    type,
+    { hiddenCategoryIds, favorites, ultraHd },
+    isIndexed,
+  );
+  const pageGeneration = indexed.result?.generation ?? '';
+  useEffect(() => {
+    if (pageGeneration) setIndexGeneration(pageGeneration);
+  }, [pageGeneration]);
+  useEffect(() => {
+    // An index that cannot answer leaves the page to the full catalogue.
+    if (isIndexed && indexed.isError) fallBack();
+  }, [fallBack, indexed.isError, isIndexed]);
 
   const categoryItems = useMemo(() => {
     return filterItemsBySmartCategory(
@@ -161,9 +246,28 @@ export function CatalogPage({
     return sortCatalogItems(genreFiltered, currentSortMode, ratingLookups);
   }, [categoryItems, selectedGenre, categoryNameMap, currentSortMode, ratingLookups]);
 
+  const indexResult = isIndexed ? indexed.result : undefined;
+  const itemCount = indexResult ? indexResult.total : items.length;
+  const categoryItemCount = indexResult ? indexResult.categoryTotal : categoryItems.length;
+  const indexGenreCounts = useMemo<GenreCounts | undefined>(() => {
+    if (!indexResult) return undefined;
+    return {
+      total: indexResult.categoryTotal,
+      genres: CATALOG_GENRES.flatMap((genre, bit) => {
+        const count = indexResult.genreCounts[bit] ?? 0;
+        return count > 0 ? [{ genre, count }] : [];
+      }),
+    };
+  }, [indexResult]);
+  const isLoading = isLegacy
+    ? isLegacyLoading
+    : mode === 'pending' || indexed.isLoading || (isIndexed && !indexResult);
+
   const pageError = getCombinedErrorMessage([error, categoriesError], '');
   const errorPresentation = getErrorPresentation(pageError, title);
-  const showLoadError = (isError || isCategoriesError) && allItems.length === 0;
+  const showLoadError =
+    ((isLegacy && isError) || isCategoriesError) &&
+    (isIndexed ? !indexResult : allItems.length === 0);
 
   const retryPage = () => {
     const retries = [
@@ -180,17 +284,17 @@ export function CatalogPage({
       return t('Loading channels');
     }
     if (type === 'vod') {
-      return tn('{count} movie', '{count} movies', items.length, {
-        count: number(items.length),
+      return tn('{count} movie', '{count} movies', itemCount, {
+        count: number(itemCount),
       });
     }
     if (type === 'series') {
-      return tn('{count} series', '{count} series', items.length, {
-        count: number(items.length),
+      return tn('{count} series', '{count} series', itemCount, {
+        count: number(itemCount),
       });
     }
-    return tn('{count} channel', '{count} channels', items.length, {
-      count: number(items.length),
+    return tn('{count} channel', '{count} channels', itemCount, {
+      count: number(itemCount),
     });
   };
 
@@ -200,6 +304,7 @@ export function CatalogPage({
         type={type}
         activeCategoryId={activeCategoryId}
         onSelectCategory={setActiveCategoryId}
+        indexStats={isLegacy ? undefined : (indexStats ?? null)}
       />
 
       <div className={styles.catalogMain}>
@@ -245,11 +350,12 @@ export function CatalogPage({
             actionLabel="Manage Sources"
             onAction={() => navigate('/settings?section=sources')}
           />
-        ) : items.length === 0 ? (
+        ) : itemCount === 0 ? (
           <div className={styles.catalogContent}>
-            {type !== 'live' && categoryItems.length > 0 && (
+            {type !== 'live' && categoryItemCount > 0 && (
               <GenreFilterBar
-                items={categoryItems}
+                items={indexGenreCounts ? undefined : categoryItems}
+                counts={indexGenreCounts}
                 selectedGenre={selectedGenre}
                 onSelectGenre={setSelectedGenre}
                 categoryNameMap={categoryNameMap}
@@ -262,7 +368,8 @@ export function CatalogPage({
           <div className={styles.catalogContent}>
             {type !== 'live' && (
               <GenreFilterBar
-                items={categoryItems}
+                items={indexGenreCounts ? undefined : categoryItems}
+                counts={indexGenreCounts}
                 selectedGenre={selectedGenre}
                 onSelectGenre={setSelectedGenre}
                 categoryNameMap={categoryNameMap}
@@ -270,7 +377,13 @@ export function CatalogPage({
               />
             )}
             <VirtualizedGrid
-              items={items}
+              {...(indexResult
+                ? {
+                    count: indexResult.total,
+                    getItem: indexed.getItem,
+                    onRangeChange: indexed.requestRange,
+                  }
+                : { items })}
               isLiveTv={isLiveTv}
               showTypeInList={false}
               onItemClick={onItemClick}

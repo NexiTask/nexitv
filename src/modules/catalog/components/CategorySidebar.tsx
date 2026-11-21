@@ -55,11 +55,18 @@ import styles from './CategorySidebar.module.css';
 import { useI18n } from '@/shared/i18n/i18n';
 import { getErrorMessage } from '@/shared/lib/error';
 import { providerRatingValue, TOP_RATED_MIN_RATING } from '@/shared/lib/rating';
+import type { CatalogPageStats } from '@/platform/tauri';
 
 interface CategorySidebarProps {
   type: 'vod' | 'series' | 'live';
   activeCategoryId: string | null;
   onSelectCategory: (id: string | null) => void;
+  /**
+   * Counts the page already has from the catalogue index. Without them the
+   * sidebar counts the full catalogue itself; `null` while they are pending
+   * (the full catalogue is then not loaded either).
+   */
+  indexStats?: CatalogPageStats | null | undefined;
 }
 
 interface Row {
@@ -98,6 +105,7 @@ export function CategorySidebar({
   type,
   activeCategoryId,
   onSelectCategory,
+  indexStats,
 }: CategorySidebarProps) {
   const { t, tn, number, language } = useI18n();
   const itemCountLabel = (count: number) =>
@@ -157,20 +165,36 @@ export function CategorySidebar({
     refetch,
   } = useCategories(type);
 
-  const { data: items = [] } = useCatalogByType(type);
+  const fromIndex = indexStats !== undefined;
+  const { data: items = [] } = useCatalogByType(type, { enabled: !fromIndex });
 
   const counts = useMemo(() => {
     const tally = new Map<string, number>();
+    if (fromIndex) {
+      for (const [id, count] of Object.entries(indexStats?.categoryCounts ?? {})) {
+        tally.set(id, count);
+      }
+      return tally;
+    }
     for (const item of items) {
       if (!item.categoryId) continue;
       tally.set(item.categoryId, (tally.get(item.categoryId) ?? 0) + 1);
     }
     return tally;
-  }, [items]);
+  }, [fromIndex, indexStats, items]);
 
   const hiddenCategoryIds = useHiddenCategoryIds(type);
   const favorites = useLibraryStore((s) => s.favorites);
   const catalogStats = useMemo(() => {
+    if (fromIndex) {
+      return {
+        visibleTotal: indexStats?.visibleTotal ?? 0,
+        favorites: indexStats?.favorites ?? 0,
+        recent: indexStats?.recent ?? 0,
+        topRated: indexStats?.topRated ?? 0,
+        fourK: indexStats?.fourK ?? 0,
+      };
+    }
     const favSet = new Set(favorites.map((f) => f.id));
     let visibleTotal = 0;
     let favCount = 0;
@@ -196,7 +220,7 @@ export function CategorySidebar({
       topRated: topRatedCount,
       fourK: fourKCount,
     };
-  }, [items, favorites, hiddenCategoryIds, verifiedResolutions]);
+  }, [fromIndex, indexStats, items, favorites, hiddenCategoryIds, verifiedResolutions]);
   const visibleTotal = catalogStats.visibleTotal;
   const smartHubCounts = catalogStats;
 

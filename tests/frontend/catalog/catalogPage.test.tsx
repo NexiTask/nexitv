@@ -12,6 +12,8 @@ import * as categoriesApi from '@/modules/catalog/data/useCategories';
 import * as enabledSourcesHook from '@/modules/sources/hooks/useEnabledSources';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import type { MediaItem } from '@/modules/catalog/model/media';
+import { desktopApi } from '@/platform/desktop';
+import { decodeCatalogPage, tauriApi } from '@/platform/tauri';
 
 const tmdb = vi.hoisted(() => ({
   searchTmdbTitles: vi.fn(),
@@ -23,13 +25,22 @@ vi.mock('@/modules/metadata/data/tmdbClient', () => tmdb);
 vi.mock('@/modules/catalog/components/VirtualizedGrid', () => ({
   VirtualizedGrid: ({
     items,
+    count,
+    getItem,
     onItemClick,
   }: {
-    items: Array<{ id: string; title: string }>;
+    items?: Array<{ id: string; title: string }>;
+    count?: number;
+    getItem?: (index: number) => { id: string; title: string } | undefined;
     onItemClick?: (item: { id: string; title: string }) => void;
   }) => (
     <div data-testid="virtualized-grid">
-      {items.map((item) => (
+      {(
+        items ??
+        Array.from({ length: count ?? 0 }, (_, index) => getItem?.(index)).filter(
+          (item): item is { id: string; title: string } => Boolean(item),
+        )
+      ).map((item) => (
         <button key={item.id} onClick={() => onItemClick?.(item)}>
           {item.title}
         </button>
@@ -581,5 +592,160 @@ describe('CatalogPage component', () => {
         .getAllByRole('button')
         .map((button) => button.textContent),
     ).toEqual(['Heist', 'Chase']);
+  });
+});
+
+describe('CatalogPage served from the catalogue index', () => {
+  const source = {
+    id: 'xtream-one',
+    profile: { name: 'Provider' },
+    runtime: null,
+    credentials: { url: 'http://provider.test', username: 'u', password: 'p' },
+    queryScope: 'xtream-scope',
+    isAvailable: true,
+  };
+
+  function encodePage(header: object, keys: number[]): ArrayBuffer {
+    const json = new TextEncoder().encode(JSON.stringify(header));
+    const offset = Math.ceil((4 + json.length) / 4) * 4;
+    const buffer = new ArrayBuffer(offset + keys.length * 4);
+    new DataView(buffer).setUint32(0, json.length, true);
+    new Uint8Array(buffer, 4, json.length).set(json);
+    keys.forEach((key, index) => new DataView(buffer).setUint32(offset + index * 4, key, true));
+    return buffer;
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    useSettingsStore.getState().resetSettings();
+    vi.spyOn(desktopApi, 'isDesktop').mockReturnValue(true);
+    // The hidden-category lookup asks the provider for categories; stay offline.
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('offline'));
+    vi.spyOn(desktopApi, 'onCatalogIndexUpdated').mockResolvedValue(() => undefined);
+    vi.spyOn(enabledSourcesHook, 'useEnabledSources').mockReturnValue({
+      enabledSourceIds: ['xtream-one'],
+      xtreamEnabled: true,
+      xtreamAvailable: true,
+      xtreamSources: [source],
+      availableXtreamSources: [source],
+      m3uSources: [],
+      availableM3uSources: [],
+      isAvailable: true,
+      isLoading: false,
+      errors: [],
+      queryScope: 'all',
+    } as any);
+    vi.spyOn(categoriesApi, 'useCategories').mockReturnValue({
+      data: [{ category_id: 'xtream-one:category:1', category_name: 'Action' }],
+      isLoading: false,
+      isError: false,
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+  });
+
+  const renderPage = () =>
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <BrowserRouter>
+          <CatalogPage
+            type="vod"
+            title="Movies"
+            icon={Film}
+            emptyTitle="No Movies Found"
+            emptyDescription="None here."
+            noSourceDescription="Add a source."
+            onItemClick={vi.fn()}
+          />
+        </BrowserRouter>
+      </QueryClientProvider>,
+    );
+
+  it('shows the index page without loading the full catalogue', async () => {
+    const catalog = vi.spyOn(catalogApi, 'useCatalogByType');
+    vi.spyOn(tauriApi, 'catalogIndexPageStatus').mockResolvedValue({
+      state: 'ready',
+      pending: 0,
+      total: 2,
+    });
+    const page = vi.spyOn(tauriApi, 'catalogIndexPage').mockImplementation(async () =>
+      decodeCatalogPage(
+        encodePage(
+          {
+            ready: true,
+            status: null,
+            generation: '4',
+            total: 2,
+            categoryTotal: 2,
+            genreCounts: [2],
+            head: [
+              { key: 1, raw: { stream_id: 8, name: 'Second Film', category_id: 1 } },
+              { key: 0, raw: { stream_id: 7, name: 'First Film', category_id: 1 } },
+            ],
+          },
+          [1, 0],
+        ),
+      ),
+    );
+    vi.spyOn(tauriApi, 'catalogIndexPageStats').mockResolvedValue({
+      categoryCounts: { 'xtream-one:category:1': 2 },
+      visibleTotal: 2,
+      favorites: 0,
+      recent: 0,
+      topRated: 0,
+      fourK: 0,
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('Second Film')).toBeTruthy();
+    const grid = screen.getByTestId('virtualized-grid');
+    expect(
+      within(grid)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Second Film', 'First Film']);
+    expect(screen.getByText(/2 movies/i)).toBeTruthy();
+    const genres = screen.getByRole('group', { name: 'Filter by genre' });
+    expect(within(genres).getByRole('button', { name: /Action/ }).textContent).toContain('2');
+    expect(page).toHaveBeenCalledWith(
+      'vod',
+      [{ sourceId: 'xtream-one', scope: 'xtream-scope' }],
+      expect.objectContaining({ category: null, sort: 'default', genre: null }),
+    );
+    for (const [type, options] of catalog.mock.calls) {
+      expect(type).toBe('vod');
+      expect(options?.enabled).toBe(false);
+    }
+  });
+
+  it('falls back to the full catalogue when the index cannot serve the page', async () => {
+    vi.spyOn(tauriApi, 'catalogIndexPageStatus').mockResolvedValue({
+      state: 'unavailable',
+      pending: 0,
+      total: 0,
+    });
+    const page = vi.spyOn(tauriApi, 'catalogIndexPage');
+    vi.spyOn(catalogApi, 'useCatalogByType').mockImplementation(
+      (_type, options) =>
+        ({
+          data: options?.enabled
+            ? [{ id: 'm1', title: 'Legacy Film', posterUrl: '', type: 'vod' }]
+            : undefined,
+          isLoading: false,
+          isError: false,
+          error: null,
+          isFetching: false,
+          refetch: vi.fn(),
+        }) as any,
+    );
+
+    renderPage();
+
+    expect(await screen.findByText('Legacy Film')).toBeTruthy();
+    expect(page).not.toHaveBeenCalled();
   });
 });
