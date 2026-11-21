@@ -40,7 +40,8 @@ use crate::credentials::source::validate_source_id;
 /// variant grouping prefers those); the rebuild replays the facet build once.
 /// The backfilled IMDb columns now travel with the carried facets, so a
 /// rebuild no longer drops the pipeline's matches.
-const SCHEMA_VERSION: i64 = 6;
+/// v7: the poster flag counts only https covers, so the facet build replays.
+const SCHEMA_VERSION: i64 = 7;
 /// Rows returned with a page so its first screen needs no second request.
 const PAGE_HEAD_ROWS: usize = 120;
 const MAX_ROWS_PER_REQUEST: usize = 2_000;

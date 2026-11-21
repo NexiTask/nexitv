@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   catalogItemFacets,
+  FACET_HAS_POSTER,
   FACET_KIDS,
   FACET_NEWS,
   FACET_SPORTS,
@@ -100,6 +101,17 @@ describe('catalogue index facets', () => {
     expect(facets[2]).toBe('Unknown Movie');
     expect(facets[6]).toBeNull();
     expect(facets[5]).toBe(0);
+  });
+
+  it('counts only https covers as a poster the grouped card can rely on', () => {
+    const flagsFor = (icon: string) =>
+      catalogItemFacets(
+        0,
+        xtreamVodFields('s', '', { stream_id: 1, name: 'X', stream_icon: icon } as never, 0),
+      )[8] & FACET_HAS_POSTER;
+    expect(flagsFor('https://image.tmdb.org/t/p/w600/a.jpg')).toBe(FACET_HAS_POSTER);
+    expect(flagsFor('http://103.176.90.118/images/movies//a.jpg')).toBe(0);
+    expect(flagsFor('')).toBe(0);
   });
 
   it('maps series exactly like the catalogue mapping', () => {

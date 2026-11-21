@@ -27,7 +27,8 @@ pub(crate) const FLAG_TITLE_UHD: u8 = 16;
 pub(crate) const FLAG_BADGE_UHD: u8 = 32;
 /// The provider flags the title as adult (its own `is_adult`).
 pub(crate) const FLAG_ADULT: u8 = 64;
-/// The variant's provider copy carries a poster (the facet build's finding).
+/// The variant's provider copy carries an https poster (the facet build's
+/// finding; plain-http cover hosts proved dead or hanging).
 pub(crate) const FLAG_HAS_POSTER: u8 = 128;
 /// `TOP_RATED_MIN_RATING` in rating.ts.
 const TOP_RATED_MIN_RATING: f64 = 7.0;
