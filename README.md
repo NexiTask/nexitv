@@ -39,11 +39,17 @@ the Catppuccin Mocha theme with 125% cards. The posters are artwork from TMDB,
 shown here only to illustrate the app; no account, source name, or credential
 appears in them.
 
-|                                                  Movies with IMDb ratings                                                  |                                                            Movie info page                                                            |
-| :------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------: |
-| ![NexiTV Movies page with IMDb ratings, vote counts, and 4K badges on real posters](.github/assets/readme/app-movies.webp) | ![NexiTV movie info page with IMDb rating, genres, version picker, director, and cast](.github/assets/readme/app-movie-details.webp)  |
-|                                                           Series                                                           |                                                           Series info page                                                            |
-|               ![NexiTV Series page with IMDb ratings on real posters](.github/assets/readme/app-series.webp)               | ![NexiTV series info page with seasons, compact episode rows, and Mark season watched](.github/assets/readme/app-series-details.webp) |
+|                                                         Movies with IMDb ratings                                                          |                                                            Movie info page                                                            |
+| :---------------------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------: |
+|        ![NexiTV Movies page with IMDb ratings, vote counts, and 4K badges on real posters](.github/assets/readme/app-movies.webp)         | ![NexiTV movie info page with IMDb rating, genres, version picker, director, and cast](.github/assets/readme/app-movie-details.webp)  |
+|                                                                  Filters                                                                  |                                                                Search                                                                 |
+| ![NexiTV Filters panel with year, runtime, IMDb rating and votes, genres, added, and watch state](.github/assets/readme/app-filters.webp) |         ![NexiTV search results across movies, series, and Live TV with IMDb ratings](.github/assets/readme/app-search.webp)          |
+|                                                                  Series                                                                   |                                                           Series info page                                                            |
+|                      ![NexiTV Series page with IMDb ratings on real posters](.github/assets/readme/app-series.webp)                       | ![NexiTV series info page with seasons, compact episode rows, and Mark season watched](.github/assets/readme/app-series-details.webp) |
+
+**Live TV programme guide**, switched on from the Channels | Guide toggle next to the page title:
+
+![NexiTV Live TV guide with the Channels and Guide toggle, now/next programmes, and a timeline](.github/assets/readme/app-live-guide.webp)
 
 ## Get started
 

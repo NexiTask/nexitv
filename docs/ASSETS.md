@@ -28,8 +28,9 @@ Files covered include:
 
 The images in `.github/assets/readme/` are:
 
-- `app-movies.webp`, `app-movie-details.webp`, `app-series.webp`, and
-  `app-series-details.webp`: screenshots of the NexiTV desktop app taken on
+- `app-movies.webp`, `app-movie-details.webp`, `app-filters.webp`,
+  `app-search.webp`, `app-series.webp`, `app-series-details.webp`, and
+  `app-live-guide.webp`: screenshots of the NexiTV desktop app taken on
   21 November 2026 on a real catalogue, in the Catppuccin Mocha theme with 125%
   cards. They show TMDB poster artwork and provider titles, which are
   third-party content, and no account, source name, or credential.
