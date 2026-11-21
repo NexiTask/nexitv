@@ -6,7 +6,7 @@ import {
   Download,
   Heart,
   HardDriveDownload,
-  MonitorPlay,
+  Clapperboard,
   Play,
   Settings,
 } from 'lucide-react';
@@ -488,7 +488,7 @@ function XtreamSeriesDetailsDialog({
               titleId={titleId}
               title={cleanSeriesTitle}
               posterUrl={enriched?.posterUrl || data.info?.cover || seriesPoster}
-              posterIcon={<MonitorPlay size={40} />}
+              posterIcon={<Clapperboard size={40} />}
               backdropUrl={backdropUrl}
               facts={[
                 Number.isFinite(releaseYear) && (

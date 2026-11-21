@@ -4,13 +4,13 @@ import {
   ArrowRight,
   CheckCircle2,
   Circle,
+  Clapperboard,
   Clock,
   Film,
   Heart,
   Radio,
   Search as SearchIcon,
   Star,
-  Tv,
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -481,7 +481,7 @@ export function HeaderSearch({
                               {item.type === 'live' ? (
                                 <Radio size={18} />
                               ) : item.type === 'series' ? (
-                                <Tv size={18} />
+                                <Clapperboard size={18} />
                               ) : (
                                 <Film size={18} />
                               )}

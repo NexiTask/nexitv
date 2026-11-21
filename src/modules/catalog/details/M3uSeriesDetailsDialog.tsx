@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Download, HardDriveDownload, Heart, MonitorPlay, Play } from 'lucide-react';
+import { Download, HardDriveDownload, Heart, Clapperboard, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getM3uSeriesGroups } from '@/modules/sources/public/data/m3uClient';
 import { useSourceStore } from '@/modules/sources/public/store/useSourceStore';
@@ -235,7 +235,7 @@ export function M3uSeriesDetailsDialog({
               <img src={seriesPoster} alt={parsedSeries.cleanTitle} className={styles.poster} />
             ) : (
               <div className={styles.posterPlaceholder}>
-                <MonitorPlay size={44} />
+                <Clapperboard size={44} />
                 <span>{parsedSeries.cleanTitle}</span>
               </div>
             )}
@@ -328,7 +328,7 @@ export function M3uSeriesDetailsDialog({
                       {entry.logo ? (
                         <img src={entry.logo} alt="" className={styles.episodeImage} />
                       ) : (
-                        <MonitorPlay size={22} />
+                        <Clapperboard size={22} />
                       )}
                       {isDownloaded && (
                         <span className={styles.episodeDownloadedBadge} title={t('Downloaded')}>

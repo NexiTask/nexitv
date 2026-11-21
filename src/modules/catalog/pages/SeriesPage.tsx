@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { MonitorPlay } from 'lucide-react';
+import { Clapperboard } from 'lucide-react';
 import type { MediaItem } from '../model/media';
 import { CatalogPage } from '../components/CatalogPage';
 import { MediaDetailsDialogs } from '../details/MediaDetailsDialogs';
@@ -20,7 +20,7 @@ export function SeriesPage() {
       <CatalogPage
         type="series"
         title="Series"
-        icon={MonitorPlay}
+        icon={Clapperboard}
         emptyTitle="No Series Found"
         emptyDescription="There are no TV series available in this category."
         noSourceDescription="Connect an Xtream account or add an M3U playlist in Settings to view TV series."

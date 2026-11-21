@@ -6,6 +6,7 @@ import {
   Circle,
   CircleHelp,
   CirclePlay,
+  Clapperboard,
   Clock3,
   Contrast,
   Download,
@@ -116,8 +117,8 @@ export const RiServerLine = Server;
 export const RiSettings3Fill = Settings;
 export const RiSettings3Line = Settings;
 export const RiSkipForwardFill = SkipForward;
-export const RiSlideshow3Fill = Tv;
-export const RiSlideshow3Line = Tv;
+export const RiSlideshow3Fill = Clapperboard;
+export const RiSlideshow3Line = Clapperboard;
 export const RiSparklingFill = Sparkles;
 export const RiSparklingLine = Sparkles;
 export const RiSpeedUpFill = Gauge;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, CalendarClock, Film, ListFilter, RefreshCw, Tv } from 'lucide-react';
+import { Calendar, CalendarClock, Clapperboard, Film, ListFilter, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUpcomingReleases } from '../data/useUpcomingReleases';
 import { EmptyState } from '@/shared/ui/EmptyState';
@@ -194,7 +194,7 @@ export function UpcomingPage() {
                 ariaLabel="Filter releases by type"
                 options={[
                   { value: 'all', label: 'All', icon: ListFilter },
-                  { value: 'episode', label: 'Series', icon: Tv },
+                  { value: 'episode', label: 'Series', icon: Clapperboard },
                   { value: 'movie', label: 'Movies', icon: Film },
                 ]}
               />

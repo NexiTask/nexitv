@@ -78,6 +78,7 @@ export function CatalogViewToggle() {
       <span ref={buttonRef} className={styles.anchor}>
         <IconButton
           size="sm"
+          className={styles.trigger}
           aria-label={t('View options')}
           title={t('View options')}
           aria-haspopup="dialog"

@@ -1,4 +1,4 @@
-import { Play, Heart, Check, Film, Tv, Radio, HardDriveDownload, X } from 'lucide-react';
+import { Play, Heart, Check, Film, Clapperboard, Radio, HardDriveDownload, X } from 'lucide-react';
 import styles from './MediaCard.module.css';
 import { memo, useState, useEffect } from 'react';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
@@ -176,7 +176,8 @@ function MediaCardComponent({
         <Radio size={36} className={styles.placeholderIcon} />
       );
     }
-    if (item.type === 'series') return <Tv size={36} className={styles.placeholderIcon} />;
+    if (item.type === 'series')
+      return <Clapperboard size={36} className={styles.placeholderIcon} />;
     return <Film size={36} className={styles.placeholderIcon} />;
   };
 

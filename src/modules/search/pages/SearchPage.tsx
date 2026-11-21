@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search as SearchIcon, SearchX, X, Film, MonitorPlay, Tv, LayoutGrid } from 'lucide-react';
+import { Search as SearchIcon, SearchX, X, Film, Clapperboard, Tv, LayoutGrid } from 'lucide-react';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { useSearchParams } from 'react-router-dom';
 import { VirtualizedGrid } from '@/modules/catalog/public/components/VirtualizedGrid';
@@ -28,7 +28,7 @@ const SEARCH_DEBOUNCE_MS = 120;
 const FILTER_OPTIONS: { value: FilterType; label: string; icon: typeof LayoutGrid }[] = [
   { value: 'all', label: 'All', icon: LayoutGrid },
   { value: 'movies', label: 'Movies', icon: Film },
-  { value: 'series', label: 'Series', icon: MonitorPlay },
+  { value: 'series', label: 'Series', icon: Clapperboard },
   { value: 'live', label: 'Live TV', icon: Tv },
 ];
 
