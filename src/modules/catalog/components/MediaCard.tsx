@@ -22,6 +22,7 @@ import {
   useStreamVerificationStore,
 } from '@/modules/sources/public/store/useStreamVerificationStore';
 import { useLogoAspect } from '../hooks/useLogoAspect';
+import { useTmdbPosterFallback } from '../data/useTmdbPosterFallback';
 import {
   streamProviderBrand,
   type StreamProviderBrand,
@@ -103,7 +104,6 @@ function MediaCardComponent({
     setImgError(false);
   }, [item.id, item.posterUrl]);
 
-  const showPlaceholder = !item.posterUrl || imgError;
   const providerBrand = item.type === 'live' ? streamProviderBrand(item.streamUrl) : null;
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
@@ -147,6 +147,21 @@ function MediaCardComponent({
     : null;
   const displayTitle = parsedTitle?.cleanTitle ?? parsedMediaTitle?.cleanTitle ?? item.title;
   const displayYear = parsedMediaTitle?.releaseYear ?? null;
+
+  // A provider copy with no cover, or one whose link no longer loads, shows
+  // TMDB's poster instead of a grey card.
+  const needsPosterFallback = !isLive && (!item.posterUrl || imgError);
+  const tmdbPoster = useTmdbPosterFallback(
+    !isLive ? (item.type === 'series' ? 'tv' : 'movie') : undefined,
+    needsPosterFallback
+      ? {
+          title: parsedMediaTitle?.cleanTitle ?? item.title,
+          year: parsedMediaTitle?.releaseYear ?? item.year,
+        }
+      : undefined,
+  );
+  const posterSrc = !imgError && item.posterUrl ? item.posterUrl : tmdbPoster;
+  const showPlaceholder = !posterSrc;
   const verifiedResolutionBadge =
     badgeVisibility?.verified && verifiedMeta
       ? formatVerifiedResolution(verifiedMeta.width, verifiedMeta.height, verifiedMeta.fps)
@@ -225,7 +240,7 @@ function MediaCardComponent({
       >
         {!showPlaceholder ? (
           <img
-            src={item.posterUrl}
+            src={posterSrc}
             alt={displayTitle}
             className={`${styles.poster} ${isLive ? styles.posterLive : ''} ${logoAspectClass}`}
             loading="lazy"

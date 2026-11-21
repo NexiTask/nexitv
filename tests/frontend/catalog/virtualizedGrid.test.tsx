@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
@@ -15,6 +16,18 @@ vi.mock('@tanstack/react-virtual', () => ({
 
 import { VirtualizedGrid } from '@/modules/catalog/components/VirtualizedGrid';
 import type { MediaItem } from '@/modules/catalog/model/media';
+
+/** A client wrapper for rerenders, which replace the tree the first render made. */
+function withQueryClient(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+}
+
+/** Cards ask react-query for a poster fallback, so they need a client. */
+function renderWithClient(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 beforeAll(() => {
   class TestResizeObserver {
@@ -38,7 +51,7 @@ describe('virtualized grid resizing', () => {
         streamUrl: 'https://www.youtube.com/@channel/live',
       },
     ];
-    const view = render(
+    const view = renderWithClient(
       <MemoryRouter>
         <VirtualizedGrid items={items} isLiveTv gap={16} />
       </MemoryRouter>,
@@ -47,9 +60,11 @@ describe('virtualized grid resizing', () => {
 
     virtualState.rowKey = 'live:4:121:16:0';
     view.rerender(
-      <MemoryRouter>
-        <VirtualizedGrid items={items} isLiveTv gap={17} />
-      </MemoryRouter>,
+      withQueryClient(
+        <MemoryRouter>
+          <VirtualizedGrid items={items} isLiveTv gap={17} />
+        </MemoryRouter>,
+      ),
     );
 
     expect(screen.getByRole('img', { name: 'YouTube' })).toBe(originalLogo);
@@ -64,7 +79,7 @@ describe('virtualized grid over a list held elsewhere', () => {
       2: { id: 'c', title: 'Gamma', posterUrl: '', type: 'vod' },
     };
     const onRangeChange = vi.fn();
-    const { container } = render(
+    const { container } = renderWithClient(
       <MemoryRouter>
         <VirtualizedGrid
           count={3}

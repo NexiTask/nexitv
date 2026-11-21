@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -14,6 +15,12 @@ import { DownloadsPage } from '@/modules/downloads/pages/DownloadsPage';
 import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import { usePlayerStore } from '@/modules/playback/store/usePlayerStore';
 
+/** Cards ask react-query for a poster fallback, so they need a client. */
+function renderWithClient(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
 describe('Downloads page', () => {
   beforeEach(() => {
     useDownloadStore.setState({ jobs: [], downloadedByLibraryId: {} });
@@ -21,7 +28,7 @@ describe('Downloads page', () => {
   });
 
   it('explains where player downloads appear when the queue is empty', () => {
-    render(
+    renderWithClient(
       <MemoryRouter>
         <DownloadsPage />
       </MemoryRouter>,
@@ -52,7 +59,7 @@ describe('Downloads page', () => {
     });
 
     const user = userEvent.setup();
-    render(
+    renderWithClient(
       <MemoryRouter>
         <DownloadsPage />
       </MemoryRouter>,
@@ -83,7 +90,7 @@ describe('Downloads page', () => {
       ],
     });
 
-    render(
+    renderWithClient(
       <MemoryRouter>
         <DownloadsPage />
       </MemoryRouter>,
@@ -105,7 +112,7 @@ describe('Downloads page', () => {
       downloadedAt: Date.now(),
     });
     const user = userEvent.setup();
-    render(
+    renderWithClient(
       <MemoryRouter>
         <DownloadsPage />
       </MemoryRouter>,
@@ -157,7 +164,7 @@ describe('Downloads page', () => {
       },
     });
     const user = userEvent.setup();
-    render(
+    renderWithClient(
       <MemoryRouter>
         <DownloadsPage />
       </MemoryRouter>,
@@ -193,7 +200,7 @@ describe('Downloads page', () => {
       downloadedAt: Date.now(),
     });
     const user = userEvent.setup();
-    render(
+    renderWithClient(
       <MemoryRouter>
         <DownloadsPage />
       </MemoryRouter>,
