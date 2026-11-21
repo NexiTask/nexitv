@@ -1,4 +1,6 @@
 pub(crate) mod files;
+#[cfg(all(target_os = "linux", not(feature = "desktop-e2e")))]
+pub(crate) mod linux_profile;
 
 use std::path::Path;
 use tauri::{Manager, State};
