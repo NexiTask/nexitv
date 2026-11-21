@@ -473,6 +473,21 @@ pub(crate) fn delete_source(app: &tauri::AppHandle, source_id: &str) -> Result<(
     })
 }
 
+/// Whether the facet worker still owes match keys for some movie or series
+/// row (a fresh list, or the replay after a schema bump). The IMDb pipeline
+/// waits for it: a universe taken mid-build would pre-filter the dumps to a
+/// fraction of the catalogue.
+pub(crate) fn facets_pending(app: &tauri::AppHandle) -> Result<bool, String> {
+    with_reader(app, |connection| {
+        connection.query_row(
+            "SELECT EXISTS (SELECT 1 FROM items
+                WHERE kind IN ('vod', 'series') AND f_id IS NULL)",
+            [],
+            |row| row.get(0),
+        )
+    })
+}
+
 /// The keys and provider IMDb ids the catalogue's IMDb pipeline can match
 /// against: every facet match key, plus the IMDb ids the ingest picked out of
 /// provider JSON. The dumps are pre-filtered to these, which is what keeps

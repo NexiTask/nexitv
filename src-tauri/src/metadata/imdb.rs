@@ -53,6 +53,13 @@ const STARTUP_DELAY: Duration = Duration::from_secs(120);
 /// Rows per backfill transaction: bounded commits keep readers unblocked.
 const BACKFILL_BATCH: i64 = 5_000;
 const DOWNLOAD_EMIT_EVERY: Duration = Duration::from_millis(500);
+/// How long a pass waits for the facet build to finish keying the catalogue.
+const FACET_WAIT: Duration = Duration::from_secs(15 * 60);
+const FACET_POLL: Duration = Duration::from_secs(3);
+
+fn facets_timed_out() -> String {
+    "The catalogue index is still being built; the IMDb update will retry".to_string()
+}
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
@@ -325,6 +332,15 @@ async fn refresh_locked(app: &tauri::AppHandle, manual: bool) -> Result<usize, S
     }
     // Only a run that will actually work is announced.
     emit(&app, "checking", None);
+    // A pass started mid-build (a schema bump, a fresh list) waits for the
+    // facet worker, or the dumps would be filtered to part of the catalogue.
+    let waited = Instant::now();
+    while catalog_index::facets_pending(&app)? {
+        if waited.elapsed() >= FACET_WAIT {
+            return Err(facets_timed_out());
+        }
+        tokio::time::sleep(FACET_POLL).await;
+    }
     let (keys, tt_ids) = catalog_index::match_universe(&app)?;
     if keys.is_empty() && tt_ids.is_empty() {
         return Err("The catalogue index has no match keys yet".to_string());
@@ -420,6 +436,13 @@ fn rematch_locked(app: &tauri::AppHandle) -> Result<usize, String> {
     let cache = cache_directory(app)?;
     let cached =
         cache.join("title.basics.tsv.gz").exists() && cache.join("title.ratings.tsv.gz").exists();
+    let waited = Instant::now();
+    while catalog_index::facets_pending(app)? {
+        if waited.elapsed() >= FACET_WAIT {
+            return Err(facets_timed_out());
+        }
+        std::thread::sleep(FACET_POLL);
+    }
     if cached {
         let (keys, tt_ids) = catalog_index::match_universe(app)?;
         let parsed: (HashSet<String>, HashSet<String>) = with_connection(app, |connection| {
