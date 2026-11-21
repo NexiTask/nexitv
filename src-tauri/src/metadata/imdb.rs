@@ -90,6 +90,16 @@ fn with_connection<T>(
     f(connection)
 }
 
+/// The catalogue index was rebuilt (a schema bump): its IMDb columns are
+/// gone, so the stored dumps must be re-matched on the next schedule tick
+/// instead of waiting out the daily backfill gate.
+pub(crate) fn invalidate_backfill(app: &tauri::AppHandle) {
+    let _ = with_connection(app, |connection| {
+        meta_set(connection, "last_backfill", 0);
+        Ok(())
+    });
+}
+
 /// One connection per process; the schema it creates is the pipeline's whole
 /// storage contract, so a test can open the same database from its path.
 fn open_database(path: &std::path::Path) -> Result<rusqlite::Connection, String> {

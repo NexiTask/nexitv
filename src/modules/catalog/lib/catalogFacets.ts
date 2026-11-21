@@ -55,6 +55,8 @@ export const FACET_TITLE_UHD = 16;
 export const FACET_BADGE_UHD = 32;
 /** The provider flags the title as adult (its own `is_adult`). */
 export const FACET_ADULT = 64;
+/** The variant's provider copy actually carries a poster. */
+export const FACET_HAS_POSTER = 128;
 
 const isUltraHdTag = (tags: readonly string[]) => tags.includes('4K') || tags.includes('8K');
 
@@ -73,6 +75,9 @@ export function catalogItemFacets(ord: number, item: CatalogItem): CatalogFacetR
   }
   if (isUltraHdQuality(item)) flags |= FACET_ULTRA_HD;
   if (item.adult) flags |= FACET_ADULT;
+  // A variant without a poster makes a broken group card, so the flag lets
+  // the query engine prefer siblings that have one.
+  if (item.posterUrl) flags |= FACET_HAS_POSTER;
   if (SMART_TITLE_PATTERNS['smart:sports'].test(item.title)) flags |= FACET_SPORTS;
   if (SMART_TITLE_PATTERNS['smart:news'].test(item.title)) flags |= FACET_NEWS;
   if (SMART_TITLE_PATTERNS['smart:kids'].test(item.title)) flags |= FACET_KIDS;

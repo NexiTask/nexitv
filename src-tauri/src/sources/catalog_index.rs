@@ -19,6 +19,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -35,7 +36,11 @@ use super::catalog_query::{
 use super::catalog_search::normalize_text;
 use crate::credentials::source::validate_source_id;
 
-const SCHEMA_VERSION: i64 = 5;
+/// v6: the facet build also reports whether a copy carries a poster (the
+/// variant grouping prefers those); the rebuild replays the facet build once.
+/// The backfilled IMDb columns now travel with the carried facets, so a
+/// rebuild no longer drops the pipeline's matches.
+const SCHEMA_VERSION: i64 = 6;
 /// Rows returned with a page so its first screen needs no second request.
 const PAGE_HEAD_ROWS: usize = 120;
 const MAX_ROWS_PER_REQUEST: usize = 2_000;
@@ -74,6 +79,7 @@ fn open(path: &PathBuf) -> rusqlite::Result<Connection> {
         // pipeline keeps its own database, so a rebuild costs no downloads;
         // the version bump replays the facet build once (see
         // metadata::imdb for the match-key column).
+        REBUILT.store(true, Ordering::Relaxed);
         connection.execute_batch(
             "DROP TABLE IF EXISTS items;
              DROP TABLE IF EXISTS lists;",
@@ -151,17 +157,30 @@ pub(crate) fn with_reader<T>(
     f(connection).map_err(|error| format!("Catalog index error: {error}"))
 }
 
+/// Set when a schema bump dropped the tables: the caller that opened the
+/// connection tells the IMDb pipeline to re-match at once, instead of letting
+/// its daily gate sit on a catalogue that just lost its matches.
+static REBUILT: AtomicBool = AtomicBool::new(false);
+
 pub(crate) fn with_connection<T>(
     app: &tauri::AppHandle,
     f: impl FnOnce(&mut Connection) -> rusqlite::Result<T>,
 ) -> Result<T, String> {
     let mut guard = CONNECTION.lock().unwrap_or_else(|e| e.into_inner());
-    if guard.is_none() {
+    let opened = guard.is_none();
+    if opened {
         let path = database_path(app)?;
         *guard = Some(open(&path).map_err(|error| format!("Catalog index unavailable: {error}"))?);
     }
-    let connection = guard.as_mut().expect("connection was just opened");
-    f(connection).map_err(|error| format!("Catalog index error: {error}"))
+    let result = f(guard.as_mut().expect("connection was just opened"))
+        .map_err(|error| format!("Catalog index error: {error}"));
+    // The imdb module takes this lock in turn (its backfill reads the index),
+    // so no lock of ours is held while calling across.
+    drop(guard);
+    if opened && REBUILT.swap(false, Ordering::Relaxed) {
+        crate::metadata::imdb::invalidate_backfill(app);
+    }
+    result
 }
 
 /// JavaScript's `Number.parseInt(value, 10) || 0` for the provider's `added`
@@ -305,9 +324,9 @@ fn ingest_into(
                 "INSERT INTO items (source_id, kind, ord, added, rating, category_id, raw,
                     raw_hash, f_id, f_title, f_category, f_added, f_has_added, f_year,
                     f_rating, f_flags, f_genres, f_rank, f_fold_key, f_fold_rank,
-                    f_match_key, imdb_tconst)
+                    f_match_key, imdb_tconst, imdb_rating, imdb_votes)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-                    ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+                    ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
             )?;
             for (ord, raw) in list.iter().enumerate() {
                 let Ok(item) = serde_json::from_str::<Value>(raw.get()) else {
@@ -321,6 +340,9 @@ fn ingest_into(
                 }
                 let hash = raw_hash(raw.get());
                 let facets = carried.get(&hash);
+                // The carried match wins; a provider-embedded IMDb id can be
+                // filled right away.
+                let derived_imdb_id = crate::metadata::imdb::imdb_id_of(&item);
                 insert.execute(params![
                     source_id,
                     kind,
@@ -342,10 +364,15 @@ fn ingest_into(
                     facets.and_then(|f| f.rank),
                     facets.and_then(|f| f.fold_key.as_ref()),
                     facets.map(|f| f.fold_rank),
-                    // The match key arrives with the facet build; a provider
-                    // IMDb id can be filled right away.
+                    // The match key arrives with the facet build; the IMDb
+                    // columns travel with the carried facets so a rebuild
+                    // keeps the pipeline's matches.
                     facets.and_then(|f| f.match_key.as_ref()),
-                    crate::metadata::imdb::imdb_id_of(&item),
+                    facets
+                        .and_then(|f| f.imdb_tconst.as_ref())
+                        .or(derived_imdb_id.as_ref()),
+                    facets.and_then(|f| f.imdb_rating),
+                    facets.and_then(|f| f.imdb_votes),
                 ])?;
                 inserted += 1;
             }
@@ -378,6 +405,10 @@ struct StoredFacets {
     fold_key: Option<String>,
     fold_rank: i64,
     match_key: Option<String>,
+    /// The IMDb pipeline's columns; carried so a rebuild keeps its matches.
+    imdb_tconst: Option<String>,
+    imdb_rating: Option<f64>,
+    imdb_votes: Option<f64>,
 }
 
 fn raw_hash(raw: &str) -> i64 {
@@ -393,7 +424,8 @@ fn carried_facets(
 ) -> rusqlite::Result<HashMap<i64, StoredFacets>> {
     let mut statement = connection.prepare(
         "SELECT raw_hash, f_id, f_title, f_category, f_added, f_has_added, f_year, f_rating,
-            f_flags, f_genres, f_rank, f_fold_key, f_fold_rank, f_match_key
+            f_flags, f_genres, f_rank, f_fold_key, f_fold_rank, f_match_key,
+            imdb_tconst, imdb_rating, imdb_votes
          FROM items WHERE source_id = ?1 AND kind = ?2 AND f_id IS NOT NULL",
     )?;
     let rows = statement.query_map(params![source_id, kind], |row| {
@@ -413,6 +445,9 @@ fn carried_facets(
                 fold_key: row.get(11)?,
                 fold_rank: row.get::<_, Option<i64>>(12)?.unwrap_or(0),
                 match_key: row.get(13)?,
+                imdb_tconst: row.get(14)?,
+                imdb_rating: row.get(15)?,
+                imdb_votes: row.get::<_, Option<i64>>(16)?.map(|votes| votes as f64),
             },
         ))
     })?;

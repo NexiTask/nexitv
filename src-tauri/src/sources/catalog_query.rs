@@ -27,6 +27,8 @@ pub(crate) const FLAG_TITLE_UHD: u8 = 16;
 pub(crate) const FLAG_BADGE_UHD: u8 = 32;
 /// The provider flags the title as adult (its own `is_adult`).
 pub(crate) const FLAG_ADULT: u8 = 64;
+/// The variant's provider copy carries a poster (the facet build's finding).
+pub(crate) const FLAG_HAS_POSTER: u8 = 128;
 /// `TOP_RATED_MIN_RATING` in rating.ts.
 const TOP_RATED_MIN_RATING: f64 = 7.0;
 /// The votes a title needs behind its IMDb rating to rank in Top Rated (the
@@ -586,20 +588,23 @@ struct Group {
 }
 
 /// Collapses provider variants of the same IMDb title into one card. The card
-/// goes to the best variant — most 4K (measured playback, title tag, provider
-/// category), then the shortest search title, so the plain one beats
-/// decorated ones like "EN - X (2022) (US)", then list order. Titles without
-/// an IMDb id keep their own card.
+/// goes to the best variant — one with a poster first (a card without one is
+/// broken), then most 4K (measured playback, title tag, provider category),
+/// then the shortest search title, so the plain one beats decorated ones like
+/// "EN - X (2022) (US)", then list order. Titles without an IMDb id keep
+/// their own card.
 fn group_by_identity(context: &Context<'_>, entries: Vec<Entry>) -> Vec<Group> {
     let mut slots: HashMap<&str, usize> = HashMap::with_capacity(entries.len());
     let mut cards: Vec<Group> = Vec::with_capacity(entries.len());
     let mut widths: Vec<usize> = Vec::with_capacity(entries.len());
-    let mut qualities: Vec<u8> = Vec::with_capacity(entries.len());
+    // The card's rank: a poster first (a card without one is broken), then
+    // the 4K tiers, 0..3.
+    let mut ranks: Vec<u8> = Vec::with_capacity(entries.len());
     for entry in entries {
         let row = context.row(entry);
         let favorite = context.favorites.contains(&*row.id);
         let recent = row.has_added;
-        let quality = context.quality_rank(entry);
+        let rank = u8::from(row.flags & FLAG_HAS_POSTER != 0) * 4 + context.quality_rank(entry);
         let Some(identity) = row.imdb_tconst.as_deref() else {
             cards.push(Group {
                 representative: entry,
@@ -607,7 +612,7 @@ fn group_by_identity(context: &Context<'_>, entries: Vec<Entry>) -> Vec<Group> {
                 recent,
             });
             widths.push(0);
-            qualities.push(0);
+            ranks.push(0);
             continue;
         };
         let slot = match slots.get(identity) {
@@ -620,19 +625,17 @@ fn group_by_identity(context: &Context<'_>, entries: Vec<Entry>) -> Vec<Group> {
                     recent,
                 });
                 widths.push(row.search_title.len());
-                qualities.push(quality);
+                ranks.push(rank);
                 continue;
             }
         };
         let card = &mut cards[slot];
         card.favorite |= favorite;
         card.recent |= recent;
-        if quality > qualities[slot]
-            || (quality == qualities[slot] && row.search_title.len() < widths[slot])
-        {
+        if rank > ranks[slot] || (rank == ranks[slot] && row.search_title.len() < widths[slot]) {
             card.representative = entry;
             widths[slot] = row.search_title.len();
-            qualities[slot] = quality;
+            ranks[slot] = rank;
         }
     }
     cards
@@ -1514,6 +1517,30 @@ mod tests {
             keys(&page(&[&facets], &q)),
             vec![1],
             "the variant filed under the 4K category represents the title"
+        );
+    }
+
+    #[test]
+    fn a_variant_with_a_poster_represents_the_title() {
+        let facets = source(vec![
+            // Short and 4K-declared, but without a poster: a broken card.
+            Title {
+                imdb_tconst: Some("tt1"),
+                flags: FLAG_TITLE_UHD,
+                ..title("bare-4k-copy")
+            },
+            Title {
+                imdb_tconst: Some("tt1"),
+                flags: FLAG_HAS_POSTER,
+                ..title("longer-copy-with-a-poster")
+            },
+        ]);
+        let mut q = query("default");
+        q.group_titles = true;
+        assert_eq!(
+            keys(&page(&[&facets], &q)),
+            vec![1],
+            "the poster wins the card over quality and a shorter name"
         );
     }
 
