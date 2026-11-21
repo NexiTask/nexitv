@@ -47,7 +47,7 @@ if (process.platform !== 'darwin') {
 }
 
 const projectRoot = resolve(import.meta.dirname, '..');
-const executable = join(projectRoot, 'src-tauri', 'target', 'release', 'movena');
+const executable = join(projectRoot, 'src-tauri', 'target', 'release', 'nexitv');
 const frameworksDir = join(projectRoot, 'src-tauri', 'macos-frameworks');
 
 if (!existsSync(executable)) {

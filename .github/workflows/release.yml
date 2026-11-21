@@ -40,8 +40,8 @@ jobs:
           package_version="$(node --input-type=module -e "import { readFileSync } from 'node:fs'; console.log(JSON.parse(readFileSync('package.json', 'utf8')).version)")"
           tag="v${package_version}"
           mkdir -p dist-source
-          git archive --format=tar.gz --prefix="movena-${tag}/" --output="dist-source/movena-${tag}-source.tar.gz" HEAD
-          git archive --format=zip --prefix="movena-${tag}/" --output="dist-source/movena-${tag}-source.zip" HEAD
+          git archive --format=tar.gz --prefix="nexitv-${tag}/" --output="dist-source/nexitv-${tag}-source.tar.gz" HEAD
+          git archive --format=zip --prefix="nexitv-${tag}/" --output="dist-source/nexitv-${tag}-source.zip" HEAD
       - uses: actions/upload-artifact@v7
         with:
           name: source-artifacts
@@ -112,7 +112,7 @@ jobs:
         shell: pwsh
         run: |
           $artifacts = @(
-            Get-Item 'src-tauri/target/release/movena.exe' -ErrorAction Stop
+            Get-Item 'src-tauri/target/release/nexitv.exe' -ErrorAction Stop
             Get-ChildItem 'src-tauri/target/release/bundle/nsis' -Filter '*.exe' -File -ErrorAction SilentlyContinue
             Get-ChildItem 'src-tauri/target/release/bundle/msi' -Filter '*.msi' -File -ErrorAction SilentlyContinue
           )
@@ -150,12 +150,12 @@ jobs:
           # Portable Zip
           $portableDir = "portable-windows"
           New-Item -ItemType Directory -Path $portableDir -Force | Out-Null
-          Copy-Item "src-tauri/target/release/movena.exe" "$portableDir/Movena.exe"
+          Copy-Item "src-tauri/target/release/nexitv.exe" "$portableDir/nexitv.exe"
           Copy-Item "src-tauri/lib/mpv-dev/libmpv-2.dll" "$portableDir/libmpv-2.dll"
           Copy-Item "src-tauri/lib/yt-dlp/yt-dlp.exe" "$portableDir/yt-dlp.exe"
           Copy-Item "LICENSE" "$portableDir/LICENSE"
           Copy-Item "THIRD_PARTY_LICENSES.txt" "$portableDir/THIRD_PARTY_LICENSES.txt"
-          Compress-Archive -Path "$portableDir/*" -DestinationPath "windows-artifacts/Movena-v${version}-windows-x64-portable.zip"
+          Compress-Archive -Path "$portableDir/*" -DestinationPath "windows-artifacts/NexiTV-v${version}-windows-x64-portable.zip"
           # Build MSIX Package
           & ./scripts/make-msix.ps1 -SkipBuild -OutputDirectory "windows-artifacts"
       - uses: actions/upload-artifact@v7
@@ -204,14 +204,14 @@ jobs:
       - name: Verify bundled mpv runtime
         shell: bash
         run: |
-          app="src-tauri/target/release/bundle/macos/Movena.app"
+          app="src-tauri/target/release/bundle/macos/NexiTV.app"
           test -f "$app/Contents/Resources/THIRD_PARTY_NOTICES_MACOS_RUNTIME.txt"
           # scripts/bundle-macos-mpv.mjs already asserted this on the raw
           # executable before Tauri packaged and signed it — re-checking the
           # actually-shipped binary here catches anything the bundling step
           # itself could not: packaging re-introducing an absolute reference.
           test -n "$(find "$app/Contents/Resources/Frameworks" -maxdepth 1 -name '*.dylib' -print -quit)"
-          if otool -L "$app/Contents/MacOS/movena" | grep -E '/(usr/local|opt/homebrew)/'; then
+          if otool -L "$app/Contents/MacOS/nexitv" | grep -E '/(usr/local|opt/homebrew)/'; then
             echo 'Homebrew-absolute library paths leaked into the packaged app.' >&2
             exit 1
           fi
@@ -229,15 +229,15 @@ jobs:
           # got signed and break updater signature verification.
           #
           # Unlike the DMG (which Tauri already names with its target arch,
-          # e.g. Movena_0.1.16_aarch64.dmg), this updater bundle is always
+          # e.g. NexiTV_0.1.16_aarch64.dmg), this updater bundle is always
           # named the same regardless of arch — harmless as a single build,
           # but the aarch64 and x86_64 matrix legs would silently clobber
           # each other once both land in the same release. Renamed here so
           # both survive; generate-latest-json.mjs expects these exact names.
           app_tar="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app.tar.gz' -print -quit 2>/dev/null || true)"
           if [ -n "$app_tar" ]; then
-            cp "$app_tar" "macos-artifacts/Movena_${{ matrix.arch }}.app.tar.gz"
-            cp "${app_tar}.sig" "macos-artifacts/Movena_${{ matrix.arch }}.app.tar.gz.sig"
+            cp "$app_tar" "macos-artifacts/NexiTV_${{ matrix.arch }}.app.tar.gz"
+            cp "${app_tar}.sig" "macos-artifacts/NexiTV_${{ matrix.arch }}.app.tar.gz.sig"
           fi
       - uses: actions/upload-artifact@v7
         with:
@@ -323,7 +323,7 @@ jobs:
         with:
           path: .
           format: spdx-json
-          output-file: release-final/movena.spdx.json
+          output-file: release-final/nexitv.spdx.json
           upload-artifact: false
       - name: Checksum all assets
         shell: bash
@@ -347,7 +347,7 @@ jobs:
           else
             gh release create "$tag" release-final/* \
               --target "$GITHUB_SHA" \
-              --title "Movena $tag" \
+              --title "NexiTV $tag" \
               --generate-notes
           fi
 

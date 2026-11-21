@@ -3,7 +3,7 @@ import process from 'node:process';
 import { createServer, type Server } from 'node:http';
 import type { TauriCapabilities } from '@wdio/tauri-service';
 
-const executable = process.platform === 'win32' ? 'movena.exe' : 'movena';
+const executable = process.platform === 'win32' ? 'nexitv.exe' : 'nexitv';
 let fixtureServer: Server | undefined;
 const capabilities: TauriCapabilities[] = [
   {

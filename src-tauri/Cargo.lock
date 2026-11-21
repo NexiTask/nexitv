@@ -2633,45 +2633,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "movena"
-version = "0.1.32"
-dependencies = [
- "chrono",
- "dirs",
- "encoding_rs",
- "flate2",
- "gtk",
- "icu_normalizer",
- "keyring",
- "libc",
- "libmpv-sys",
- "log",
- "objc2",
- "objc2-app-kit",
- "objc2-foundation",
- "objc2-quartz-core",
- "quick-xml 0.42.0",
- "raw-window-handle",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-log",
- "tauri-plugin-opener",
- "tauri-plugin-process",
- "tauri-plugin-updater",
- "tauri-plugin-wdio",
- "tauri-plugin-wdio-webdriver",
- "tempfile",
- "tokio",
- "url",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "muda"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2733,6 +2694,45 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
+
+[[package]]
+name = "nexitv"
+version = "0.1.32"
+dependencies = [
+ "chrono",
+ "dirs",
+ "encoding_rs",
+ "flate2",
+ "gtk",
+ "icu_normalizer",
+ "keyring",
+ "libc",
+ "libmpv-sys",
+ "log",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "objc2-quartz-core",
+ "quick-xml 0.42.0",
+ "raw-window-handle",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-log",
+ "tauri-plugin-opener",
+ "tauri-plugin-process",
+ "tauri-plugin-updater",
+ "tauri-plugin-wdio",
+ "tauri-plugin-wdio-webdriver",
+ "tempfile",
+ "tokio",
+ "url",
+ "windows-sys 0.61.2",
+]
 
 [[package]]
 name = "num"

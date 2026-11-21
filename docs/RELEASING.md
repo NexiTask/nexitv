@@ -103,7 +103,7 @@ unsigned status; partial credentials fail rather than silently downgrade.
 Updater signing continues to use `TAURI_SIGNING_PRIVATE_KEY` and its password
 independently.
 
-Every published release includes `movena.spdx.json`, checksums that cover the
+Every published release includes `nexitv.spdx.json`, checksums that cover the
 SBOM, and GitHub artifact attestations for the complete `release-final` set.
 Consumers can verify provenance with `gh attestation verify <artifact>
 --repo movena-app/movena` and verify file bytes with `SHA256SUMS.txt`.

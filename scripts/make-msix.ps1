@@ -70,7 +70,7 @@ if (-not $SkipBuild) {
   finally { Pop-Location }
 }
 
-$executable = Join-Path $releaseDirectory 'movena.exe'
+$executable = Join-Path $releaseDirectory 'nexitv.exe'
 $mpvLibrary = Join-Path $releaseDirectory 'libmpv-2.dll'
 $ytdlp = Join-Path $releaseDirectory 'yt-dlp.exe'
 foreach ($file in @($manifestTemplate, $executable, $mpvLibrary, $ytdlp)) {
@@ -96,7 +96,7 @@ $manifest = $manifest.Replace('{{IDENTITY_NAME}}', [System.Security.SecurityElem
 $manifest = $manifest.Replace('{{PUBLISHER}}', [System.Security.SecurityElement]::Escape($Publisher))
 [System.IO.File]::WriteAllText((Join-Path $stagingDirectory 'AppxManifest.xml'), $manifest, [System.Text.UTF8Encoding]::new($false))
 
-$packagePath = Join-Path $OutputDirectory "Movena_$msixVersion`_x64.msix"
+$packagePath = Join-Path $OutputDirectory "NexiTV_$msixVersion`_x64.msix"
 Remove-Item -LiteralPath $packagePath -Force -ErrorAction SilentlyContinue
 & $makeAppx pack /d $stagingDirectory /p $packagePath /o
 if ($LASTEXITCODE -ne 0) { throw 'MakeAppx failed to create the MSIX package.' }
