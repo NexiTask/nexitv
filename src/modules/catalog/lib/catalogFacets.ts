@@ -3,6 +3,7 @@ import type {
   XtreamSeries,
   XtreamVodStream,
 } from '@/modules/sources/public/data/xtreamClient';
+import { imdbMatchKey } from '@/modules/metadata/public/model/imdbMatchKey';
 import { isUltraHdQuality, mergeMediaTags } from '@/shared/lib/mediaTags';
 import { providerRatingValue } from '@/shared/lib/rating';
 import type { CatalogItem } from '../model/catalogItem';
@@ -21,10 +22,11 @@ import { xtreamLiveFields, xtreamSeriesItem, xtreamVodFields } from './xtreamIte
  * own functions:
  *
  * `[ord, id, title, categoryId, added, hasAdded, year, providerRating, flags, genreMask,
- *   foldKey, foldRank]`
+ *   foldKey, foldRank, matchKey]`
  *
  * Channels also carry what stream folding reads: the group they fold into
- * and their quality rank (null and 0 for movies and series).
+ * and their quality rank (null and 0 for movies and series). The match key is
+ * what the IMDb pipeline joins on (movies and series only, null for channels).
  */
 export type CatalogFacetRow = [
   ord: number,
@@ -39,6 +41,7 @@ export type CatalogFacetRow = [
   genres: number,
   foldKey: string | null,
   foldRank: number,
+  matchKey: string | null,
 ];
 
 /** Declared 4K or 8K (the title/quality/tags path of `isUltraHdQuality`). */
@@ -83,6 +86,7 @@ export function catalogItemFacets(ord: number, item: CatalogItem): CatalogFacetR
     catalogGenreMask(item),
     foldKey,
     foldRank,
+    item.type === 'live' ? null : imdbMatchKey(item.title || '', item.year),
   ];
 }
 

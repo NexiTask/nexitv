@@ -40,6 +40,8 @@ pub fn run() {
             sources::remote::m3u_probe_stream,
             sources::xmltv::xmltv_fetch,
             metadata::intro_db::introdb_fetch_segments,
+            metadata::imdb::imdb_refresh_status,
+            metadata::imdb::imdb_refresh_start,
             downloads::download_media_start,
             downloads::download_media_pause,
             downloads::download_media_resume,
@@ -116,6 +118,9 @@ pub fn run() {
                         .build(),
                 )?;
             }
+            // The IMDb refresh loop starts on its own delayed thread; it must
+            // never sit on the startup path.
+            metadata::imdb::schedule(_app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())

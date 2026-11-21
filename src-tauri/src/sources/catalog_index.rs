@@ -35,7 +35,7 @@ use super::catalog_query::{
 use super::catalog_search::normalize_text;
 use crate::credentials::source::validate_source_id;
 
-const SCHEMA_VERSION: i64 = 4;
+const SCHEMA_VERSION: i64 = 5;
 /// Rows returned with a page so its first screen needs no second request.
 const PAGE_HEAD_ROWS: usize = 120;
 const MAX_ROWS_PER_REQUEST: usize = 2_000;
@@ -70,6 +70,10 @@ fn open(path: &PathBuf) -> rusqlite::Result<Connection> {
     connection.pragma_update(None, "synchronous", "NORMAL")?;
     let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
     if version != SCHEMA_VERSION {
+        // Facets are re-derived from the stored provider JSON and the IMDb
+        // pipeline keeps its own database, so a rebuild costs no downloads;
+        // the version bump replays the facet build once (see
+        // metadata::imdb for the match-key column).
         connection.execute_batch(
             "DROP TABLE IF EXISTS items;
              DROP TABLE IF EXISTS lists;",
@@ -106,10 +110,19 @@ fn open(path: &PathBuf) -> rusqlite::Result<Connection> {
             f_rank INTEGER,
             f_fold_key TEXT,
             f_fold_rank INTEGER,
+            f_match_key TEXT,
+            imdb_tconst TEXT,
+            imdb_rating REAL,
+            imdb_votes INTEGER,
+            imdb_adult INTEGER,
+            imdb_runtime INTEGER,
+            imdb_genres TEXT,
             PRIMARY KEY (source_id, kind, ord)
          );
          CREATE INDEX IF NOT EXISTS items_added ON items (source_id, kind, added DESC, ord);
          CREATE INDEX IF NOT EXISTS items_rating ON items (source_id, kind, rating DESC, ord);
+         CREATE INDEX IF NOT EXISTS items_imdb ON items (source_id, kind, imdb_rating DESC, ord)
+            WHERE imdb_rating IS NOT NULL;
          CREATE INDEX IF NOT EXISTS items_unranked ON items (source_id, kind, ord)
             WHERE f_rank IS NULL;",
     )?;
@@ -117,7 +130,7 @@ fn open(path: &PathBuf) -> rusqlite::Result<Connection> {
     Ok(connection)
 }
 
-fn with_reader<T>(
+pub(crate) fn with_reader<T>(
     app: &tauri::AppHandle,
     f: impl FnOnce(&Connection) -> rusqlite::Result<T>,
 ) -> Result<T, String> {
@@ -138,7 +151,7 @@ fn with_reader<T>(
     f(connection).map_err(|error| format!("Catalog index error: {error}"))
 }
 
-fn with_connection<T>(
+pub(crate) fn with_connection<T>(
     app: &tauri::AppHandle,
     f: impl FnOnce(&mut Connection) -> rusqlite::Result<T>,
 ) -> Result<T, String> {
@@ -291,9 +304,10 @@ fn ingest_into(
             let mut insert = transaction.prepare(
                 "INSERT INTO items (source_id, kind, ord, added, rating, category_id, raw,
                     raw_hash, f_id, f_title, f_category, f_added, f_has_added, f_year,
-                    f_rating, f_flags, f_genres, f_rank, f_fold_key, f_fold_rank)
+                    f_rating, f_flags, f_genres, f_rank, f_fold_key, f_fold_rank,
+                    f_match_key, imdb_tconst)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-                    ?16, ?17, ?18, ?19, ?20)",
+                    ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
             )?;
             for (ord, raw) in list.iter().enumerate() {
                 let Ok(item) = serde_json::from_str::<Value>(raw.get()) else {
@@ -328,6 +342,10 @@ fn ingest_into(
                     facets.and_then(|f| f.rank),
                     facets.and_then(|f| f.fold_key.as_ref()),
                     facets.map(|f| f.fold_rank),
+                    // The match key arrives with the facet build; a provider
+                    // IMDb id can be filled right away.
+                    facets.and_then(|f| f.match_key.as_ref()),
+                    crate::metadata::imdb::imdb_id_of(&item),
                 ])?;
                 inserted += 1;
             }
@@ -359,6 +377,7 @@ struct StoredFacets {
     rank: Option<i64>,
     fold_key: Option<String>,
     fold_rank: i64,
+    match_key: Option<String>,
 }
 
 fn raw_hash(raw: &str) -> i64 {
@@ -374,7 +393,7 @@ fn carried_facets(
 ) -> rusqlite::Result<HashMap<i64, StoredFacets>> {
     let mut statement = connection.prepare(
         "SELECT raw_hash, f_id, f_title, f_category, f_added, f_has_added, f_year, f_rating,
-            f_flags, f_genres, f_rank, f_fold_key, f_fold_rank
+            f_flags, f_genres, f_rank, f_fold_key, f_fold_rank, f_match_key
          FROM items WHERE source_id = ?1 AND kind = ?2 AND f_id IS NOT NULL",
     )?;
     let rows = statement.query_map(params![source_id, kind], |row| {
@@ -393,6 +412,7 @@ fn carried_facets(
                 rank: row.get(10)?,
                 fold_key: row.get(11)?,
                 fold_rank: row.get::<_, Option<i64>>(12)?.unwrap_or(0),
+                match_key: row.get(13)?,
             },
         ))
     })?;
@@ -404,6 +424,32 @@ pub(crate) fn delete_source(app: &tauri::AppHandle, source_id: &str) -> Result<(
         connection.execute("DELETE FROM items WHERE source_id = ?1", params![source_id])?;
         connection.execute("DELETE FROM lists WHERE source_id = ?1", params![source_id])?;
         Ok(())
+    })
+}
+
+/// The keys and provider IMDb ids the catalogue's IMDb pipeline can match
+/// against: every facet match key, plus the IMDb ids the ingest picked out of
+/// provider JSON. The dumps are pre-filtered to these, which is what keeps
+/// `imdb.sqlite` at megabytes instead of gigabytes.
+pub(crate) fn match_universe(
+    app: &tauri::AppHandle,
+) -> Result<
+    (
+        std::collections::HashSet<String>,
+        std::collections::HashSet<String>,
+    ),
+    String,
+> {
+    with_reader(app, |connection| {
+        let keys: std::collections::HashSet<String> = connection
+            .prepare("SELECT DISTINCT f_match_key FROM items WHERE f_match_key IS NOT NULL")?
+            .query_map([], |row| row.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        let tt_ids: std::collections::HashSet<String> = connection
+            .prepare("SELECT DISTINCT imdb_tconst FROM items WHERE imdb_tconst IS NOT NULL")?
+            .query_map([], |row| row.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok((keys, tt_ids))
     })
 }
 
@@ -1130,7 +1176,7 @@ pub fn catalog_index_facet_batch(
 }
 
 /// `[ord, id, title, categoryId, added, hasAdded, year, rating, flags, genres,
-/// foldKey, foldRank]`
+/// foldKey, foldRank, matchKey]`
 type FacetIn = (
     u32,
     String,
@@ -1144,6 +1190,7 @@ type FacetIn = (
     u16,
     Option<String>,
     u8,
+    Option<String>,
 );
 
 /// Store facets the worker derived; `false` when the list changed meanwhile.
@@ -1166,7 +1213,8 @@ pub fn catalog_index_store_facets(
             let mut update = transaction.prepare(
                 "UPDATE items SET f_id = ?4, f_title = ?5, f_category = ?6, f_added = ?7,
                     f_has_added = ?8, f_year = ?9, f_rating = ?10, f_flags = ?11,
-                    f_genres = ?12, f_fold_key = ?13, f_fold_rank = ?14, f_rank = NULL
+                    f_genres = ?12, f_fold_key = ?13, f_fold_rank = ?14, f_match_key = ?15,
+                    f_rank = NULL
                  WHERE source_id = ?1 AND kind = ?2 AND ord = ?3",
             )?;
             for (
@@ -1182,11 +1230,12 @@ pub fn catalog_index_store_facets(
                 genres,
                 fold_key,
                 fold_rank,
+                match_key,
             ) in &facets
             {
                 update.execute(params![
                     source_id, kind, ord, id, title, category, added, has_added, year, rating,
-                    flags, genres, fold_key, fold_rank
+                    flags, genres, fold_key, fold_rank, match_key
                 ])?;
             }
         }
