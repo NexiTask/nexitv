@@ -400,6 +400,24 @@ function XtreamSeriesDetailsDialog({
   const seasonWatched =
     seasonEpisodeIds.length > 0 && seasonEpisodeIds.every((id) => watchedIds.includes(id));
 
+  // Keep the library's "started series" list true to the episodes: the Not
+  // started filter reads it, and it also repairs shows marked before it existed.
+  const setSeriesStarted = useLibraryStore((state) => state.setSeriesStarted);
+  useEffect(() => {
+    if (!data?.episodes) return;
+    const watchedSet = new Set(watchedIds);
+    const anyWatched = Object.values(data.episodes).some((episodes) =>
+      episodes.some((episode) =>
+        watchedSet.has(
+          resolvedSourceId
+            ? xtreamItemId(resolvedSourceId, 'episode', episode.id)
+            : episode.id.toString(),
+        ),
+      ),
+    );
+    setSeriesStarted(seriesId, anyWatched);
+  }, [data?.episodes, watchedIds, resolvedSourceId, seriesId, setSeriesStarted]);
+
   const handleToggleSeasonWatched = () => {
     const library = useLibraryStore.getState();
     library.setWatched(seasonEpisodeIds, !seasonWatched);

@@ -153,6 +153,14 @@ interface LibraryState {
   history: HistoryItem[];
   watched: string[];
   /**
+   * Series with at least one episode watched. Watched is recorded per
+   * episode, which carries no link back to its show, so the Not started
+   * filter reads this list instead.
+   */
+  startedSeries: string[];
+  /** Records (or clears) that a series has watched episodes. */
+  setSeriesStarted: (seriesId: string, started: boolean) => void;
+  /**
    * Live channels played most recently, newest first (ids only). Live
    * playback never enters `history`, which needs a duration.
    */
@@ -227,6 +235,9 @@ export function migrateLibraryState(persistedState: unknown): LibraryState {
     collections: Array.isArray(state.collections) ? state.collections : [],
     history: Array.isArray(state.history) ? state.history : [],
     watched: Array.isArray(state.watched) ? state.watched : [],
+    startedSeries: Array.isArray(state.startedSeries)
+      ? state.startedSeries.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      : [],
     recentChannels: Array.isArray(state.recentChannels)
       ? state.recentChannels
           .filter((id): id is string => typeof id === 'string' && id.length > 0)
@@ -246,7 +257,17 @@ export const useLibraryStore = create<LibraryState>()(
       collections: [],
       history: [],
       watched: [],
+      startedSeries: [],
       recentChannels: [],
+
+      setSeriesStarted: (seriesId, started) => {
+        if (!seriesId) return;
+        const current = get().startedSeries || [];
+        if (current.includes(seriesId) === started) return;
+        set({
+          startedSeries: started ? [...current, seriesId] : current.filter((id) => id !== seriesId),
+        });
+      },
 
       addRecentChannel: (id) => {
         if (!id || get().recentChannels[0] === id) return;
@@ -464,6 +485,11 @@ export const useLibraryStore = create<LibraryState>()(
           // Continue Watching, so there was nothing to click to keep going.
           if (remaining <= FINISHED_TAIL_SECONDS) {
             const nextWatched = watched.includes(progress.id) ? watched : [...watched, progress.id];
+            const started = state.startedSeries || [];
+            const nextStarted =
+              progress.type === 'series' && !started.includes(historyId)
+                ? [...started, historyId]
+                : started;
 
             if (progress.type === 'series' && progress.nextEpisode) {
               const next = progress.nextEpisode;
@@ -495,10 +521,11 @@ export const useLibraryStore = create<LibraryState>()(
               return {
                 history: [nextEntry, ...others].slice(0, MAX_HISTORY_ITEMS),
                 watched: nextWatched,
+                startedSeries: nextStarted,
               };
             }
 
-            return { history: others, watched: nextWatched };
+            return { history: others, watched: nextWatched, startedSeries: nextStarted };
           }
 
           // Too early to be worth resuming. Leave any existing entry untouched
@@ -585,7 +612,14 @@ export const useLibraryStore = create<LibraryState>()(
       },
 
       clearAllData: () => {
-        set({ favorites: [], collections: [], history: [], watched: [], recentChannels: [] });
+        set({
+          favorites: [],
+          collections: [],
+          history: [],
+          watched: [],
+          startedSeries: [],
+          recentChannels: [],
+        });
         notify.warning(
           'Library Reset',
           'All history, favorites, collections, and watched state cleared.',

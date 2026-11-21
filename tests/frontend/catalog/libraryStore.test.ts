@@ -25,7 +25,13 @@ beforeEach(() => {
   localStorage.clear();
   useSettingsStore.getState().resetSettings();
   useNotificationStore.setState({ notifications: [] });
-  useLibraryStore.setState({ favorites: [], collections: [], history: [], watched: [] });
+  useLibraryStore.setState({
+    favorites: [],
+    collections: [],
+    history: [],
+    watched: [],
+    startedSeries: [],
+  });
   vi.setSystemTime(new Date('2026-08-10T12:00:00Z'));
 });
 
@@ -158,5 +164,32 @@ describe('recently played channels', () => {
       'a',
       'b',
     ]);
+  });
+
+  it('remembers which series have watched episodes', () => {
+    const store = useLibraryStore.getState();
+    store.setSeriesStarted('series-1', true);
+    store.setSeriesStarted('series-1', true);
+    expect(useLibraryStore.getState().startedSeries).toEqual(['series-1']);
+    store.setSeriesStarted('series-1', false);
+    expect(useLibraryStore.getState().startedSeries).toEqual([]);
+  });
+
+  it('counts a series as started once one of its episodes is finished', () => {
+    useLibraryStore.getState().updateHistory(
+      progress({
+        id: 'episode-1',
+        type: 'series',
+        seriesId: 'series-1',
+        currentTime: 990,
+        duration: 1000,
+      }),
+    );
+    expect(useLibraryStore.getState().startedSeries).toEqual(['series-1']);
+  });
+
+  it('migrates a missing started-series list', () => {
+    expect(migrateLibraryState({}).startedSeries).toEqual([]);
+    expect(migrateLibraryState({ startedSeries: ['a', 3] }).startedSeries).toEqual(['a']);
   });
 });

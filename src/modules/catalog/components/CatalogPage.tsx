@@ -125,6 +125,7 @@ export function CatalogPage({
   const setCatalogFilters = useSettingsStore((state) => state.setCatalogFilters);
   const watchedIds = useLibraryStore((state) => state.watched);
   const watchHistory = useLibraryStore((state) => state.history);
+  const startedSeries = useLibraryStore((state) => state.startedSeries);
 
   // Reset genre when category changes, or when the genre bar is turned off (a
   // genre picked there must not keep filtering with nothing to undo it).
@@ -221,6 +222,11 @@ export function CatalogPage({
   }, [imdbQuality, filters?.minRating, filters?.minVotes]);
   // Watch state is only sent while the watch filter asks for it.
   const watchFilterOn = (filters?.watch ?? 'all') !== 'all';
+  // A series counts as watched once any of its episodes is (see the store).
+  const watchedOrStartedIds = useMemo(
+    () => (watchFilterOn ? [...watchedIds, ...(startedSeries ?? [])] : undefined),
+    [watchFilterOn, watchedIds, startedSeries],
+  );
   const inProgressIds = useMemo(
     () => (watchFilterOn ? watchHistory.map((entry) => entry.id) : undefined),
     [watchFilterOn, watchHistory],
@@ -249,7 +255,7 @@ export function CatalogPage({
       excludeAdult,
       groupTitles,
       filters,
-      ...(watchFilterOn ? { watchedIds, inProgressIds } : {}),
+      ...(watchFilterOn ? { watchedIds: watchedOrStartedIds, inProgressIds } : {}),
     }),
     [
       activeCategoryId,
@@ -268,7 +274,7 @@ export function CatalogPage({
       groupTitles,
       filters,
       watchFilterOn,
-      watchedIds,
+      watchedOrStartedIds,
       inProgressIds,
     ],
   );
