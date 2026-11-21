@@ -240,7 +240,6 @@ export const NL_MESSAGES: Record<string, string> = {
   'IMDb quality': 'IMDb-kwaliteit',
   '{count} version': '{count} versie',
   '{count} versions': '{count} versies',
-  Version: 'Versie',
   Standard: 'Standaard',
   'Quality: All': 'Kwaliteit: Alles',
   'IMDb ≥ 7.0 · 1k+ votes': 'IMDb ≥ 7,0 · 1k+ stemmen',

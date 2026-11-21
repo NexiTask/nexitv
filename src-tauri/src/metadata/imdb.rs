@@ -35,7 +35,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use flate2::read::MultiGzDecoder;
 use icu_normalizer::DecomposingNormalizerBorrowed;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 use tauri::{Emitter, Manager};
 
@@ -52,6 +52,7 @@ const SCHEDULE_TICK: Duration = Duration::from_secs(6 * 3600);
 const STARTUP_DELAY: Duration = Duration::from_secs(120);
 /// Rows per backfill transaction: bounded commits keep readers unblocked.
 const BACKFILL_BATCH: i64 = 5_000;
+const DOWNLOAD_EMIT_EVERY: Duration = Duration::from_millis(500);
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
 
@@ -140,7 +141,12 @@ fn open_database(path: &std::path::Path) -> Result<rusqlite::Connection, String>
             CREATE TABLE IF NOT EXISTS meta (
                 name  TEXT PRIMARY KEY,
                 value TEXT NOT NULL
-            );",
+            );
+            CREATE TABLE IF NOT EXISTS universe (
+                value TEXT NOT NULL,
+                is_id INTEGER NOT NULL,
+                PRIMARY KEY (value, is_id)
+            ) WITHOUT ROWID;",
         )
         .map_err(|error| format!("IMDb database error: {error}"))?;
     Ok(connection)
@@ -297,14 +303,18 @@ async fn run_refresh(app: tauri::AppHandle, manual: bool) -> Result<usize, Strin
     if RUNNING.swap(true, Ordering::SeqCst) {
         return Err("An IMDb refresh is already running".to_string());
     }
-    let outcome = refresh_locked(app, manual).await;
+    let outcome = refresh_locked(&app, manual).await;
     RUNNING.store(false, Ordering::SeqCst);
+    if outcome.is_err() {
+        // Followers that announced the run must hear that it ended.
+        emit(&app, "failed", None);
+    }
     outcome
 }
 
-async fn refresh_locked(app: tauri::AppHandle, manual: bool) -> Result<usize, String> {
+async fn refresh_locked(app: &tauri::AppHandle, manual: bool) -> Result<usize, String> {
+    let app = app.clone();
     let start = Instant::now();
-    emit(&app, "checking", None);
     if !manual {
         let fresh = with_connection(&app, |connection| Ok(age_secs(connection, "last_refresh")))?
             .map(|age| age < REFRESH_AFTER.as_secs())
@@ -313,6 +323,8 @@ async fn refresh_locked(app: tauri::AppHandle, manual: bool) -> Result<usize, St
             return Ok(0);
         }
     }
+    // Only a run that will actually work is announced.
+    emit(&app, "checking", None);
     let (keys, tt_ids) = catalog_index::match_universe(&app)?;
     if keys.is_empty() && tt_ids.is_empty() {
         return Err("The catalogue index has no match keys yet".to_string());
@@ -325,7 +337,7 @@ async fn refresh_locked(app: tauri::AppHandle, manual: bool) -> Result<usize, St
     let parse_cache = cache.clone();
     let parse_database = database_path(&app)?;
     let titles = tauri::async_runtime::spawn_blocking(move || {
-        parse_and_swap(&parse_database, &parse_cache, &keys, &tt_ids)
+        parse_and_swap(&parse_database, &parse_cache, ".new", &keys, &tt_ids)
     })
     .await
     .map_err(|error| format!("IMDb parse failed: {error}"))??;
@@ -372,6 +384,7 @@ async fn download_dump(
     let mut file = std::fs::File::create(dest)
         .map_err(|error| format!("Could not write the IMDb dump: {error}"))?;
     let mut received = 0u64;
+    let mut last_emit: Option<Instant> = None;
     while let Some(chunk) = response
         .chunk()
         .await
@@ -380,9 +393,67 @@ async fn download_dump(
         std::io::Write::write_all(&mut file, &chunk)
             .map_err(|error| format!("Could not write the IMDb dump: {error}"))?;
         received += chunk.len() as u64;
-        emit(app, "downloading", Some(received));
+        // A ~240 MB pair arrives in thousands of chunks; a few progress
+        // events a second are all the webview needs.
+        if last_emit.map_or(true, |at| at.elapsed() >= DOWNLOAD_EMIT_EVERY) {
+            last_emit = Some(Instant::now());
+            emit(app, "downloading", Some(received));
+        }
     }
+    emit(app, "downloading", Some(received));
     Ok(())
+}
+
+/// The daily pass between dump refreshes. Lists ingested since the last parse
+/// can carry keys the stored titles were never filtered for; those need the
+/// cached dumps re-parsed (no download) before the backfill can match them.
+fn run_rematch(app: &tauri::AppHandle) -> Result<usize, String> {
+    if RUNNING.swap(true, Ordering::SeqCst) {
+        return Err("An IMDb refresh is already running".to_string());
+    }
+    let outcome = rematch_locked(app);
+    RUNNING.store(false, Ordering::SeqCst);
+    outcome
+}
+
+fn rematch_locked(app: &tauri::AppHandle) -> Result<usize, String> {
+    let cache = cache_directory(app)?;
+    let cached =
+        cache.join("title.basics.tsv.gz").exists() && cache.join("title.ratings.tsv.gz").exists();
+    if cached {
+        let (keys, tt_ids) = catalog_index::match_universe(app)?;
+        let parsed: (HashSet<String>, HashSet<String>) = with_connection(app, |connection| {
+            let mut keys = HashSet::new();
+            let mut ids = HashSet::new();
+            let mut statement = connection
+                .prepare("SELECT value, is_id FROM universe")
+                .map_err(database_error)?;
+            let rows = statement
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+                })
+                .map_err(database_error)?;
+            for row in rows {
+                let (value, is_id) = row.map_err(database_error)?;
+                if is_id != 0 {
+                    ids.insert(value);
+                } else {
+                    keys.insert(value);
+                }
+            }
+            Ok((keys, ids))
+        })?;
+        let unseen = keys.iter().any(|key| !parsed.0.contains(key))
+            || tt_ids.iter().any(|id| !parsed.1.contains(id));
+        if unseen {
+            let titles = parse_and_swap(&database_path(app)?, &cache, "", &keys, &tt_ids)?;
+            with_connection(app, |connection| {
+                meta_set(connection, "titles", titles as u64);
+                Ok(())
+            })?;
+        }
+    }
+    backfill(app)
 }
 
 /// IMDb's TSV escaping: a literal `\N` is a null field; nothing is quoted.
@@ -399,15 +470,20 @@ fn parse_i64(field: &str) -> Option<i64> {
 
 /// Stream both dumps into the staging table and swap it in. Runs on a
 /// blocking thread; the previous table stays readable until the swap commits.
+/// `suffix` picks the dump pair: `.new` for a fresh download, `""` for the
+/// cached pair a rematch re-reads. The keys and ids parsed against are stored
+/// as the `universe`, so a later pass can tell which catalogue keys the
+/// stored titles were never filtered for.
 fn parse_and_swap(
     database: &std::path::Path,
     cache: &std::path::Path,
+    suffix: &str,
     keys: &HashSet<String>,
     tt_ids: &HashSet<String>,
 ) -> Result<usize, String> {
     let start = Instant::now();
     let mut ratings: HashMap<String, (f64, i64)> = HashMap::new();
-    let ratings_file = std::fs::File::open(cache.join("title.ratings.tsv.gz.new"))
+    let ratings_file = std::fs::File::open(cache.join(format!("title.ratings.tsv.gz{suffix}")))
         .map_err(|error| format!("Could not read the IMDb ratings dump: {error}"))?;
     for line in BufReader::new(MultiGzDecoder::new(ratings_file)).lines() {
         let line = line.map_err(|error| format!("IMDb ratings dump is unreadable: {error}"))?;
@@ -420,7 +496,7 @@ fn parse_and_swap(
         }
     }
 
-    let basics_file = std::fs::File::open(cache.join("title.basics.tsv.gz.new"))
+    let basics_file = std::fs::File::open(cache.join(format!("title.basics.tsv.gz{suffix}")))
         .map_err(|error| format!("Could not read the IMDb basics dump: {error}"))?;
     let mut staging: Vec<StagingRow> = Vec::new();
     for line in BufReader::new(MultiGzDecoder::new(basics_file)).lines() {
@@ -524,6 +600,20 @@ fn parse_and_swap(
                  );",
             )
             .map_err(database_error)?;
+        transaction
+            .execute("DELETE FROM universe", [])
+            .map_err(database_error)?;
+        {
+            let mut insert = transaction
+                .prepare("INSERT OR IGNORE INTO universe (value, is_id) VALUES (?1, ?2)")
+                .map_err(database_error)?;
+            for key in keys {
+                insert.execute(params![key, 0]).map_err(database_error)?;
+            }
+            for id in tt_ids {
+                insert.execute(params![id, 1]).map_err(database_error)?;
+            }
+        }
         transaction.commit().map_err(database_error)?;
     }
     crate::perf::log(
@@ -586,7 +676,7 @@ fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
         with_connection(app, |connection| {
             for key in &keys {
                 let found = connection
-                    .prepare(
+                    .prepare_cached(
                         "SELECT tconst, kind, year, adult, runtime, genres, rating, votes
                          FROM titles WHERE key1 = ?1 OR key2 = ?1",
                     )
@@ -650,6 +740,7 @@ fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
             Ok(())
         })?;
     }
+    let refreshed = resync_matched(app)?;
     with_connection(app, |connection| {
         meta_set(connection, "last_backfill", now_secs());
         Ok(())
@@ -661,9 +752,95 @@ fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
     crate::perf::log(
         "imdb:backfill",
         Some(start.elapsed().as_millis()),
-        &format!("matched={matched}"),
+        &format!("matched={matched} refreshed={refreshed}"),
     );
     Ok(matched)
+}
+
+/// Bring every already-identified row up to the stored dumps: a weekly
+/// refresh moves ratings and votes, a provider-embedded `tt…` id arrives with
+/// no rating at all, and a re-ingest carries only what was stored before.
+/// Rows whose title left the dumps keep their last values. Returns the rows
+/// that changed.
+fn resync_matched(app: &tauri::AppHandle) -> Result<usize, String> {
+    let mut changed = 0usize;
+    let mut cursor: i64 = 0;
+    loop {
+        let batch: Vec<(i64, String)> = catalog_index::with_reader(app, |connection| {
+            connection
+                .prepare(
+                    "SELECT rowid, imdb_tconst FROM items
+                     WHERE rowid > ?1 AND kind IN ('vod', 'series') AND imdb_tconst IS NOT NULL
+                     ORDER BY rowid LIMIT ?2",
+                )?
+                .query_map(params![cursor, BACKFILL_BATCH], |row| {
+                    Ok((row.get(0)?, row.get(1)?))
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()
+        })?;
+        if batch.is_empty() {
+            break;
+        }
+        cursor = batch.last().expect("batch is not empty").0;
+
+        let mut updates: Vec<MatchUpdate> = Vec::with_capacity(batch.len());
+        with_connection(app, |connection| {
+            let mut statement = connection
+                .prepare_cached(
+                    "SELECT adult, runtime, genres, rating, votes FROM titles WHERE tconst = ?1",
+                )
+                .map_err(database_error)?;
+            for (rowid, tconst) in &batch {
+                let found = statement
+                    .query_row(params![tconst], |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, Option<i64>>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                            row.get::<_, Option<f64>>(3)?,
+                            row.get::<_, i64>(4)?,
+                        ))
+                    })
+                    .optional()
+                    .map_err(database_error)?;
+                if let Some((adult, runtime, genres, rating, votes)) = found {
+                    updates.push((
+                        tconst.clone(),
+                        *rowid,
+                        adult,
+                        runtime,
+                        genres,
+                        rating,
+                        votes,
+                    ));
+                }
+            }
+            Ok(())
+        })?;
+        changed += catalog_index::with_connection(app, |connection| {
+            let transaction = connection.transaction()?;
+            let mut changed = 0usize;
+            {
+                // Unchanged rows are skipped so a quiet week writes nothing.
+                let mut update = transaction.prepare(
+                    "UPDATE items SET imdb_adult = ?1, imdb_runtime = ?2, imdb_genres = ?3,
+                        imdb_rating = ?4, imdb_votes = ?5
+                     WHERE rowid = ?6 AND imdb_tconst = ?7
+                       AND (imdb_adult IS NOT ?1 OR imdb_runtime IS NOT ?2
+                         OR imdb_genres IS NOT ?3 OR imdb_rating IS NOT ?4
+                         OR imdb_votes IS NOT ?5)",
+                )?;
+                for (tconst, rowid, adult, runtime, genres, rating, votes) in &updates {
+                    changed += update.execute(params![
+                        adult, runtime, genres, rating, votes, rowid, tconst,
+                    ])?;
+                }
+            }
+            transaction.commit()?;
+            Ok(changed)
+        })?;
+    }
+    Ok(changed)
 }
 
 fn emit(app: &tauri::AppHandle, stage: &str, progress: Option<u64>) {
@@ -771,7 +948,7 @@ pub(crate) fn schedule(app: tauri::AppHandle) {
                 if due.0 {
                     tauri::async_runtime::block_on(run_refresh(app.clone(), false))
                 } else if due.1 {
-                    backfill(&app)
+                    run_rematch(&app)
                 } else {
                     Ok(0)
                 }
@@ -938,8 +1115,8 @@ mod tests {
         );
 
         let keys = HashSet::from([title_key("Götz Otto"), title_key("Unrated Show")]);
-        let count =
-            parse_and_swap(&database, &cache, &keys, &HashSet::new()).expect("parse and swap");
+        let count = parse_and_swap(&database, &cache, ".new", &keys, &HashSet::new())
+            .expect("parse and swap");
         assert_eq!(
             count, 2,
             "the short and the unlisted movie are filtered out"
@@ -995,8 +1172,9 @@ mod tests {
         let replaced = parse_and_swap(
             &database,
             &cache,
+            ".new",
             &HashSet::from([title_key("Fresh Title")]),
-            &HashSet::new(),
+            &HashSet::from(["tt0000042".to_string()]),
         )
         .expect("second parse");
         assert_eq!(replaced, 1);
@@ -1004,5 +1182,17 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM titles", [], |row| row.get(0))
             .expect("count");
         assert_eq!(leftovers, 1, "the swap drops the previous parse");
+        // The universe records what this parse was filtered for, and only that.
+        let universe: Vec<(String, i64)> = connection
+            .prepare("SELECT value, is_id FROM universe ORDER BY is_id, value")
+            .expect("query")
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .expect("map")
+            .collect::<rusqlite::Result<_>>()
+            .expect("rows");
+        assert_eq!(
+            universe,
+            vec![(title_key("Fresh Title"), 0), ("tt0000042".to_string(), 1)]
+        );
     }
 }

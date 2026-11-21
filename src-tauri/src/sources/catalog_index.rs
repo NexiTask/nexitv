@@ -324,9 +324,10 @@ fn ingest_into(
                 "INSERT INTO items (source_id, kind, ord, added, rating, category_id, raw,
                     raw_hash, f_id, f_title, f_category, f_added, f_has_added, f_year,
                     f_rating, f_flags, f_genres, f_rank, f_fold_key, f_fold_rank,
-                    f_match_key, imdb_tconst, imdb_rating, imdb_votes)
+                    f_match_key, imdb_tconst, imdb_rating, imdb_votes, imdb_adult,
+                    imdb_runtime, imdb_genres)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-                    ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+                    ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)",
             )?;
             for (ord, raw) in list.iter().enumerate() {
                 let Ok(item) = serde_json::from_str::<Value>(raw.get()) else {
@@ -373,6 +374,9 @@ fn ingest_into(
                         .or(derived_imdb_id.as_ref()),
                     facets.and_then(|f| f.imdb_rating),
                     facets.and_then(|f| f.imdb_votes),
+                    facets.and_then(|f| f.imdb_adult),
+                    facets.and_then(|f| f.imdb_runtime),
+                    facets.and_then(|f| f.imdb_genres.as_ref()),
                 ])?;
                 inserted += 1;
             }
@@ -409,6 +413,9 @@ struct StoredFacets {
     imdb_tconst: Option<String>,
     imdb_rating: Option<f64>,
     imdb_votes: Option<f64>,
+    imdb_adult: Option<i64>,
+    imdb_runtime: Option<i64>,
+    imdb_genres: Option<String>,
 }
 
 fn raw_hash(raw: &str) -> i64 {
@@ -425,7 +432,7 @@ fn carried_facets(
     let mut statement = connection.prepare(
         "SELECT raw_hash, f_id, f_title, f_category, f_added, f_has_added, f_year, f_rating,
             f_flags, f_genres, f_rank, f_fold_key, f_fold_rank, f_match_key,
-            imdb_tconst, imdb_rating, imdb_votes
+            imdb_tconst, imdb_rating, imdb_votes, imdb_adult, imdb_runtime, imdb_genres
          FROM items WHERE source_id = ?1 AND kind = ?2 AND f_id IS NOT NULL",
     )?;
     let rows = statement.query_map(params![source_id, kind], |row| {
@@ -448,6 +455,9 @@ fn carried_facets(
                 imdb_tconst: row.get(14)?,
                 imdb_rating: row.get(15)?,
                 imdb_votes: row.get::<_, Option<i64>>(16)?.map(|votes| votes as f64),
+                imdb_adult: row.get(17)?,
+                imdb_runtime: row.get(18)?,
+                imdb_genres: row.get(19)?,
             },
         ))
     })?;

@@ -239,7 +239,6 @@ export const ES_MESSAGES: Record<string, string> = {
   'IMDb quality': 'Calidad de IMDb',
   '{count} version': '{count} versión',
   '{count} versions': '{count} versiones',
-  Version: 'Versión',
   Standard: 'Estándar',
   'Quality: All': 'Calidad: Todo',
   'IMDb ≥ 7.0 · 1k+ votes': 'IMDb ≥ 7.0 · más de 1000 votos',

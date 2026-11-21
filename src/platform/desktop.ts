@@ -90,7 +90,8 @@ export const desktopApi = {
   onCatalogIndexUpdated: (handler: (kind: string) => void) =>
     listen<string>('catalog-index-updated', ({ payload }) => handler(payload)),
   /** The IMDb pipeline's stage events: checking/downloading/parsing while a
-   * refresh or backfill runs, done when it finishes. */
+   * refresh runs, done when new matches land (also after a quiet daily
+   * backfill), failed when an announced refresh stopped early. */
   onImdbRefreshed: (handler: (stage: string) => void) =>
     listen<{ stage: string }>('imdb://refresh', ({ payload }) => {
       handler(payload.stage);

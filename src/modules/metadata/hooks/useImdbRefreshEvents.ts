@@ -16,7 +16,15 @@ export function useImdbRefreshEvents() {
     let stop: (() => void) | undefined;
     desktopApi
       .onImdbRefreshed((stage) => {
+        if (stage === 'failed') {
+          announcedRun.current = false;
+          return;
+        }
         if (stage === 'done') {
+          // The daily backfill finishes silently: only a run that was
+          // announced reports its counts (a full refresh sends 'done' twice,
+          // and only the first one toasts).
+          if (!announcedRun.current) return;
           announcedRun.current = false;
           void tauriApi
             .imdbRefreshStatus()

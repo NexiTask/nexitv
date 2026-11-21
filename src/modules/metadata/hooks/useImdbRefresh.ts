@@ -40,7 +40,7 @@ export function useImdbRefresh() {
     let stop: (() => void) | undefined;
     desktopApi
       .onImdbRefreshed((stage) => {
-        if (stage === 'done') {
+        if (stage === 'done' || stage === 'failed') {
           void reload();
           return;
         }
