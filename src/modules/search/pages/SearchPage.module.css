@@ -37,9 +37,6 @@
   height: var(--control-height-sm);
   padding: 0;
   border-radius: var(--radius-full);
-  transition:
-    color var(--duration-normal) var(--ease-standard),
-    background-color var(--duration-normal) var(--ease-standard);
 }
 
 .clearInputBtn:hover {
@@ -115,9 +112,6 @@
   min-height: var(--control-height-sm);
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
-  transition:
-    color var(--duration-normal) var(--ease-standard),
-    background-color var(--duration-normal) var(--ease-standard);
 }
 
 .clearAllBtn:hover {
@@ -141,9 +135,6 @@
   background: var(--surface-input);
   font-size: var(--font-size-control);
   color: var(--text-primary);
-  transition:
-    border-color var(--duration-normal) var(--ease-standard),
-    background-color var(--duration-normal) var(--ease-standard);
 }
 
 .recentItem:hover,
@@ -173,11 +164,6 @@
   border-radius: var(--radius-full);
   flex-shrink: 0;
   margin-right: var(--space-1);
-  opacity: var(--alpha-60);
-  transition:
-    color var(--duration-normal) var(--ease-standard),
-    background-color var(--duration-normal) var(--ease-standard),
-    opacity var(--duration-normal) var(--ease-standard);
 }
 
 .recentSelectBtn {
@@ -195,15 +181,15 @@
   text-align: left;
 }
 
-.recentDeleteBtn:hover {
-  color: var(--color-error);
-  background: rgba(var(--color-error-rgb), var(--alpha-10));
-}
-
 .recentItem:hover .recentDeleteBtn,
 .recentItem:focus-within .recentDeleteBtn,
 .recentDeleteBtn:focus-visible {
-  opacity: 1;
+  color: var(--text-primary);
+}
+
+.recentItem .recentDeleteBtn:hover {
+  color: var(--color-error);
+  background: rgba(var(--color-error-rgb), var(--alpha-10));
 }
 
 /* ============================

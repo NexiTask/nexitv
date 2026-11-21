@@ -41,7 +41,6 @@
   z-index: 1;
   padding: var(--window-chrome-height) var(--space-5) 0;
   display: flex;
-  transition: padding var(--duration-normal) var(--ease-standard);
 }
 
 .page {
@@ -143,7 +142,6 @@
   letter-spacing: -0.025em;
   color: var(--text-primary);
   margin-bottom: var(--space-2);
-  transition: font-size var(--duration-normal) var(--ease-standard);
 }
 
 .pageSubtitle {

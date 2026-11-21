@@ -38,13 +38,12 @@
   z-index: 4;
   background: rgba(var(--neutral-black-rgb), var(--alpha-55));
   color: var(--text-primary);
-  opacity: 0;
-  transition: opacity var(--duration-fast) var(--ease-standard);
+  visibility: hidden;
 }
 
 .movieCardWrapper:hover .movieRemoveBtn,
 .movieCardWrapper:focus-within .movieRemoveBtn {
-  opacity: 1;
+  visibility: visible;
 }
 
 .movieRemoveBtn:hover {
@@ -155,7 +154,6 @@
   height: 100%;
   border-radius: inherit;
   background: var(--accent-color);
-  transition: width var(--duration-normal) var(--ease-standard);
 }
 
 .rowActions {

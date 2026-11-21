@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { RiPauseFill, RiPlayFill, RiVolumeUpLine } from '@/shared/ui/icons';
 import styles from './PlayerControls.module.css';
-import { MOTION_DURATION, MOTION_EASE } from '@/shared/design/motion';
 import { useI18n } from '@/shared/i18n/i18n';
 
 export function FeedbackHud() {
@@ -45,14 +44,7 @@ export function FeedbackHud() {
         <motion.div className={styles.feedbackWrapper} role="status" aria-label={feedbackLabel}>
           <motion.div
             key={`${feedback.type}-${feedback.key}`}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: [0, 1, 1, 0], scale: [0.8, 1, 1, 1.2] }}
-            exit={{ opacity: 0 }}
-            transition={{
-              duration: MOTION_DURATION.feedback,
-              times: [0, 0.15, 0.7, 1],
-              ease: MOTION_EASE.standard,
-            }}
+            initial={false}
             onClick={(e: React.MouseEvent) => e.stopPropagation()}
           >
             <div className={styles.feedbackCircle}>{renderIcon()}</div>

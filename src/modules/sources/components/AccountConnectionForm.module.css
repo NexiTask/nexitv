@@ -127,7 +127,6 @@
   left: 14px;
   color: var(--text-muted);
   pointer-events: none;
-  transition: color var(--duration-normal) var(--ease-standard);
   z-index: 2;
 }
 

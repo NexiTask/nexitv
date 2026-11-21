@@ -123,12 +123,6 @@
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
   white-space: nowrap;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard),
-    opacity var(--duration-fast) var(--ease-standard),
-    transform var(--duration-instant) var(--ease-standard);
 }
 
 .playBtn {
@@ -141,12 +135,7 @@
 }
 
 .playBtn:hover {
-  opacity: var(--alpha-90);
-}
-
-.playBtn:active,
-.favoriteBtn:active {
-  transform: scale(0.98);
+  background: color-mix(in srgb, var(--text-primary) 90%, var(--bg-base));
 }
 
 .playBtnLabel {
@@ -294,7 +283,6 @@
   font-size: var(--font-size-control);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-standard);
 }
 
 .detailsToggle:hover {
@@ -335,10 +323,6 @@
   font-weight: var(--font-weight-semibold);
   white-space: nowrap;
   cursor: pointer;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
 }
 
 .downloadSeasonBtn:hover {
@@ -369,19 +353,11 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    transform var(--duration-instant) var(--ease-standard);
 }
 
 .episodeCard:hover {
   background: var(--surface-control-hover);
   border-color: var(--border-strong);
-}
-
-.episodeCard:active {
-  transform: scale(0.995);
 }
 
 .currentEpisodeCard {
@@ -412,11 +388,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform var(--duration-fast) var(--ease-standard);
-}
-
-.episodeCard:hover .episodeImage {
-  transform: scale(1.04);
 }
 
 .playOverlay {
@@ -427,8 +398,7 @@
   justify-content: center;
   background: rgba(var(--neutral-black-rgb), var(--alpha-45));
   color: var(--text-primary);
-  opacity: var(--alpha-0);
-  transition: opacity var(--duration-fast) var(--ease-standard);
+  visibility: hidden;
 }
 
 .playCircle {
@@ -446,7 +416,7 @@
 
 .episodeCard:hover .playOverlay,
 .episodeCard:focus-visible .playOverlay {
-  opacity: var(--alpha-98);
+  visibility: visible;
 }
 
 .episodeDownloadedBadge {

@@ -62,13 +62,11 @@ function m3uSnapshot(): EnabledSourcesSnapshot {
 beforeEach(() => queryClient.clear());
 
 describe('navigation prefetching', () => {
-  it('warms the live catalog and categories without eagerly fetching XMLTV', async () => {
+  it('warms route code and categories, not the catalog or XMLTV', async () => {
     await prefetchNavigationData('/live', m3uSnapshot());
 
     expect(preloadRouteModule).toHaveBeenCalledWith('/live');
-    expect(queryClient.getQueryData(queryKeys.catalog('live', queryScope))).toEqual([
-      expect.objectContaining({ title: 'Example TV', sourceId }),
-    ]);
+    expect(queryClient.getQueryData(queryKeys.catalog('live', queryScope))).toBeUndefined();
     expect(queryClient.getQueryData(queryKeys.categories('live', queryScope))).toEqual([
       expect.objectContaining({ category_name: 'News' }),
     ]);

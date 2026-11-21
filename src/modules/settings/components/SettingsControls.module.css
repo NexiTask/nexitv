@@ -61,9 +61,6 @@
   min-height: 68px;
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border-subtle);
-  transition:
-    background-color var(--duration-normal) var(--ease-standard),
-    opacity var(--duration-normal) var(--ease-standard);
 }
 
 .row:last-child {
@@ -139,9 +136,6 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-full);
   background: var(--surface-control-active);
-  transition:
-    background-color var(--duration-normal) var(--ease-standard),
-    border-color var(--duration-normal) var(--ease-standard);
 }
 
 .toggleThumb {
@@ -153,7 +147,6 @@
   border-radius: var(--radius-full);
   background: var(--text-primary);
   box-shadow: var(--shadow-control);
-  transition: transform var(--duration-normal) var(--ease-standard);
 }
 
 .toggle input:checked + .toggleTrack {
