@@ -236,6 +236,7 @@ const DEFAULT_SETTINGS = {
   catalogImdbQuality: 'all' as ImdbQualityPreset,
   catalogHideAdult: true,
   catalogGroupTitles: true,
+  catalogHiddenKeywords: [] as string[],
   catalogSortModes: emptyCatalogSortModes(),
   sidebarWidth: 260,
   viewMode: 'grid' as const,
@@ -301,6 +302,24 @@ const normalizeChannelLogoAspectOverrides = (value: unknown): Record<string, Cha
   }
   return result;
 };
+
+/** Trimmed, case-insensitively unique, bounded: the keyword list is user
+ * input that every catalogue page matches category names against. */
+export function normalizeHiddenKeywords(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const keywords: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue;
+    const keyword = entry.trim().slice(0, 64);
+    const key = keyword.toLowerCase();
+    if (!keyword || seen.has(key)) continue;
+    seen.add(key);
+    keywords.push(keyword);
+    if (keywords.length >= 50) break;
+  }
+  return keywords;
+}
 
 export function migrateSettingsState(persistedState: unknown): SettingsState {
   const state = (
@@ -460,6 +479,7 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
     catalogHideAdult: typeof state.catalogHideAdult === 'boolean' ? state.catalogHideAdult : true,
     catalogGroupTitles:
       typeof state.catalogGroupTitles === 'boolean' ? state.catalogGroupTitles : true,
+    catalogHiddenKeywords: normalizeHiddenKeywords(state.catalogHiddenKeywords),
     catalogSortModes: normalizeCatalogSortModes(state.catalogSortModes),
     lastCollectionId:
       typeof state.lastCollectionId === 'string' && state.lastCollectionId.length <= 512

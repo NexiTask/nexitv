@@ -13,6 +13,7 @@ import { storeTmdbApiKey } from '@/modules/metadata/public/services/tmdbCredenti
 import { useImdbRefresh } from '@/modules/metadata/public/hooks/useImdbRefresh';
 import { notify } from '@/shared/notifications/useNotificationStore';
 import { getErrorMessage } from '@/shared/lib/error';
+import { ContentFilterSettings } from './ContentFilterSettings';
 
 export function LibraryMetadataSettingsSection() {
   const settings = useSettingsStore();
@@ -92,6 +93,8 @@ export function LibraryMetadataSettingsSection() {
           />
         </SettingsRow>
       </SettingsGroup>
+
+      <ContentFilterSettings />
 
       {/* Metadata Enrichment (TMDB) */}
       <SettingsGroup

@@ -202,23 +202,35 @@ export function useHiddenCategoryState(
   const categories = query.data;
   const settled = query.isSuccess || query.isError;
   const categoryPrefs = useSettingsStore((s) => s.categoryPrefs);
+  const hiddenKeywords = useSettingsStore((s) => s.catalogHiddenKeywords);
 
   return useMemo(() => {
     const hidden = categoryPrefs?.hidden?.[type] ?? [];
     const hiddenCountries = categoryPrefs?.hiddenCountries?.[type] ?? [];
+    // Settings' content filter keywords apply to Movies and Series.
+    const keywords =
+      type === 'live' ? [] : (hiddenKeywords ?? []).map((keyword) => keyword.toLowerCase());
     const ids = new Set(hidden);
-    // Direct ids need no lookup, so nothing is pending unless a country is hid.
-    if (hiddenCountries.length === 0) return { ids, isResolved: true };
+    // Direct ids need no lookup, so nothing is pending unless a country or a
+    // keyword is hidden.
+    if (hiddenCountries.length === 0 && keywords.length === 0) return { ids, isResolved: true };
 
     const hiddenCountrySet = new Set(hiddenCountries);
     for (const cat of categories ?? EMPTY_LIST) {
-      const { country } = parseProviderCategoryName(cat.category_name || '');
-      if (hiddenCountrySet.has(country ?? 'other')) ids.add(String(cat.category_id));
+      const name = cat.category_name || '';
+      const { country } = parseProviderCategoryName(name);
+      const lowered = name.toLowerCase();
+      if (
+        hiddenCountrySet.has(country ?? 'other') ||
+        keywords.some((keyword) => lowered.includes(keyword))
+      ) {
+        ids.add(String(cat.category_id));
+      }
     }
     // A failed category request is as resolved as it will get: fall back to the
     // ids we do know rather than leaving every surface permanently empty.
     return { ids, isResolved: settled };
-  }, [categories, categoryPrefs, settled, type]);
+  }, [categories, categoryPrefs, hiddenKeywords, settled, type]);
 }
 
 /**

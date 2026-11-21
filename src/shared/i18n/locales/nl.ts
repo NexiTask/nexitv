@@ -370,6 +370,21 @@ export const NL_MESSAGES: Record<string, string> = {
   Rating: 'Beoordeling',
   'Rating {rating}': 'Beoordeling {rating}',
   Provider: 'Aanbieder',
+  'Content Filter': 'Inhoudsfilter',
+  'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
+    'Laat standaard inhoud weg uit Films en Series. Een titel met een niet-gefilterde kopie toont nog steeds die kopie.',
+  'Hidden Countries': 'Verborgen landen',
+  'Hides every Movies and Series category of these countries. The category sidebar shares this list.':
+    'Verbergt alle film- en seriecategorieën van deze landen. De categoriezijbalk deelt deze lijst.',
+  'Hide a country': 'Een land verbergen',
+  'Hide a country…': 'Land verbergen…',
+  'Show {name} again': '{name} weer tonen',
+  'Hidden Keywords': 'Verborgen trefwoorden',
+  'Hides Movies and Series categories whose name contains one of these words, e.g. "Bollywood".':
+    'Verbergt film- en seriecategorieën waarvan de naam een van deze woorden bevat, bijv. "Bollywood".',
+  'Keyword to hide': 'Te verbergen trefwoord',
+  'Add a keyword': 'Trefwoord toevoegen',
+  'Remove {name}': '{name} verwijderen',
   'IMDb rating {rating} out of 10 from {count} vote':
     'IMDb-beoordeling {rating} van 10 op basis van {count} stem',
   'IMDb rating {rating} out of 10 from {count} votes':

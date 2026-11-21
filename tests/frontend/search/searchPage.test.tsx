@@ -221,6 +221,29 @@ describe('search page controls', () => {
     expect(screen.queryByRole('button', { name: 'Dune Deutsch' })).toBeNull();
   });
 
+  it('leaves items from categories matching a hidden keyword out of the results', async () => {
+    queryClient.setQueryData(queryKeys.categories('vod', 'test-scope'), [
+      { category_id: 'cat-bolly', category_name: '|DE| BOLLYWOOD', parent_id: 0 },
+      { category_id: 'cat-fr', category_name: 'FR | Movies', parent_id: 0 },
+    ]);
+    vi.mocked(useVodStreams).mockReturnValue(
+      vodQuery([
+        { id: 'b', title: 'Dune Bolly', posterUrl: '', type: 'vod', categoryId: 'cat-bolly' },
+        { id: 'fr', title: 'Dune Francais', posterUrl: '', type: 'vod', categoryId: 'cat-fr' },
+      ]),
+    );
+    useSettingsStore.getState().updateSetting('catalogHiddenKeywords', ['bollywood']);
+
+    render(
+      <MemoryRouter initialEntries={['/search?q=Dune&type=movies']}>
+        <SearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Dune Francais' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Dune Bolly' })).toBeNull();
+  });
+
   it('shows nothing from a hidden country until the category list has arrived', async () => {
     // A hidden country only maps to category ids once the category list is
     // there. Rendering the catalogue unfiltered until then is how hidden

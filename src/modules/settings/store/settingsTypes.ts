@@ -149,6 +149,9 @@ export interface SettingsState {
   catalogHideAdult: boolean;
   /** Provider variants of one IMDb title collapse into a single card. */
   catalogGroupTitles: boolean;
+  /** Movies/Series leave out the categories whose name contains one of these
+   * (case-insensitive), e.g. "Bollywood" for a dubbed copy filed abroad. */
+  catalogHiddenKeywords: string[];
   catalogSortModes: CatalogSortModes;
 
   // UI & Desktop
@@ -286,6 +289,7 @@ export const SETTINGS_SNAPSHOT_KEYS = [
   'catalogImdbQuality',
   'catalogHideAdult',
   'catalogGroupTitles',
+  'catalogHiddenKeywords',
   'smartLogoAspectMode',
   'imageSharpness',
   'imageBrightness',

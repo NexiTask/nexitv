@@ -369,6 +369,21 @@ export const PL_MESSAGES: Record<string, string> = {
   Rating: 'Ocena',
   'Rating {rating}': 'Ocena {rating}',
   Provider: 'Dostawca',
+  'Content Filter': 'Filtr treści',
+  'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
+    'Domyślnie pomija treści w Filmach i Serialach. Tytuł z kopią, która nie jest filtrowana, nadal pokazuje tę kopię.',
+  'Hidden Countries': 'Ukryte kraje',
+  'Hides every Movies and Series category of these countries. The category sidebar shares this list.':
+    'Ukrywa wszystkie kategorie Filmów i Seriali z tych krajów. Pasek boczny kategorii korzysta z tej samej listy.',
+  'Hide a country': 'Ukryj kraj',
+  'Hide a country…': 'Ukryj kraj…',
+  'Show {name} again': 'Pokaż ponownie {name}',
+  'Hidden Keywords': 'Ukryte słowa kluczowe',
+  'Hides Movies and Series categories whose name contains one of these words, e.g. "Bollywood".':
+    'Ukrywa kategorie Filmów i Seriali, których nazwa zawiera jedno z tych słów, np. „Bollywood”.',
+  'Keyword to hide': 'Słowo kluczowe do ukrycia',
+  'Add a keyword': 'Dodaj słowo kluczowe',
+  'Remove {name}': 'Usuń {name}',
   'IMDb rating {rating} out of 10 from {count} vote': 'Ocena IMDb {rating} na 10 z {count} głosu',
   'IMDb rating {rating} out of 10 from {count} votes': 'Ocena IMDb {rating} na 10 z {count} głosów',
   'TMDB rating {rating} out of 10 from {count} vote': 'Ocena TMDB {rating} na 10 z {count} głosu',

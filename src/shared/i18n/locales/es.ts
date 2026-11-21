@@ -371,6 +371,21 @@ export const ES_MESSAGES: Record<string, string> = {
   Rating: 'Calificación',
   'Rating {rating}': 'Calificación {rating}',
   Provider: 'Proveedor',
+  'Content Filter': 'Filtro de contenido',
+  'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
+    'Excluye contenido de Películas y Series por defecto. Un título con una copia no filtrada sigue mostrando esa copia.',
+  'Hidden Countries': 'Países ocultos',
+  'Hides every Movies and Series category of these countries. The category sidebar shares this list.':
+    'Oculta todas las categorías de Películas y Series de estos países. La barra lateral de categorías comparte esta lista.',
+  'Hide a country': 'Ocultar un país',
+  'Hide a country…': 'Ocultar un país…',
+  'Show {name} again': 'Mostrar {name} de nuevo',
+  'Hidden Keywords': 'Palabras clave ocultas',
+  'Hides Movies and Series categories whose name contains one of these words, e.g. "Bollywood".':
+    'Oculta las categorías de Películas y Series cuyo nombre contiene una de estas palabras, p. ej. «Bollywood».',
+  'Keyword to hide': 'Palabra clave a ocultar',
+  'Add a keyword': 'Añadir una palabra clave',
+  'Remove {name}': 'Quitar {name}',
   'IMDb rating {rating} out of 10 from {count} vote':
     'Calificación de IMDb {rating} de 10 con {count} voto',
   'IMDb rating {rating} out of 10 from {count} votes':

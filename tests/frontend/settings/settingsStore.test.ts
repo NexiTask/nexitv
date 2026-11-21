@@ -2,7 +2,11 @@
 
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { migrateSettingsState, useSettingsStore } from '@/modules/settings/store/useSettingsStore';
+import {
+  migrateSettingsState,
+  normalizeHiddenKeywords,
+  useSettingsStore,
+} from '@/modules/settings/store/useSettingsStore';
 import { useCatalogCategorySelection } from '@/modules/catalog/hooks/useCatalogCategorySelection';
 
 beforeEach(() => {
@@ -274,5 +278,14 @@ describe('settings store', () => {
     expect(SETTINGS_SNAPSHOT_KEYS).not.toContain('sidebarCollapsed');
     expect(SETTINGS_SNAPSHOT_KEYS).not.toContain('epgXmltvUrl');
     expect(SETTINGS_SNAPSHOT_KEYS).toContain('themePreference');
+  });
+});
+
+describe('hidden keyword list', () => {
+  it('trims, de-duplicates case-insensitively and drops junk', () => {
+    expect(
+      normalizeHiddenKeywords(['  Bollywood ', 'bollywood', '', 42, 'Hindi', 'x'.repeat(80)]),
+    ).toEqual(['Bollywood', 'Hindi', 'x'.repeat(64)]);
+    expect(normalizeHiddenKeywords('Bollywood')).toEqual([]);
   });
 });
