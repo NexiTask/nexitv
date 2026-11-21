@@ -4,6 +4,7 @@ import {
   type CatalogFilterKind,
   type CatalogFilters,
   type CatalogWatchFilter,
+  type ImdbQualityPreset,
 } from '@/modules/settings/public/store/useSettingsStore';
 import { useI18n } from '@/shared/i18n/i18n';
 import { Select } from '@/shared/ui/Select';
@@ -16,6 +17,9 @@ interface CatalogFilterPanelProps {
   type: CatalogFilterKind;
   filters: CatalogFilters;
   onChange: (filters: CatalogFilters) => void;
+  /** The IMDb quality preset (a global setting, shared by Movies and Series). */
+  quality: ImdbQualityPreset;
+  onQualityChange: (preset: ImdbQualityPreset) => void;
 }
 
 /** Runtime buckets: films by feature length, series by episode length. */
@@ -46,7 +50,13 @@ const runtimeKey = (min: number | null, max: number | null) => `${min ?? ''}-${m
  * The Movies/Series filter panel: everything the catalogue index knows about
  * a title. Genres cycle through include → exclude → off.
  */
-export function CatalogFilterPanel({ type, filters, onChange }: CatalogFilterPanelProps) {
+export function CatalogFilterPanel({
+  type,
+  filters,
+  onChange,
+  quality,
+  onQualityChange,
+}: CatalogFilterPanelProps) {
   const { t, number } = useI18n();
   const set = (patch: Partial<CatalogFilters>) => onChange({ ...filters, ...patch });
 
@@ -92,6 +102,22 @@ export function CatalogFilterPanel({ type, filters, onChange }: CatalogFilterPan
   return (
     <section className={styles.panel} aria-label={t('Filters')}>
       <div className={styles.fields}>
+        <div className={styles.field}>
+          <span className={styles.label}>{t('Quality')}</span>
+          <Select
+            ariaLabel={t('IMDb quality')}
+            value={quality}
+            width={210}
+            options={[
+              { value: 'all', label: t('Any') },
+              { value: 'imdb-7-1k', label: t('IMDb ≥ 7.0 · 1k+ votes') },
+              { value: 'imdb-65-5k', label: t('IMDb ≥ 6.5 · 5k+ votes') },
+              { value: 'imdb-6-10k', label: t('IMDb ≥ 6.0 · 10k+ votes') },
+            ]}
+            onChange={onQualityChange}
+          />
+        </div>
+
         <div className={styles.field}>
           <span className={styles.label}>{t('Year')}</span>
           <div className={styles.yearRange}>
@@ -245,7 +271,10 @@ export function CatalogFilterPanel({ type, filters, onChange }: CatalogFilterPan
         <button
           type="button"
           className={styles.clear}
-          onClick={() => onChange(EMPTY_CATALOG_FILTERS)}
+          onClick={() => {
+            onChange(EMPTY_CATALOG_FILTERS);
+            onQualityChange('all');
+          }}
         >
           <RotateCcw size={14} />
           {t('Clear filters')}

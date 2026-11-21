@@ -74,7 +74,13 @@ describe('catalogue filter panel', () => {
   it('cycles a genre through include, exclude and off', () => {
     const onChange = vi.fn();
     const { rerender } = render(
-      <CatalogFilterPanel type="vod" filters={EMPTY_CATALOG_FILTERS} onChange={onChange} />,
+      <CatalogFilterPanel
+        type="vod"
+        filters={EMPTY_CATALOG_FILTERS}
+        onChange={onChange}
+        quality="all"
+        onQualityChange={vi.fn()}
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Comedy' }));
     expect(onChange).toHaveBeenLastCalledWith(filters({ genres: ['Comedy'] }));
@@ -84,6 +90,8 @@ describe('catalogue filter panel', () => {
         type="vod"
         filters={filters({ genres: ['Comedy'] })}
         onChange={onChange}
+        quality="all"
+        onQualityChange={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: '+Comedy' }));
@@ -94,6 +102,8 @@ describe('catalogue filter panel', () => {
         type="vod"
         filters={filters({ excludeGenres: ['Comedy'] })}
         onChange={onChange}
+        quality="all"
+        onQualityChange={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: '−Comedy' }));
@@ -102,7 +112,15 @@ describe('catalogue filter panel', () => {
 
   it('takes a typed year when it is a real one', () => {
     const onChange = vi.fn();
-    render(<CatalogFilterPanel type="vod" filters={EMPTY_CATALOG_FILTERS} onChange={onChange} />);
+    render(
+      <CatalogFilterPanel
+        type="vod"
+        filters={EMPTY_CATALOG_FILTERS}
+        onChange={onChange}
+        quality="all"
+        onQualityChange={vi.fn()}
+      />,
+    );
     const from = screen.getByRole('combobox', { name: 'From year' });
     fireEvent.change(from, { target: { value: '1994' } });
     fireEvent.blur(from);
@@ -111,7 +129,15 @@ describe('catalogue filter panel', () => {
 
   it('offers a dropdown of years to pick from', () => {
     const onChange = vi.fn();
-    render(<CatalogFilterPanel type="vod" filters={EMPTY_CATALOG_FILTERS} onChange={onChange} />);
+    render(
+      <CatalogFilterPanel
+        type="vod"
+        filters={EMPTY_CATALOG_FILTERS}
+        onChange={onChange}
+        quality="all"
+        onQualityChange={vi.fn()}
+      />,
+    );
     const to = screen.getByRole('combobox', { name: 'To year' });
     fireEvent.focus(to);
     // Newest first, and narrowed by what is typed.
@@ -137,7 +163,13 @@ describe('catalogue filter panel', () => {
   it('picks with the keyboard, clears when emptied, and ignores nonsense', () => {
     const onChange = vi.fn();
     render(
-      <CatalogFilterPanel type="vod" filters={filters({ yearMin: 2001 })} onChange={onChange} />,
+      <CatalogFilterPanel
+        type="vod"
+        filters={filters({ yearMin: 2001 })}
+        onChange={onChange}
+        quality="all"
+        onQualityChange={vi.fn()}
+      />,
     );
     const from = screen.getByRole('combobox', { name: 'From year' });
     fireEvent.focus(from);
@@ -155,5 +187,23 @@ describe('catalogue filter panel', () => {
     fireEvent.change(from, { target: { value: '12' } });
     fireEvent.blur(from);
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('holds the IMDb quality preset and clears it with the other filters', () => {
+    const onChange = vi.fn();
+    const onQualityChange = vi.fn();
+    render(
+      <CatalogFilterPanel
+        type="vod"
+        filters={filters({ yearMin: 2000 })}
+        onChange={onChange}
+        quality="imdb-65-5k"
+        onQualityChange={onQualityChange}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'IMDb quality' }).textContent).toContain('6.5');
+    fireEvent.click(screen.getByRole('button', { name: /Clear filters/ }));
+    expect(onChange).toHaveBeenLastCalledWith(EMPTY_CATALOG_FILTERS);
+    expect(onQualityChange).toHaveBeenLastCalledWith('all');
   });
 });

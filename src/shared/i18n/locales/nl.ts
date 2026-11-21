@@ -440,6 +440,7 @@ export const NL_MESSAGES: Record<string, string> = {
   'Leave out the movies and series the provider flags as adult from the Movies and Series pages. Needs the catalogue index.':
     'Laat films en series die de aanbieder als volwassen markeert weg van de pagina’s Films en Series. Vereist de catalogusindex.',
   'No matching year': 'Geen passend jaar',
+  Quality: 'Kwaliteit',
   'Content Filter': 'Inhoudsfilter',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Laat standaard inhoud weg uit Films en Series. Een titel met een niet-gefilterde kopie toont nog steeds die kopie.',

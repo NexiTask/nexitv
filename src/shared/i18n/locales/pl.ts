@@ -439,6 +439,7 @@ export const PL_MESSAGES: Record<string, string> = {
   'Leave out the movies and series the provider flags as adult from the Movies and Series pages. Needs the catalogue index.':
     'Pomija na stronach Filmy i Seriale tytuły oznaczone przez dostawcę jako dla dorosłych. Wymaga indeksu katalogu.',
   'No matching year': 'Brak pasującego roku',
+  Quality: 'Jakość',
   'Content Filter': 'Filtr treści',
   'Leave content out of Movies and Series by default. A title with a copy that is not filtered still shows that copy.':
     'Domyślnie pomija treści w Filmach i Serialach. Tytuł z kopią, która nie jest filtrowana, nadal pokazuje tę kopię.',

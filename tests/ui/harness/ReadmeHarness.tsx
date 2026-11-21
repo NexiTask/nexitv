@@ -1374,6 +1374,8 @@ function MoviesFiltersShowcase() {
             watch: 'unwatched',
           }}
           onChange={() => undefined}
+          quality="all"
+          onQualityChange={() => undefined}
         />
         <div className={appStyles.catalogContent}>
           <VirtualizedGrid items={SHOWCASE_ITEMS} />

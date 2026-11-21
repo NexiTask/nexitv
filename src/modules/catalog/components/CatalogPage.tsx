@@ -23,7 +23,6 @@ import {
   IMDB_QUALITY_PRESETS,
   type ImdbQualityPreset,
 } from '@/modules/settings/public/store/useSettingsStore';
-import { Select } from '@/shared/ui/Select';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import { useEnabledSources } from '@/modules/sources/public/hooks/useEnabledSources';
 import { useVerifiedResolutionMap } from '@/modules/sources/public/store/useStreamVerificationStore';
@@ -205,7 +204,10 @@ export function CatalogPage({
   const filterKind = type === 'live' ? null : type;
   const storedFilters = filterKind ? allCatalogFilters[filterKind] : EMPTY_CATALOG_FILTERS;
   const filters = isIndexed && filterKind ? storedFilters : undefined;
-  const filterCount = filterKind ? activeFilterCount(storedFilters) : 0;
+  // The quality preset lives in the panel, so it counts toward the badge.
+  const filterCount = filterKind
+    ? activeFilterCount(storedFilters) + (catalogImdbQuality !== 'all' ? 1 : 0)
+    : 0;
   // The panel's IMDb floor and the quality preset combine: the stricter wins.
   const imdbQualityParams = useMemo(() => {
     const preset = imdbQuality === 'all' ? null : IMDB_QUALITY_PRESETS[imdbQuality];
@@ -412,21 +414,6 @@ export function CatalogPage({
                       : 'Search channels...'
                 }
               />
-              {type !== 'live' && (
-                <Select
-                  value={imdbQuality}
-                  onChange={(value) => setCatalogImdbQuality('catalogImdbQuality', value)}
-                  disabled={isLegacy}
-                  width={175}
-                  ariaLabel={t('IMDb quality')}
-                  options={[
-                    { value: 'all', label: t('Quality: All') },
-                    { value: 'imdb-7-1k', label: t('IMDb ≥ 7.0 · 1k+ votes') },
-                    { value: 'imdb-65-5k', label: t('IMDb ≥ 6.5 · 5k+ votes') },
-                    { value: 'imdb-6-10k', label: t('IMDb ≥ 6.0 · 10k+ votes') },
-                  ]}
-                />
-              )}
               {filterKind && (
                 <button
                   type="button"
@@ -460,6 +447,8 @@ export function CatalogPage({
             type={filterKind}
             filters={storedFilters}
             onChange={(next) => setCatalogFilters(filterKind, next)}
+            quality={catalogImdbQuality}
+            onQualityChange={(preset) => setCatalogImdbQuality('catalogImdbQuality', preset)}
           />
         )}
 
