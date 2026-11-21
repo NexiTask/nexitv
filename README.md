@@ -4,14 +4,6 @@
 
 <h1 align="center">NexiTV</h1>
 
-> **NexiTV is a modified version of [Movena](https://github.com/movena-app/movena)**,
-> the free IPTV player by the Movena contributors. It is not the official Movena
-> release and is not affiliated with or endorsed by the Movena project. It is
-> distributed under the same licence, GPL-3.0-or-later, with the original copyright
-> and licence notices kept (see [LICENSE](LICENSE) and
-> [docs/TRADEMARK.md](docs/TRADEMARK.md)); the modifications are in this repository's
-> git history.
-
 <p align="center">
   A private, cross-platform IPTV and VOD desktop player for Xtream Codes and
   M3U/M3U8 playlists, with XMLTV EPG and native libmpv playback.
@@ -250,8 +242,10 @@ Read the [privacy documentation](docs/PRIVACY.md) and
 [security policy](.github/SECURITY.md) for data handling and private vulnerability
 reporting.
 
-NexiTV is licensed under [GPL-3.0-or-later](LICENSE). Packaging and distribution
-requirements are documented in [docs/RELEASING.md](docs/RELEASING.md).
+NexiTV is a modified version of [Movena](https://github.com/movena-app/movena)
+(not the official release, and not endorsed by that project), licensed under
+[GPL-3.0-or-later](LICENSE). Packaging and distribution requirements are
+documented in [docs/RELEASING.md](docs/RELEASING.md).
 See [CHANGELOG.md](CHANGELOG.md) for unreleased and tagged product changes.
 Third-party notices and asset provenance are in
 [docs/THIRD_PARTY_NOTICES.md](docs/THIRD_PARTY_NOTICES.md),
