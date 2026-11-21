@@ -428,8 +428,10 @@ export const FR_MESSAGES: Record<string, string> = {
     'Met à l’échelle toute l’interface : texte, cartes et commandes. Ctrl + et Ctrl − la modifient aussi, Ctrl 0 la réinitialise.',
   'Color Theme': 'Thème de couleurs',
   'Color theme': 'Thème de couleurs',
-  'A color palette over the dark or light canvas. Catppuccin brings its own soft pastel colors and Mauve accent.':
-    'Une palette de couleurs sur le thème sombre ou clair. Catppuccin apporte ses couleurs pastel douces et l’accent Mauve.',
+  'A color palette over the dark or light canvas, with its own accent unless you pick one.':
+    'Une palette de couleurs sur le thème sombre ou clair, avec son propre accent sauf si vous en choisissez un.',
+  'A color palette over the dark canvas, with its own accent unless you pick one. It has no light version, so the light theme keeps the default colors.':
+    'Une palette de couleurs sur le thème sombre, avec son propre accent sauf si vous en choisissez un. Elle n’a pas de version claire : le thème clair garde les couleurs par défaut.',
   'Catppuccin Flavor': 'Variante Catppuccin',
   'Catppuccin flavor': 'Variante Catppuccin',
   'The dark flavor. The light theme always uses Latte.':

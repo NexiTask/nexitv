@@ -437,8 +437,10 @@ export const DE_MESSAGES: Record<string, string> = {
     'Skaliert die gesamte Oberfläche: Text, Karten und Bedienelemente. Strg + und Strg − ändern sie ebenfalls, Strg 0 setzt sie zurück.',
   'Color Theme': 'Farbthema',
   'Color theme': 'Farbthema',
-  'A color palette over the dark or light canvas. Catppuccin brings its own soft pastel colors and Mauve accent.':
-    'Eine Farbpalette über dem dunklen oder hellen Design. Catppuccin bringt eigene sanfte Pastellfarben und den Mauve-Akzent mit.',
+  'A color palette over the dark or light canvas, with its own accent unless you pick one.':
+    'Eine Farbpalette über dem dunklen oder hellen Design, mit eigenem Akzent, sofern du keinen wählst.',
+  'A color palette over the dark canvas, with its own accent unless you pick one. It has no light version, so the light theme keeps the default colors.':
+    'Eine Farbpalette über dem dunklen Design, mit eigenem Akzent, sofern du keinen wählst. Sie hat keine helle Version, daher behält das helle Design die Standardfarben.',
   'Catppuccin Flavor': 'Catppuccin-Variante',
   'Catppuccin flavor': 'Catppuccin-Variante',
   'The dark flavor. The light theme always uses Latte.':

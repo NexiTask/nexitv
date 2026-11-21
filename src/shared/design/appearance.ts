@@ -9,7 +9,15 @@ import {
 export type ThemePreference = 'dark' | 'light';
 
 /** A colour theme over the dark/light canvas. */
-export type ColorTheme = 'default' | 'catppuccin';
+export type ColorTheme =
+  | 'default'
+  | 'catppuccin'
+  | 'dracula'
+  | 'nord'
+  | 'gruvbox'
+  | 'tokyo-night'
+  | 'rose-pine'
+  | 'solarized';
 /** Catppuccin's dark flavours; the light canvas always uses Latte. */
 export type CatppuccinFlavor = 'mocha' | 'macchiato' | 'frappe';
 
@@ -20,18 +28,64 @@ export interface AppearancePalette {
 
 export const DEFAULT_PALETTE: AppearancePalette = { theme: 'default', flavor: 'mocha' };
 
-/** Each Catppuccin flavour's Mauve, its usual accent. */
-const CATPPUCCIN_ACCENTS: Record<CatppuccinFlavor | 'latte', string> = {
-  mocha: '#cba6f7',
-  macchiato: '#c6a0f6',
-  frappe: '#ca9ee6',
-  latte: '#8839ef',
+/** The themes Settings offers, in its order, with their display names. */
+export const COLOR_THEMES: readonly { value: ColorTheme; label: string }[] = [
+  { value: 'default', label: 'Default' },
+  { value: 'catppuccin', label: 'Catppuccin' },
+  { value: 'dracula', label: 'Dracula' },
+  { value: 'nord', label: 'Nord' },
+  { value: 'gruvbox', label: 'Gruvbox' },
+  { value: 'tokyo-night', label: 'Tokyo Night' },
+  { value: 'rose-pine', label: 'Rosé Pine' },
+  { value: 'solarized', label: 'Solarized' },
+];
+
+/** Each theme's variant per canvas (index.css `data-palette`); null: the
+ * theme has none for that canvas and the default colours apply. */
+const THEME_VARIANTS: Record<
+  Exclude<ColorTheme, 'default' | 'catppuccin'>,
+  { dark: string | null; light: string | null }
+> = {
+  dracula: { dark: 'dracula', light: null },
+  nord: { dark: 'nord', light: 'nord-light' },
+  gruvbox: { dark: 'gruvbox-dark', light: 'gruvbox-light' },
+  'tokyo-night': { dark: 'tokyo-night', light: 'tokyo-night-day' },
+  'rose-pine': { dark: 'rose-pine', light: 'rose-pine-dawn' },
+  solarized: { dark: 'solarized-dark', light: 'solarized-light' },
 };
+
+/** Each palette's usual accent. */
+const PALETTE_ACCENTS: Record<string, string> = {
+  'catppuccin-mocha': '#cba6f7',
+  'catppuccin-macchiato': '#c6a0f6',
+  'catppuccin-frappe': '#ca9ee6',
+  'catppuccin-latte': '#8839ef',
+  dracula: '#bd93f9',
+  nord: '#88c0d0',
+  'nord-light': '#5e81ac',
+  'gruvbox-dark': '#fe8019',
+  'gruvbox-light': '#af3a03',
+  'tokyo-night': '#7aa2f7',
+  'tokyo-night-day': '#2e7de9',
+  'rose-pine': '#ebbcba',
+  'rose-pine-dawn': '#d7827e',
+  'solarized-dark': '#268bd2',
+  'solarized-light': '#268bd2',
+};
+
+/** Whether a theme has a variant for the light canvas. */
+export function themeHasLightVariant(theme: ColorTheme): boolean {
+  if (theme === 'default' || theme === 'catppuccin') return true;
+  return THEME_VARIANTS[theme].light !== null;
+}
 
 /** The `data-palette` value for a palette on a canvas, or null for the default. */
 export function paletteName(theme: ThemePreference, palette: AppearancePalette): string | null {
-  if (palette.theme !== 'catppuccin') return null;
-  return `catppuccin-${theme === 'light' ? 'latte' : palette.flavor}`;
+  if (palette.theme === 'default') return null;
+  if (palette.theme === 'catppuccin') {
+    return `catppuccin-${theme === 'light' ? 'latte' : palette.flavor}`;
+  }
+  return THEME_VARIANTS[palette.theme][theme];
 }
 export type Season = 'christmas' | 'easter';
 
@@ -107,7 +161,7 @@ export function applyAppearanceTheme(
   // A colour theme brings its own accent, unless the viewer picked one.
   const themeAccent =
     named && accentValue.toLowerCase() === DEFAULT_ACCENT_COLOR.toLowerCase()
-      ? CATPPUCCIN_ACCENTS[theme === 'light' ? 'latte' : palette.flavor]
+      ? (PALETTE_ACCENTS[named] ?? accentValue)
       : accentValue;
   const requestedAccent = appliedSeason ? SEASON_ACCENT_COLORS[appliedSeason] : themeAccent;
   const accent = parseHex(requestedAccent) ? requestedAccent : DEFAULT_ACCENT_COLOR;

@@ -15,6 +15,7 @@ import {
   type ThemePreference,
 } from '../store/useSettingsStore';
 import { Select } from '@/shared/ui/Select';
+import { COLOR_THEMES, themeHasLightVariant } from '@/shared/design/appearance';
 import { DEFAULT_ACCENT_COLOR } from '@/shared/design/color';
 import { AccentColorPicker } from '@/shared/ui/AccentColorPicker';
 import { SegmentedControl } from '@/shared/ui/SegmentedControl';
@@ -51,7 +52,11 @@ export function AppearanceSettingsSection() {
 
         <SettingsRow
           title="Color Theme"
-          description="A color palette over the dark or light canvas. Catppuccin brings its own soft pastel colors and Mauve accent."
+          description={
+            themeHasLightVariant(settings.colorTheme)
+              ? 'A color palette over the dark or light canvas, with its own accent unless you pick one.'
+              : 'A color palette over the dark canvas, with its own accent unless you pick one. It has no light version, so the light theme keeps the default colors.'
+          }
         >
           <Select
             ariaLabel="Color theme"
@@ -59,10 +64,11 @@ export function AppearanceSettingsSection() {
             width={170}
             value={settings.colorTheme}
             onChange={(value) => settings.updateSetting('colorTheme', value)}
-            options={[
-              { value: 'default', label: 'Default' },
-              { value: 'catppuccin', label: 'Catppuccin', localize: false },
-            ]}
+            options={COLOR_THEMES.map((theme) => ({
+              value: theme.value,
+              label: theme.label,
+              localize: theme.value === 'default',
+            }))}
           />
         </SettingsRow>
 

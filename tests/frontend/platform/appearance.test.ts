@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   activeSeason,
   applyAppearanceTheme,
+  COLOR_THEMES,
+  paletteName,
+  themeHasLightVariant,
   easterSunday,
   msUntilNextLocalMidnight,
 } from '@/shared/design/appearance';
@@ -144,5 +147,42 @@ describe('colour themes', () => {
     applyAppearanceTheme('dark', DEFAULT_ACCENT_COLOR, 'christmas', root);
     expect(root.dataset.palette).toBeUndefined();
     expect(root.dataset.season).toBe('christmas');
+  });
+});
+
+describe('famous themes', () => {
+  const palette = (theme: 'dracula' | 'nord' | 'gruvbox' | 'rose-pine') => ({
+    theme,
+    flavor: 'mocha' as const,
+  });
+
+  it('picks the dark and light variant of a theme', () => {
+    const root = document.createElement('html');
+    applyAppearanceTheme('dark', DEFAULT_ACCENT_COLOR, null, root, palette('gruvbox'));
+    expect(root.dataset.palette).toBe('gruvbox-dark');
+    expect(root.style.getPropertyValue('--accent-color')).toBe('#fe8019');
+    applyAppearanceTheme('light', DEFAULT_ACCENT_COLOR, null, root, palette('rose-pine'));
+    expect(root.dataset.palette).toBe('rose-pine-dawn');
+  });
+
+  it('keeps the default light colours for a dark-only theme', () => {
+    const root = document.createElement('html');
+    applyAppearanceTheme('light', DEFAULT_ACCENT_COLOR, null, root, palette('dracula'));
+    expect(root.dataset.palette).toBeUndefined();
+    expect(themeHasLightVariant('dracula')).toBe(false);
+    expect(themeHasLightVariant('nord')).toBe(true);
+  });
+
+  it('defines CSS for every palette the themes can name', async () => {
+    const { readFileSync } = await import('node:fs');
+    const css = readFileSync('src/shared/design/index.css', 'utf8');
+    for (const { value } of COLOR_THEMES) {
+      for (const canvas of ['dark', 'light'] as const) {
+        for (const flavor of ['mocha', 'macchiato', 'frappe'] as const) {
+          const name = paletteName(canvas, { theme: value, flavor });
+          if (name) expect(css).toContain(`html[data-palette='${name}']`);
+        }
+      }
+    }
   });
 });

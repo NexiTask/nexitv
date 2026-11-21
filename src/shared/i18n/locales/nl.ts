@@ -425,8 +425,10 @@ export const NL_MESSAGES: Record<string, string> = {
     'Schaalt de hele interface: tekst, kaarten en bediening. Ctrl + en Ctrl − passen hem ook aan, Ctrl 0 zet hem terug.',
   'Color Theme': 'Kleurthema',
   'Color theme': 'Kleurthema',
-  'A color palette over the dark or light canvas. Catppuccin brings its own soft pastel colors and Mauve accent.':
-    'Een kleurenpalet over het donkere of lichte thema. Catppuccin brengt eigen zachte pastelkleuren en het Mauve-accent mee.',
+  'A color palette over the dark or light canvas, with its own accent unless you pick one.':
+    'Een kleurenpalet over het donkere of lichte thema, met een eigen accent tenzij je er zelf een kiest.',
+  'A color palette over the dark canvas, with its own accent unless you pick one. It has no light version, so the light theme keeps the default colors.':
+    'Een kleurenpalet over het donkere thema, met een eigen accent tenzij je er zelf een kiest. Er is geen lichte versie, dus het lichte thema houdt de standaardkleuren.',
   'Catppuccin Flavor': 'Catppuccin-variant',
   'Catppuccin flavor': 'Catppuccin-variant',
   'The dark flavor. The light theme always uses Latte.':

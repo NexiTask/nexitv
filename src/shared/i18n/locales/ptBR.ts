@@ -425,8 +425,10 @@ export const PT_BR_MESSAGES: Record<string, string> = {
     'Ajusta a escala de toda a interface: texto, cartões e controles. Ctrl + e Ctrl − também a mudam, Ctrl 0 a redefine.',
   'Color Theme': 'Tema de cores',
   'Color theme': 'Tema de cores',
-  'A color palette over the dark or light canvas. Catppuccin brings its own soft pastel colors and Mauve accent.':
-    'Uma paleta de cores sobre o tema escuro ou claro. Catppuccin traz seus tons pastel suaves e o destaque Mauve.',
+  'A color palette over the dark or light canvas, with its own accent unless you pick one.':
+    'Uma paleta de cores sobre o tema escuro ou claro, com seu próprio destaque, a menos que você escolha um.',
+  'A color palette over the dark canvas, with its own accent unless you pick one. It has no light version, so the light theme keeps the default colors.':
+    'Uma paleta de cores sobre o tema escuro, com seu próprio destaque, a menos que você escolha um. Não tem versão clara, então o tema claro mantém as cores padrão.',
   'Catppuccin Flavor': 'Variante do Catppuccin',
   'Catppuccin flavor': 'Variante do Catppuccin',
   'The dark flavor. The light theme always uses Latte.':

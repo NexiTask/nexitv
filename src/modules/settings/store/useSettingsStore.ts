@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AspectMode } from '@/modules/catalog/public/lib/aspect';
 import { DEFAULT_ACCENT_COLOR, isValidHex } from '@/shared/design/color';
+import { COLOR_THEMES, type ColorTheme } from '@/shared/design/appearance';
 import { DEFAULT_RECORDING_DIRECTORY } from '@/modules/playback/public/lib/recording';
 import { isUiLanguage, isUiLocale } from '@/shared/i18n/config';
 import type { CustomTitleRule } from '@/modules/catalog/public/lib/titleParser';
@@ -586,7 +587,9 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
     cardScales: normalizeCardScales(state.cardScales),
     categorySidebarHidden: state.categorySidebarHidden === true,
     interfaceZoom: normalizeInterfaceZoom(state.interfaceZoom),
-    colorTheme: state.colorTheme === 'catppuccin' ? 'catppuccin' : 'default',
+    colorTheme: COLOR_THEMES.some((theme) => theme.value === state.colorTheme)
+      ? (state.colorTheme as ColorTheme)
+      : 'default',
     catppuccinFlavor:
       state.catppuccinFlavor === 'macchiato' || state.catppuccinFlavor === 'frappe'
         ? state.catppuccinFlavor
