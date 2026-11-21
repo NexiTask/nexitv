@@ -9,7 +9,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use libmpv_sys::*;
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Serialize;
 use serde_json::Value;
@@ -27,6 +27,8 @@ use self::options::first_existing_file;
 use self::options::ytdlp_script_option;
 use self::property::{validate_mpv_property, MpvPropertyUpdate};
 
+#[cfg(target_os = "linux")]
+use crate::platform::linux as linux_embed;
 #[cfg(target_os = "macos")]
 use crate::platform::macos as macos_embed;
 #[cfg(target_os = "windows")]
@@ -145,7 +147,9 @@ fn stop_internal(app: &AppHandle, state: &NativePlayerManager) {
     // retains it while it is a child, so it would otherwise outlive mpv.
     #[cfg(target_os = "macos")]
     macos_embed::detach(app);
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    linux_embed::detach(app);
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     let _ = app;
 
     state.alive.store(false, Ordering::SeqCst);
@@ -247,7 +251,7 @@ struct MpvGuard {
     /// Set once a render context exists for this handle. It has to be freed
     /// before the handle it belongs to is destroyed, and start-up can still
     /// fail between the two.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     surface: Option<AppHandle>,
 }
 
@@ -256,7 +260,7 @@ impl MpvGuard {
         Self {
             ptr,
             defused: false,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
             surface: None,
         }
     }
@@ -264,7 +268,7 @@ impl MpvGuard {
     /// Note that a video surface is now bound to this handle, so an early
     /// return tears it down in the right order rather than leaving mpv to be
     /// destroyed out from under a live render context.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     fn holds_surface(&mut self, app: AppHandle) {
         self.surface = Some(app);
     }
@@ -284,6 +288,10 @@ impl Drop for MpvGuard {
         #[cfg(target_os = "macos")]
         if let Some(app) = self.surface.take() {
             macos_embed::detach(&app);
+        }
+        #[cfg(target_os = "linux")]
+        if let Some(app) = self.surface.take() {
+            linux_embed::detach(&app);
         }
         unsafe {
             mpv_terminate_destroy(self.ptr);
@@ -326,6 +334,9 @@ pub fn mpv_start(
     // Stop any existing instance first
     stop_internal(&app, &state);
 
+    #[cfg(target_os = "linux")]
+    linux_embed::use_c_numeric_locale();
+
     unsafe {
         let mpv = mpv_create();
         if mpv.is_null() {
@@ -338,7 +349,7 @@ pub fn mpv_start(
         // GPU contexts it offers there are Vulkan-only and unavailable on older
         // Intel Macs, so video is rendered through libmpv's render API into a
         // surface the app owns instead (see macos_embed and its `render`).
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
         {
             let window = app
                 .get_webview_window("main")
@@ -346,9 +357,6 @@ pub fn mpv_start(
             let wh = window.window_handle().map_err(|e| e.to_string())?;
             let wid = match wh.as_raw() {
                 RawWindowHandle::Win32(h) => h.hwnd.get() as i64,
-                RawWindowHandle::Xlib(h) => h.window as i64,
-                RawWindowHandle::Xcb(h) => h.window.get() as i64,
-                RawWindowHandle::Wayland(_) => return Err("Wayland playback requires an XWayland-compatible session with the current embedded MPV backend".to_string()),
                 _ => return Err("Unsupported OS window handle".to_string()),
             };
             set_mpv_option(mpv, "wid", &wid.to_string())?;
@@ -439,8 +447,13 @@ pub fn mpv_start(
         // actually started.
         #[cfg(target_os = "macos")]
         set_mpv_option(mpv, "vo", "gpu-next,gpu,libmpv")?;
-        #[cfg(not(target_os = "macos"))]
+        // Linux renders through the render API into a GTK layer under the
+        // webview (platform::linux), so the player chrome stays visible and
+        // native Wayland works.
+        #[cfg(target_os = "windows")]
         set_mpv_option(mpv, "vo", "gpu-next,gpu")?;
+        #[cfg(target_os = "linux")]
+        set_mpv_option(mpv, "vo", "libmpv")?;
         set_mpv_option(mpv, "hwdec", &hwdec)?;
         set_mpv_option(mpv, "force-window", "no")?;
         set_mpv_option(mpv, "keep-open", "yes")?;
@@ -564,6 +577,11 @@ pub fn mpv_start(
         #[cfg(target_os = "macos")]
         {
             macos_embed::start(&app, mpv);
+            guard.holds_surface(app.clone());
+        }
+        #[cfg(target_os = "linux")]
+        {
+            linux_embed::start(&app, mpv)?;
             guard.holds_surface(app.clone());
         }
 

@@ -8,7 +8,6 @@
   position: relative;
   width: 260px;
   max-width: 100%;
-  transition: width var(--duration-normal) var(--ease-smooth);
 }
 
 .headerSearch:focus-within {
@@ -117,9 +116,6 @@
   cursor: pointer;
   padding: var(--space-0-5) var(--space-1-5);
   border-radius: var(--radius-sm);
-  transition:
-    color var(--duration-normal) var(--ease-standard),
-    background-color var(--duration-normal) var(--ease-standard);
 }
 
 .clearAllBtn:hover {
@@ -134,7 +130,6 @@
   min-height: var(--control-height-md);
   padding: var(--space-2) var(--space-3);
   cursor: default;
-  transition: background-color var(--duration-normal) var(--ease-standard);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -184,9 +179,6 @@
   height: var(--control-height-sm);
   padding: 0;
   border-radius: var(--radius-full);
-  transition:
-    color var(--duration-normal) var(--ease-standard),
-    background-color var(--duration-normal) var(--ease-standard);
 }
 
 .recentDeleteBtn:hover {
@@ -203,7 +195,6 @@
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-primary);
-  transition: background-color var(--duration-normal) var(--ease-standard);
 }
 
 .suggestionItem:hover,
@@ -325,25 +316,21 @@
 
 .suggestionAction {
   color: var(--text-muted);
-  opacity: var(--alpha-60);
-  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
 .suggestionItem:hover .suggestionAction,
 .suggestionItem:focus-within .suggestionAction,
 .suggestionAction:hover,
 .suggestionAction:focus-visible {
-  opacity: 1;
+  color: var(--text-primary);
 }
 
-.suggestionFavoriteActive {
+.suggestionItem .suggestionAction.suggestionFavoriteActive {
   color: var(--color-favorite);
-  opacity: 1;
 }
 
-.suggestionWatchedActive {
+.suggestionItem .suggestionAction.suggestionWatchedActive {
   color: var(--accent-foreground);
-  opacity: 1;
 }
 
 .suggestionTitle {
@@ -407,9 +394,6 @@
   color: var(--text-secondary);
   cursor: pointer;
   background-color: var(--surface-control);
-  transition:
-    color var(--duration-normal) var(--ease-standard),
-    background-color var(--duration-normal) var(--ease-standard);
 }
 
 .viewAllRow,
@@ -432,11 +416,6 @@
 
 .viewAllLink svg {
   flex-shrink: 0;
-  transition: transform var(--duration-normal) var(--ease-standard);
-}
-
-.viewAllLink:hover svg {
-  transform: translateX(var(--space-1));
 }
 
 .viewAllLabel {

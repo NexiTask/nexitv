@@ -43,13 +43,22 @@ vi.mock('@/modules/catalog/components/CatalogViewToggle', () => ({
 vi.mock('@/modules/catalog/components/VirtualizedGrid', () => ({
   VirtualizedGrid: ({
     items,
+    count,
+    getItem,
     onItemClick,
   }: {
-    items: Array<{ id: string; title: string }>;
+    items?: Array<{ id: string; title: string }>;
+    count?: number;
+    getItem?: (index: number) => { id: string; title: string } | undefined;
     onItemClick?: (item: { id: string; title: string }) => void;
   }) => (
     <div data-testid="search-results">
-      {items.map((item) => (
+      {(
+        items ??
+        Array.from({ length: count ?? 0 }, (_, index) => getItem?.(index)).filter(
+          (item): item is { id: string; title: string } => Boolean(item),
+        )
+      ).map((item) => (
         <button key={item.id} onClick={() => onItemClick?.(item)}>
           {item.title}
         </button>

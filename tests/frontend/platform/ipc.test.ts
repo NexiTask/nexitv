@@ -121,6 +121,48 @@ describe('typed Tauri IPC wrapper', () => {
     ],
     ['catalogCacheDelete', ['xtream-one'], 'catalog_cache_delete', { sourceId: 'xtream-one' }],
     [
+      'catalogIndexPageStatus',
+      ['vod', [{ sourceId: 'xtream-one', scope: 'sources-abc' }]],
+      'catalog_index_page_status',
+      { kind: 'vod', sources: [{ sourceId: 'xtream-one', scope: 'sources-abc' }] },
+    ],
+    [
+      'catalogIndexPageRows',
+      ['live', [{ sourceId: 'xtream-one', scope: 'sources-abc' }], '3', [1, 8388609], true],
+      'catalog_index_page_rows',
+      {
+        kind: 'live',
+        sources: [{ sourceId: 'xtream-one', scope: 'sources-abc' }],
+        generation: '3',
+        keys: [1, 8388609],
+        fold: true,
+      },
+    ],
+    [
+      'catalogIndexFacetBatch',
+      ['xtream-one', 'vod', 'sources-abc', 4000],
+      'catalog_index_facet_batch',
+      { sourceId: 'xtream-one', kind: 'vod', scope: 'sources-abc', limit: 4000 },
+    ],
+    [
+      'catalogIndexStoreFacets',
+      ['xtream-one', 'vod', 7, [[0, 'id', 'Title', null, 0, 0, null, null, 0, 0]]],
+      'catalog_index_store_facets',
+      {
+        sourceId: 'xtream-one',
+        kind: 'vod',
+        generation: 7,
+        facets: [[0, 'id', 'Title', null, 0, 0, null, null, 0, 0]],
+      },
+    ],
+    ['catalogIndexTitles', ['series'], 'catalog_index_titles', { kind: 'series' }],
+    [
+      'catalogIndexStoreRanks',
+      ['vod', 'xtream-one:4', [0, 1, 1]],
+      'catalog_index_store_ranks',
+      { kind: 'vod', token: 'xtream-one:4', ranks: [0, 1, 1] },
+    ],
+    [
       'appDataClear',
       [['m3u-source', 'xtream-source']],
       'app_data_clear',
@@ -167,5 +209,119 @@ describe('typed Tauri IPC wrapper', () => {
     const options = { url: 'https://list.test/a.m3u', cacheKey: 'm3u-source' };
     await tauriApi.m3uFetch(options);
     expect(invokeMock).toHaveBeenCalledWith('m3u_fetch', { options });
+  });
+});
+
+describe('catalogue page index IPC', () => {
+  const sources = [{ sourceId: 'xtream-one', scope: 'sources-abc' }];
+  const query = {
+    hiddenCategoryIds: [],
+    category: 'smart:4k',
+    targetCategoryIds: null,
+    favoriteIds: [],
+    ultraHd: {},
+    ratings: {},
+    tmdbGenres: {},
+    categoryGenres: {},
+    genre: null,
+    sort: 'name-asc',
+    fold: false,
+  };
+
+  function encodePage(header: object, keys: number[]): ArrayBuffer {
+    const json = new TextEncoder().encode(JSON.stringify(header));
+    const offset = Math.ceil((4 + json.length) / 4) * 4;
+    const buffer = new ArrayBuffer(offset + keys.length * 4);
+    new DataView(buffer).setUint32(0, json.length, true);
+    new Uint8Array(buffer, 4, json.length).set(json);
+    keys.forEach((key, index) => new DataView(buffer).setUint32(offset + index * 4, key, true));
+    return buffer;
+  }
+
+  it('asks for a page with its query and decodes the binary keys', async () => {
+    const header = {
+      ready: true,
+      status: null,
+      generation: '5',
+      total: 3,
+      categoryTotal: 4,
+      genreCounts: [1],
+      head: [{ key: 2, raw: { stream_id: 2 } }],
+    };
+    invokeMock.mockResolvedValueOnce(encodePage(header, [2, 0, 8388608]));
+
+    const page = await tauriApi.catalogIndexPage('vod', sources, query);
+
+    expect(invokeMock).toHaveBeenCalledWith('catalog_index_page', { kind: 'vod', sources, query });
+    expect(page).toMatchObject(header);
+    expect([...page.keys]).toEqual([2, 0, 8388608]);
+  });
+
+  it('decodes a page that is not ready as having no keys', async () => {
+    const header = { ready: false, status: { state: 'building', pending: 9, total: 10 } };
+    invokeMock.mockResolvedValueOnce(encodePage(header, []));
+
+    const page = await tauriApi.catalogIndexPage('series', sources, query);
+
+    expect(page.ready).toBe(false);
+    expect(page.keys.length).toBe(0);
+  });
+
+  it('passes stats and rating-head queries unchanged', async () => {
+    await tauriApi.catalogIndexPageStats('vod', sources, query);
+    expect(invokeMock).toHaveBeenCalledWith('catalog_index_page_stats', {
+      kind: 'vod',
+      sources,
+      query,
+    });
+    await tauriApi.catalogIndexRatingHead('series', sources, query, ['a'], 40);
+    expect(invokeMock).toHaveBeenCalledWith('catalog_index_rating_head', {
+      kind: 'series',
+      sources,
+      query,
+      checkedIds: ['a'],
+      limit: 40,
+    });
+  });
+});
+
+describe('catalogue index search IPC', () => {
+  it('sends the search and decodes keys followed by scores', async () => {
+    const header = new TextEncoder().encode(
+      JSON.stringify({ ready: true, generation: '2', total: 2, head: [] }),
+    );
+    const offset = Math.ceil((4 + header.length) / 4) * 4;
+    const buffer = new ArrayBuffer(offset + 16);
+    const view = new DataView(buffer);
+    view.setUint32(0, header.length, true);
+    new Uint8Array(buffer, 4, header.length).set(header);
+    [7, 3, 1350, 600].forEach((value, index) => view.setUint32(offset + index * 4, value, true));
+    invokeMock.mockResolvedValueOnce(buffer);
+    const query = {
+      hiddenCategoryIds: [],
+      category: null,
+      targetCategoryIds: null,
+      favoriteIds: [],
+      ultraHd: {},
+      ratings: {},
+      tmdbGenres: {},
+      categoryGenres: {},
+      genre: null,
+      sort: 'default',
+      fold: true,
+    };
+    const sources = [{ sourceId: 'xtream-one', scope: 'scope' }];
+
+    const result = await tauriApi.catalogIndexSearch('live', sources, query, 'bbc', 5);
+
+    expect(invokeMock).toHaveBeenCalledWith('catalog_index_search', {
+      kind: 'live',
+      sources,
+      query,
+      text: 'bbc',
+      head: 5,
+    });
+    expect([...result.keys]).toEqual([7, 3]);
+    expect([...result.scores]).toEqual([1350, 600]);
   });
 });

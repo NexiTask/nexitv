@@ -55,3 +55,31 @@ describe('virtualized grid resizing', () => {
     expect(screen.getByRole('img', { name: 'YouTube' })).toBe(originalLogo);
   });
 });
+
+describe('virtualized grid over a list held elsewhere', () => {
+  it('renders loaded items, keeps places for missing ones and reports its range', () => {
+    virtualState.rowKey = 'standard:4:120:16:0';
+    const items: Record<number, MediaItem> = {
+      0: { id: 'a', title: 'Alpha', posterUrl: '', type: 'vod' },
+      2: { id: 'c', title: 'Gamma', posterUrl: '', type: 'vod' },
+    };
+    const onRangeChange = vi.fn();
+    const { container } = render(
+      <MemoryRouter>
+        <VirtualizedGrid
+          count={3}
+          getItem={(index) => items[index]}
+          onRangeChange={onRangeChange}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByText('Alpha').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Gamma').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('[aria-hidden="true"][class*="itemWrapper"]')).toHaveLength(
+      1,
+    );
+    // One rendered row holds all three positions.
+    expect(onRangeChange).toHaveBeenCalledWith(0, 3);
+  });
+});

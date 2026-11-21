@@ -4,7 +4,13 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Search, Tv, X } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { getXtreamCredentials, useAuthStore } from '@/modules/sources/public/store/useAuthStore';
-import { useLiveStreams } from '@/modules/catalog/public/data/useCatalog';
+import { useLiveStreams, type CatalogItem } from '@/modules/catalog/public/data/useCatalog';
+import {
+  useIndexedCatalogPage,
+  useIndexedSearch,
+  useLiveIndexAvailable,
+  type IndexedPageParams,
+} from '@/modules/catalog/public/data/useIndexedCatalog';
 import { useCategories, useHiddenCategoryIds } from '@/modules/catalog/public/data/useCategories';
 import { playableFromMediaItem } from '../lib/playback';
 import { parseProviderCategoryName } from '@/shared/lib/categoryName';
@@ -25,6 +31,11 @@ import { useLogoAspect } from '@/modules/catalog/public/hooks/useLogoAspect';
  * expected to keep this list open instead of closing after each pick.
  */
 const ROW_HEIGHT = 46;
+const CATEGORY_CHUNK = 1_000;
+const NO_FAVORITES: { id: string }[] = [];
+const NO_CATEGORIES: { category_id: string; category_name: string }[] = [];
+const NO_OVERRIDES: Record<string, never> = {};
+const NO_LOOKUPS = new Map<string, never>();
 
 function DrawerChannelLogo({
   posterUrl,
@@ -95,11 +106,63 @@ export function ChannelsDrawer() {
   const shouldShow = isLive && showChannelsDrawer;
   const activeKey = activeStream ? (activeStream.sourceItemId || activeStream.id).toString() : '';
 
-  const { data: allChannels = [] } = useLiveStreams({ enabled: shouldShow });
   const { data: categories = [] } = useCategories('live');
   const hiddenCategoryIds = useHiddenCategoryIds('live');
+  const streamFoldingEnabled = useSettingsStore((s) => s.streamFoldingEnabled);
 
   const activeCategoryId = activeStream?.categoryId;
+
+  // The channel's category comes from the catalogue index, and typing
+  // searches every channel there; the full list is only loaded for M3U
+  // sources or while the index is being built.
+  const indexAvailable = useLiveIndexAvailable();
+  const [indexFailed, setIndexFailed] = useState(false);
+  const fromIndex = indexAvailable && !indexFailed;
+  const trimmedQuery = query.trim();
+  const categoryParams = useMemo<IndexedPageParams>(
+    () => ({
+      activeCategoryId: activeCategoryId ?? null,
+      hiddenCategoryIds,
+      favorites: NO_FAVORITES,
+      // No category list: the drawer shows the channel's own category only,
+      // not its same-named siblings.
+      categories: NO_CATEGORIES,
+      categoryGenres: NO_OVERRIDES,
+      ultraHd: NO_OVERRIDES,
+      ratingLookups: NO_LOOKUPS,
+      genre: null,
+      sort: 'default',
+      fold: streamFoldingEnabled,
+    }),
+    [activeCategoryId, hiddenCategoryIds, streamFoldingEnabled],
+  );
+  const categoryPage = useIndexedCatalogPage('live', categoryParams, shouldShow && fromIndex);
+  const indexSearch = useIndexedSearch('live', trimmedQuery, {
+    enabled: shouldShow && fromIndex && trimmedQuery.length > 0,
+    fold: streamFoldingEnabled,
+    hiddenCategoryIds,
+    head: 40,
+  });
+  useEffect(() => {
+    if (categoryPage.isError || indexSearch.isError) setIndexFailed(true);
+  }, [categoryPage.isError, indexSearch.isError]);
+  const searching = trimmedQuery.length > 0;
+  const indexCount = searching
+    ? (indexSearch.result?.total ?? 0)
+    : (categoryPage.result?.total ?? 0);
+  const indexRows = searching ? indexSearch.rows : categoryPage;
+  const { requestRange: requestIndexRange, getItem: getIndexItem } = indexRows;
+
+  // A category is loaded whole (the largest holds about 1,300 channels), so
+  // up/down and channel numbers step through it in order.
+  useEffect(() => {
+    if (!fromIndex || searching || !activeCategoryId || indexCount === 0) return;
+    for (let start = 0; start < indexCount; start += CATEGORY_CHUNK) {
+      requestIndexRange(start, Math.min(indexCount, start + CATEGORY_CHUNK));
+    }
+  }, [activeCategoryId, fromIndex, indexCount, requestIndexRange, searching]);
+
+  const { data: allChannels = [] } = useLiveStreams({ enabled: shouldShow && !fromIndex });
 
   // Scoped to the category the current channel was opened from — the full
   // catalogue is what caused the freeze this replaces, and it's also just
@@ -110,7 +173,8 @@ export function ChannelsDrawer() {
     return match ? parseProviderCategoryName(match.category_name || '').label : null;
   }, [categories, activeCategoryId]);
 
-  const channels = useMemo(() => {
+  const legacyChannels = useMemo(() => {
+    if (fromIndex) return [];
     const scoped = activeCategoryId
       ? allChannels.filter((c) => c.categoryId === activeCategoryId)
       : allChannels;
@@ -118,14 +182,27 @@ export function ChannelsDrawer() {
     const trimmed = query.trim().toLowerCase();
     if (!trimmed) return visible;
     return visible.filter((c) => c.title.toLowerCase().includes(trimmed));
-  }, [allChannels, activeCategoryId, hiddenCategoryIds, query]);
+  }, [allChannels, activeCategoryId, fromIndex, hiddenCategoryIds, query]);
+  const indexedChannels = useMemo(
+    () =>
+      fromIndex
+        ? Array.from({ length: indexCount }, (_, index) => getIndexItem(index)).filter(
+            (item): item is CatalogItem => Boolean(item),
+          )
+        : [],
+    [fromIndex, getIndexItem, indexCount],
+  );
+  // What the keyboard steps through: every loaded channel of the list.
+  const channels = fromIndex ? indexedChannels : legacyChannels;
+  const listCount = fromIndex ? indexCount : legacyChannels.length;
+  const channelAt = (index: number) => (fromIndex ? getIndexItem(index) : legacyChannels[index]);
 
   // Provider lists routinely run into the thousands of channels — an
   // un-virtualized render of every row froze the whole window (the same
   // reason the main catalogue grid virtualizes). Only the visible slice of
   // rows is ever mounted here.
   const rowVirtualizer = useVirtualizer({
-    count: channels.length,
+    count: listCount,
     getScrollElement: () => listRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 10,
@@ -189,7 +266,14 @@ export function ChannelsDrawer() {
     };
   }, [activeKey, activeStream, channels, credentials, isLive, playStream, shouldShow]);
 
-  const playChannel = (item: (typeof channels)[number]) => {
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const firstRow = virtualRows[0]?.index ?? 0;
+  const lastRow = virtualRows[virtualRows.length - 1]?.index ?? -1;
+  useEffect(() => {
+    if (fromIndex && lastRow >= firstRow) requestIndexRange(firstRow, lastRow + 1);
+  }, [firstRow, fromIndex, lastRow, requestIndexRange]);
+
+  const playChannel = (item: CatalogItem) => {
     const playable = playableFromMediaItem({ ...item, type: 'live' }, credentials);
     if (playable) playStream(playable);
   };
@@ -233,7 +317,7 @@ export function ChannelsDrawer() {
           </div>
 
           <div ref={listRef} className={`${drawerStyles.list} subtle-scrollbar`}>
-            {channels.length === 0 ? (
+            {listCount === 0 ? (
               <div className={styles.channelsEmpty}>{t('No channels found.')}</div>
             ) : (
               <div
@@ -243,8 +327,8 @@ export function ChannelsDrawer() {
                   width: '100%',
                 }}
               >
-                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const channel = channels[virtualRow.index];
+                {virtualRows.map((virtualRow) => {
+                  const channel = channelAt(virtualRow.index);
                   if (!channel) return null;
                   const isActive = (channel.sourceItemId || channel.id).toString() === activeKey;
                   const parsed = parseLiveChannelTitle(channel.title, customRules);

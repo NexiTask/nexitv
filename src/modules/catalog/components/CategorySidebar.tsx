@@ -40,6 +40,7 @@ import {
   parseProviderCategoryName,
 } from '@/shared/lib/categoryName';
 import { countHiddenCategories, isCategoryHidden } from '../lib/categorySidebar';
+import { RECENT_CHANNELS_CATEGORY } from '../lib/smartCatalogFilter';
 import {
   getPrimaryMediaTags,
   getTagColorType,
@@ -55,11 +56,25 @@ import styles from './CategorySidebar.module.css';
 import { useI18n } from '@/shared/i18n/i18n';
 import { getErrorMessage } from '@/shared/lib/error';
 import { providerRatingValue, TOP_RATED_MIN_RATING } from '@/shared/lib/rating';
+import type { CatalogPageStats } from '@/platform/tauri';
+
+/** Category rows built with the page; enough to fill a tall window. */
+const INITIAL_SIDEBAR_ROWS = 150;
+/** Rows added per frame after that, a few milliseconds of work each. */
+const SIDEBAR_ROWS_PER_FRAME = 150;
 
 interface CategorySidebarProps {
   type: 'vod' | 'series' | 'live';
   activeCategoryId: string | null;
   onSelectCategory: (id: string | null) => void;
+  /**
+   * Counts the page already has from the catalogue index. Without them the
+   * sidebar counts the full catalogue itself; `null` while they are pending
+   * (the full catalogue is then not loaded either).
+   */
+  indexStats?: CatalogPageStats | null | undefined;
+  /** Offer "All categories" (the guide shows one group at a time instead). */
+  allowAllCategories?: boolean | undefined;
 }
 
 interface Row {
@@ -98,6 +113,8 @@ export function CategorySidebar({
   type,
   activeCategoryId,
   onSelectCategory,
+  indexStats,
+  allowAllCategories = true,
 }: CategorySidebarProps) {
   const { t, tn, number, language } = useI18n();
   const itemCountLabel = (count: number) =>
@@ -157,20 +174,37 @@ export function CategorySidebar({
     refetch,
   } = useCategories(type);
 
-  const { data: items = [] } = useCatalogByType(type);
+  const fromIndex = indexStats !== undefined;
+  const { data: items = [] } = useCatalogByType(type, { enabled: !fromIndex });
 
   const counts = useMemo(() => {
     const tally = new Map<string, number>();
+    if (fromIndex) {
+      for (const [id, count] of Object.entries(indexStats?.categoryCounts ?? {})) {
+        tally.set(id, count);
+      }
+      return tally;
+    }
     for (const item of items) {
       if (!item.categoryId) continue;
       tally.set(item.categoryId, (tally.get(item.categoryId) ?? 0) + 1);
     }
     return tally;
-  }, [items]);
+  }, [fromIndex, indexStats, items]);
 
   const hiddenCategoryIds = useHiddenCategoryIds(type);
   const favorites = useLibraryStore((s) => s.favorites);
+  const recentChannelCount = useLibraryStore((s) => s.recentChannels.length);
   const catalogStats = useMemo(() => {
+    if (fromIndex) {
+      return {
+        visibleTotal: indexStats?.visibleTotal ?? 0,
+        favorites: indexStats?.favorites ?? 0,
+        recent: indexStats?.recent ?? 0,
+        topRated: indexStats?.topRated ?? 0,
+        fourK: indexStats?.fourK ?? 0,
+      };
+    }
     const favSet = new Set(favorites.map((f) => f.id));
     let visibleTotal = 0;
     let favCount = 0;
@@ -196,7 +230,7 @@ export function CategorySidebar({
       topRated: topRatedCount,
       fourK: fourKCount,
     };
-  }, [items, favorites, hiddenCategoryIds, verifiedResolutions]);
+  }, [fromIndex, indexStats, items, favorites, hiddenCategoryIds, verifiedResolutions]);
   const visibleTotal = catalogStats.visibleTotal;
   const smartHubCounts = catalogStats;
 
@@ -214,6 +248,15 @@ export function CategorySidebar({
         label: t('Favorites'),
         count: smartHubCounts.favorites,
         icons: { line: RiHeartLine, fill: RiHeartFill },
+      });
+    }
+
+    if (type === 'live' && recentChannelCount > 0) {
+      hubs.push({
+        id: RECENT_CHANNELS_CATEGORY,
+        label: t('Recently Watched'),
+        count: recentChannelCount,
+        icons: { line: RiTimeLine, fill: RiTimeFill },
       });
     }
 
@@ -245,7 +288,7 @@ export function CategorySidebar({
     }
 
     return hubs;
-  }, [smartHubCounts, type, t]);
+  }, [recentChannelCount, smartHubCounts, type, t]);
 
   const rows = useMemo<Row[]>(() => {
     const mergedMap = new Map<string, Row>();
@@ -401,6 +444,65 @@ export function CategorySidebar({
   const displayedCategoryCount =
     pinnedRows.length +
     groups.reduce((total, group) => total + Math.max(1, countryChildRows(group).length), 0);
+
+  // Live TV can list hundreds of categories. Building every row in one go
+  // held the page back by well over 100 ms, so the rows that fit on screen
+  // come first and the rest follow a chunk per frame. The finished list is
+  // exactly the same.
+  // The full tree is long (831 categories on a large live line-up), so by
+  // default the sidebar shows the hubs, what is pinned and what is selected;
+  // search finds anything else, and "Browse all" opens the whole tree.
+  const [browseAll, setBrowseAll] = useState(false);
+  const showTree = browseAll || hasSearch;
+  const [rowBudget, setRowBudget] = useState(INITIAL_SIDEBAR_ROWS);
+  useEffect(() => {
+    if (!showTree) setRowBudget(INITIAL_SIDEBAR_ROWS);
+  }, [showTree]);
+  const pinnedCountryGroups = useMemo(
+    () => groups.filter((group) => pinnedCountries.includes(group.key)),
+    [groups, pinnedCountries],
+  );
+  const selectedRow = useMemo(():
+    { kind: 'row'; row: Row } | { kind: 'group'; group: CountryGroup } | null => {
+    if (!activeCategoryId || activeCategoryId.startsWith('smart:')) return null;
+    if (activeCategoryId.startsWith('country:')) {
+      const key = activeCategoryId.slice('country:'.length);
+      if (pinnedCountries.includes(key)) return null;
+      const group = groups.find((candidate) => candidate.key === key);
+      return group ? { kind: 'group', group } : null;
+    }
+    const row = rowById.get(activeCategoryId);
+    if (!row || isCategoryRowPinned(row) || pinnedCountries.includes(row.country ?? 'other')) {
+      return null;
+    }
+    return { kind: 'row', row };
+  }, [activeCategoryId, groups, isCategoryRowPinned, pinnedCountries, rowById]);
+  const nothingPinned = pinnedRows.length === 0 && pinnedCountryGroups.length === 0;
+  const groupRowCounts = useMemo(
+    () =>
+      groups.map((group) =>
+        hasSearch || !collapsed.includes(group.key) ? 1 + countryChildRows(group).length : 1,
+      ),
+    [collapsed, groups, hasSearch],
+  );
+  const totalGroupRows = groupRowCounts.reduce((total, count) => total + count, 0);
+  const renderedGroupCount = useMemo(() => {
+    let budget = rowBudget - pinnedRows.length;
+    let count = 0;
+    for (const rows of groupRowCounts) {
+      if (budget <= 0) break;
+      budget -= rows;
+      count += 1;
+    }
+    return count;
+  }, [groupRowCounts, pinnedRows.length, rowBudget]);
+  useEffect(() => {
+    if (!showTree || rowBudget >= totalGroupRows + pinnedRows.length) return;
+    const frame = requestAnimationFrame(() =>
+      setRowBudget((budget) => budget + SIDEBAR_ROWS_PER_FRAME),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [pinnedRows.length, rowBudget, showTree, totalGroupRows]);
 
   const openActions = (event: React.MouseEvent<HTMLElement>, items: ContextMenuItem[]) => {
     event.preventDefault();
@@ -592,6 +694,82 @@ export function CategorySidebar({
     );
   };
 
+  const renderGroup = (group: CountryGroup, forceCollapsed = false) => {
+    const key = group.key;
+    const childRows = countryChildRows(group);
+    const isDirectCountry = isDirectCountryGroup(group);
+    const isCollapsed = forceCollapsed || (hasSearch ? false : collapsed.includes(key));
+    const isHiddenCountry = hiddenCountrySet.has(key);
+    const countryId = `country:${key}`;
+    const isActive = activeCategoryId === countryId;
+    const isPinnedCountry = pinnedCountries.includes(key);
+    return (
+      <div key={key} className={styles.group}>
+        <div
+          className={`${styles.groupHeaderRow} ${isActive ? styles.active : ''} ${isHiddenCountry ? styles.hiddenRow : ''}`}
+          onContextMenu={(event) => openActions(event, countryActions(key, group.country))}
+        >
+          {!isDirectCountry && (
+            <button
+              type="button"
+              className={styles.groupCollapseButton}
+              onClick={() => toggleCategoryPref('collapsed', type, key)}
+              aria-expanded={!isCollapsed}
+              aria-label={t(isCollapsed ? 'Expand {name}' : 'Collapse {name}', {
+                name: countryName(group.country, language),
+              })}
+            >
+              <ChevronDown
+                size={13}
+                className={`${styles.chevron} ${isCollapsed ? styles.chevronCollapsed : ''}`}
+              />
+            </button>
+          )}
+          <button
+            type="button"
+            className={`${styles.groupHeader} ${isDirectCountry ? styles.directCountryHeader : ''}`}
+            onClick={() => onSelectCategory(isActive ? null : countryId)}
+            aria-pressed={isActive}
+            aria-label={`${countryName(group.country, language)}, ${itemCountLabel(group.total)}${isPinnedCountry ? `, ${t('pinned')}` : ''}`}
+          >
+            {group.country && hasCountryFlag(group.country) ? (
+              <CountryFlag code={group.country} className={styles.flag} />
+            ) : (
+              group.country && <span className={styles.countryCode}>{group.country}</span>
+            )}
+            {isPinnedCountry && (
+              <span className={styles.pinnedIndicator} title={t('Pinned')} aria-hidden="true">
+                <Pin size={12} strokeWidth={2.25} />
+              </span>
+            )}
+            <span className={styles.groupName}>{countryName(group.country, language)}</span>
+            {group.total > 0 && <span className={styles.groupCount}>{number(group.total)}</span>}
+            {isHiddenCountry && (
+              <EyeOff size={12} className={styles.hiddenIndicator} aria-hidden="true" />
+            )}
+          </button>
+          <button
+            type="button"
+            className={styles.rowMenuButton}
+            onClick={(event) => openActions(event, countryActions(key, group.country))}
+            aria-label={t('Actions for {name}', {
+              name: countryName(group.country, language),
+            })}
+            aria-haspopup="menu"
+          >
+            <MoreHorizontal size={16} />
+          </button>
+        </div>
+
+        {!isDirectCountry && !isCollapsed && (
+          <div className={styles.groupChildren}>
+            {childRows.map((row) => renderRow(row, { nested: true }))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       {showFourKNotice && <FourKQualityNotice onClose={dismissFourKNotice} />}
@@ -656,7 +834,7 @@ export function CategorySidebar({
           </div>
         ) : (
           <>
-            {!hasSearch && (
+            {!hasSearch && allowAllCategories && (
               <div
                 className={`${styles.row} ${styles.allCategoriesRow} ${activeCategoryId === null ? styles.active : ''}`}
               >
@@ -678,7 +856,7 @@ export function CategorySidebar({
                   <span className={styles.categoryLabel}>{t('All Categories')}</span>
                   {visibleTotal > 0 && <span className={styles.count}>{number(visibleTotal)}</span>}
                 </button>
-                {collapsibleGroups.length > 0 && (
+                {showTree && collapsibleGroups.length > 0 && (
                   <button
                     type="button"
                     className={styles.rowMenuButton}
@@ -690,6 +868,20 @@ export function CategorySidebar({
                     {allCollapsed ? <ChevronsUpDown size={13} /> : <ChevronsDownUp size={13} />}
                   </button>
                 )}
+              </div>
+            )}
+
+            {browseAll && !hasSearch && (
+              <div className={`${styles.row} ${styles.allCategoriesRow}`}>
+                <button
+                  type="button"
+                  className={styles.rowMain}
+                  onClick={() => setBrowseAll(false)}
+                  aria-label={t('Show fewer categories')}
+                >
+                  <ChevronsDownUp size={14} className={styles.allCategoriesIcon} />
+                  <span className={styles.categoryLabel}>{t('Show fewer categories')}</span>
+                </button>
               </div>
             )}
 
@@ -725,101 +917,56 @@ export function CategorySidebar({
             )}
 
             {/* Pinned section at the top */}
-            {pinnedRows.length > 0 && (
+            {(pinnedRows.length > 0 || (!showTree && pinnedCountryGroups.length > 0)) && (
               <div className={styles.section}>
                 <div className={styles.sectionLabel}>
                   <span>{t('Pinned')}</span>
                 </div>
                 {pinnedRows.map((row) => renderRow(row, { showCountry: true }))}
+                {!showTree && pinnedCountryGroups.map((group) => renderGroup(group))}
               </div>
             )}
 
             {/* Country groups */}
-            {groups.map((group) => {
-              const key = group.key;
-              const childRows = countryChildRows(group);
-              const isDirectCountry = isDirectCountryGroup(group);
-              const isCollapsed = hasSearch ? false : collapsed.includes(key);
-              const isHiddenCountry = hiddenCountrySet.has(key);
-              const countryId = `country:${key}`;
-              const isActive = activeCategoryId === countryId;
-              const isPinnedCountry = pinnedCountries.includes(key);
-              return (
-                <div key={key} className={styles.group}>
-                  <div
-                    className={`${styles.groupHeaderRow} ${isActive ? styles.active : ''} ${isHiddenCountry ? styles.hiddenRow : ''}`}
-                    onContextMenu={(event) =>
-                      openActions(event, countryActions(key, group.country))
-                    }
-                  >
-                    {!isDirectCountry && (
-                      <button
-                        type="button"
-                        className={styles.groupCollapseButton}
-                        onClick={() => toggleCategoryPref('collapsed', type, key)}
-                        aria-expanded={!isCollapsed}
-                        aria-label={t(isCollapsed ? 'Expand {name}' : 'Collapse {name}', {
-                          name: countryName(group.country, language),
-                        })}
-                      >
-                        <ChevronDown
-                          size={13}
-                          className={`${styles.chevron} ${isCollapsed ? styles.chevronCollapsed : ''}`}
-                        />
-                      </button>
-                    )}
+            {showTree ? (
+              groups.slice(0, renderedGroupCount).map((group) => renderGroup(group))
+            ) : (
+              <>
+                {selectedRow && (
+                  <div className={styles.section}>
+                    <div className={styles.sectionLabel}>
+                      <span>{t('Selected')}</span>
+                    </div>
+                    {selectedRow.kind === 'row'
+                      ? renderRow(selectedRow.row, { showCountry: true })
+                      : renderGroup(selectedRow.group, true)}
+                  </div>
+                )}
+                {nothingPinned && (
+                  <div className={styles.emptySearch}>
+                    <Pin size={18} aria-hidden="true" />
+                    <strong>{t('Nothing pinned yet')}</strong>
+                    <span>{t('Search for a category or country and pin it to keep it here.')}</span>
+                  </div>
+                )}
+                {rows.length > 0 && (
+                  <div className={`${styles.row} ${styles.allCategoriesRow}`}>
                     <button
                       type="button"
-                      className={`${styles.groupHeader} ${isDirectCountry ? styles.directCountryHeader : ''}`}
-                      onClick={() => onSelectCategory(isActive ? null : countryId)}
-                      aria-pressed={isActive}
-                      aria-label={`${countryName(group.country, language)}, ${itemCountLabel(group.total)}${isPinnedCountry ? `, ${t('pinned')}` : ''}`}
-                    >
-                      {group.country && hasCountryFlag(group.country) ? (
-                        <CountryFlag code={group.country} className={styles.flag} />
-                      ) : (
-                        group.country && <span className={styles.countryCode}>{group.country}</span>
-                      )}
-                      {isPinnedCountry && (
-                        <span
-                          className={styles.pinnedIndicator}
-                          title={t('Pinned')}
-                          aria-hidden="true"
-                        >
-                          <Pin size={12} strokeWidth={2.25} />
-                        </span>
-                      )}
-                      <span className={styles.groupName}>
-                        {countryName(group.country, language)}
-                      </span>
-                      {group.total > 0 && (
-                        <span className={styles.groupCount}>{number(group.total)}</span>
-                      )}
-                      {isHiddenCountry && (
-                        <EyeOff size={12} className={styles.hiddenIndicator} aria-hidden="true" />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.rowMenuButton}
-                      onClick={(event) => openActions(event, countryActions(key, group.country))}
-                      aria-label={t('Actions for {name}', {
-                        name: countryName(group.country, language),
+                      className={styles.rowMain}
+                      onClick={() => setBrowseAll(true)}
+                      aria-label={t('Browse all categories, {count} available', {
+                        count: number(rows.length),
                       })}
-                      aria-haspopup="menu"
                     >
-                      <MoreHorizontal size={16} />
+                      <ChevronsUpDown size={14} className={styles.allCategoriesIcon} />
+                      <span className={styles.categoryLabel}>{t('Browse all categories')}</span>
+                      <span className={styles.count}>{number(rows.length)}</span>
                     </button>
                   </div>
-
-                  {!isDirectCountry && !isCollapsed && (
-                    <div className={styles.groupChildren}>
-                      {childRows.map((row) => renderRow(row, { nested: true }))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                )}
+              </>
+            )}
 
             {hasSearch && displayedCategoryCount === 0 && (
               <div className={styles.emptySearch}>
@@ -841,7 +988,7 @@ export function CategorySidebar({
               </div>
             )}
 
-            {!hasSearch && hiddenCount > 0 && (
+            {browseAll && !hasSearch && hiddenCount > 0 && (
               <button
                 type="button"
                 className={styles.hiddenToggle}

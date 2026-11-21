@@ -40,6 +40,9 @@ const COMMON_GENRES = [
 
 export type KnownGenre = (typeof COMMON_GENRES)[number];
 
+/** The genres the genre bar offers, in its order; bit `i` of a genre mask is `CATALOG_GENRES[i]`. */
+export const CATALOG_GENRES: readonly KnownGenre[] = COMMON_GENRES;
+
 const GENRE_MATCHERS = new Map<KnownGenre, RegExp>(
   COMMON_GENRES.map((genre) => [
     genre,
@@ -182,6 +185,24 @@ export function itemMatchesGenre(
   return sourcesMatchGenre(genreSources(item, categoryNameMap, ratingLookups), genre);
 }
 
+/**
+ * The genres a title matches, as a bit mask over CATALOG_GENRES. A title
+ * matches a genre when any one of its sources does, so masks of separate
+ * sources (the title itself, its category's name, TMDB's verdict) combine by OR.
+ */
+export function catalogGenreMask(
+  item: SmartCatalogItem,
+  categoryNameMap?: Map<string, string>,
+  ratingLookups?: RatingLookups,
+): number {
+  const sources = genreSources(item, categoryNameMap, ratingLookups);
+  let mask = 0;
+  COMMON_GENRES.forEach((genre, bit) => {
+    if (sourcesMatchGenre(sources, genre)) mask |= 1 << bit;
+  });
+  return mask;
+}
+
 /** Whether anything about the title names a genre at all. */
 export function itemHasKnownGenre(
   item: SmartCatalogItem,
@@ -234,8 +255,15 @@ export function effectiveItemRating(
  */
 const titleCollator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
 
-function yearNumber(year: string | number | undefined, missing: number): number {
-  return typeof year === 'number' ? year : Number.parseInt(String(year || '0'), 10) || missing;
+/** The year a sort reads from an item; null when it has none. */
+export function catalogYearValue(item: { year?: string | number | undefined }): number | null {
+  const { year } = item;
+  return typeof year === 'number' ? year : Number.parseInt(String(year || '0'), 10) || null;
+}
+
+/** The `added` timestamp a sort reads from an item; 0 when it has none. */
+export function catalogAddedValue(item: { added?: string | undefined }): number {
+  return Number.parseInt(item.added || '0', 10) || 0;
 }
 
 /** Everything a comparison reads, derived once per item rather than per comparison. */
@@ -284,11 +312,74 @@ export function sortCatalogItems<T extends SmartCatalogItem>(
   const entries = items.map((item): SortEntry<T> => ({
     item,
     title: item.title || '',
-    added: Number.parseInt(item.added || '0', 10) || 0,
-    year: yearNumber(item.year, sortMode === 'year-asc' ? 9999 : 0),
+    added: catalogAddedValue(item),
+    year: catalogYearValue(item) ?? (sortMode === 'year-asc' ? 9999 : 0),
     rating: sortMode === 'rating' ? effectiveItemRating(item, ratingLookups) : null,
   }));
   return entries.sort(compare).map((entry) => entry.item);
+}
+
+/** Title patterns of the smart categories that are judged by name alone. */
+export const SMART_TITLE_PATTERNS = {
+  'smart:sports':
+    /\b(sport|sports|espn|f1|formula|ufc|football|soccer|racing|wwe|motogp|nba|nfl)\b/i,
+  'smart:news': /\b(news|cnn|bbc|bloomberg|cnbc|al jazeera|euronews|fox news|msnbc)\b/i,
+  'smart:kids': /\b(kids|disney|nick|nickelodeon|cartoon|junior|boomer|super rtl|cbeebies)\b/i,
+} as const;
+
+type SmartTitleCategory = keyof typeof SMART_TITLE_PATTERNS;
+
+/** Live channels played lately (`recentChannels` in the library), newest first. */
+export const RECENT_CHANNELS_CATEGORY = 'smart:recent-channels';
+
+const SMART_FILTERS = new Set<string>([
+  RECENT_CHANNELS_CATEGORY,
+  'smart:favorites',
+  'smart:recent',
+  'smart:top-rated',
+  'smart:4k',
+  ...Object.keys(SMART_TITLE_PATTERNS),
+]);
+
+/**
+ * The category ids a selection shows: every category of a country group, or
+ * a provider category with its same-named siblings. Null for "all" and for
+ * the smart categories, which are not a set of category ids.
+ */
+export function smartCategoryTargetIds(
+  activeCategoryId: string | null,
+  categories: CategoryLike[] = [],
+): Set<string> | null {
+  if (!activeCategoryId || SMART_FILTERS.has(activeCategoryId)) return null;
+
+  if (activeCategoryId.startsWith('country:')) {
+    const targetCountry = activeCategoryId.slice('country:'.length);
+    const targetCategoryIds = new Set<string>();
+    for (const cat of categories) {
+      const parsed = parseProviderCategoryName(cat.category_name || '');
+      if ((parsed.country ?? 'other') === targetCountry) {
+        targetCategoryIds.add(String(cat.category_id));
+      }
+    }
+    return targetCategoryIds;
+  }
+
+  // Match all sibling categories sharing the same parsed country and label
+  const targetCategoryIds = new Set<string>([activeCategoryId]);
+  const activeCat = categories.find((c) => String(c.category_id) === activeCategoryId);
+  if (activeCat) {
+    const activeParsed = parseProviderCategoryName(activeCat.category_name || '');
+    for (const cat of categories) {
+      const parsed = parseProviderCategoryName(cat.category_name || '');
+      if (
+        parsed.country === activeParsed.country &&
+        parsed.label.toLowerCase() === activeParsed.label.toLowerCase()
+      ) {
+        targetCategoryIds.add(String(cat.category_id));
+      }
+    }
+  }
+  return targetCategoryIds;
 }
 
 export function filterItemsBySmartCategory<T extends SmartCatalogItem>(
@@ -299,115 +390,53 @@ export function filterItemsBySmartCategory<T extends SmartCatalogItem>(
   categories: CategoryLike[] = [],
   verifiedResolutions?: ReadonlyMap<string, string>,
   ratingLookups?: RatingLookups,
+  recentChannelIds: readonly string[] = [],
 ): T[] {
-  if (!activeCategoryId) {
-    return items.filter((s) => !s.categoryId || !hiddenCategoryIds.has(s.categoryId));
-  }
+  const isVisible = (s: T) => !s.categoryId || !hiddenCategoryIds.has(s.categoryId);
+  if (!activeCategoryId) return items.filter(isVisible);
 
-  if (activeCategoryId.startsWith('country:')) {
-    const targetCountry = activeCategoryId.slice('country:'.length);
-    const targetCategoryIds = new Set<string>();
-
-    if (categories && categories.length > 0) {
-      for (const cat of categories) {
-        const catId = String(cat.category_id);
-        const parsed = parseProviderCategoryName(cat.category_name || '');
-        const cKey = parsed.country ?? 'other';
-        if (cKey === targetCountry) {
-          targetCategoryIds.add(catId);
-        }
-      }
-    }
-
+  const targetCategoryIds = smartCategoryTargetIds(activeCategoryId, categories);
+  if (targetCategoryIds) {
     return items.filter(
       (s) =>
         s.categoryId && targetCategoryIds.has(s.categoryId) && !hiddenCategoryIds.has(s.categoryId),
     );
   }
 
-  if (activeCategoryId === 'smart:favorites') {
-    const favIds = new Set(favorites.map((f) => f.id));
-    return items.filter(
-      (s) => favIds.has(s.id) && (!s.categoryId || !hiddenCategoryIds.has(s.categoryId)),
-    );
-  }
-
-  if (activeCategoryId === 'smart:recent') {
-    const visible = items.filter(
-      (s) => (!s.categoryId || !hiddenCategoryIds.has(s.categoryId)) && Boolean(s.added),
-    );
-    return [...visible].sort((a, b) => {
-      const addedA = Number.parseInt(a.added || '0', 10) || 0;
-      const addedB = Number.parseInt(b.added || '0', 10) || 0;
-      return addedB - addedA;
+  if (activeCategoryId === RECENT_CHANNELS_CATEGORY) {
+    const byId = new Map<string, T>();
+    for (const item of items) if (!byId.has(item.id)) byId.set(item.id, item);
+    const listed = new Set<string>();
+    return recentChannelIds.flatMap((id) => {
+      const item = byId.get(id);
+      if (!item || listed.has(id) || !isVisible(item)) return [];
+      listed.add(id);
+      return [item];
     });
   }
 
+  if (activeCategoryId === 'smart:favorites') {
+    const favIds = new Set(favorites.map((f) => f.id));
+    return items.filter((s) => favIds.has(s.id) && isVisible(s));
+  }
+
+  if (activeCategoryId === 'smart:recent') {
+    const visible = items.filter((s) => isVisible(s) && Boolean(s.added));
+    return [...visible].sort((a, b) => catalogAddedValue(b) - catalogAddedValue(a));
+  }
+
   if (activeCategoryId === 'smart:top-rated') {
-    const visible = items.filter((s) => !s.categoryId || !hiddenCategoryIds.has(s.categoryId));
-    const topRated = visible.filter(
-      (s) => (effectiveItemRating(s, ratingLookups)?.value ?? 0) >= TOP_RATED_MIN_RATING,
+    const topRated = items.filter(
+      (s) =>
+        isVisible(s) && (effectiveItemRating(s, ratingLookups)?.value ?? 0) >= TOP_RATED_MIN_RATING,
     );
     return sortCatalogItems(topRated, 'rating', ratingLookups);
   }
 
   if (activeCategoryId === 'smart:4k') {
-    return items.filter(
-      (s) =>
-        (!s.categoryId || !hiddenCategoryIds.has(s.categoryId)) &&
-        isUltraHdQuality(s, verifiedResolutions?.get(s.id)),
-    );
+    return items.filter((s) => isVisible(s) && isUltraHdQuality(s, verifiedResolutions?.get(s.id)));
   }
 
-  if (activeCategoryId === 'smart:sports') {
-    return items.filter(
-      (s) =>
-        (!s.categoryId || !hiddenCategoryIds.has(s.categoryId)) &&
-        /\b(sport|sports|espn|f1|formula|ufc|football|soccer|racing|wwe|motogp|nba|nfl)\b/i.test(
-          s.title,
-        ),
-    );
-  }
-
-  if (activeCategoryId === 'smart:news') {
-    return items.filter(
-      (s) =>
-        (!s.categoryId || !hiddenCategoryIds.has(s.categoryId)) &&
-        /\b(news|cnn|bbc|bloomberg|cnbc|al jazeera|euronews|fox news|msnbc)\b/i.test(s.title),
-    );
-  }
-
-  if (activeCategoryId === 'smart:kids') {
-    return items.filter(
-      (s) =>
-        (!s.categoryId || !hiddenCategoryIds.has(s.categoryId)) &&
-        /\b(kids|disney|nick|nickelodeon|cartoon|junior|boomer|super rtl|cbeebies)\b/i.test(
-          s.title,
-        ),
-    );
-  }
-
-  // Match all sibling categories sharing the same parsed country and label
-  const targetCategoryIds = new Set<string>([activeCategoryId]);
-  if (categories && categories.length > 0) {
-    const activeCat = categories.find((c) => String(c.category_id) === activeCategoryId);
-    if (activeCat) {
-      const activeParsed = parseProviderCategoryName(activeCat.category_name || '');
-      for (const cat of categories) {
-        const catId = String(cat.category_id);
-        const parsed = parseProviderCategoryName(cat.category_name || '');
-        if (
-          parsed.country === activeParsed.country &&
-          parsed.label.toLowerCase() === activeParsed.label.toLowerCase()
-        ) {
-          targetCategoryIds.add(catId);
-        }
-      }
-    }
-  }
-
-  return items.filter(
-    (s) =>
-      s.categoryId && targetCategoryIds.has(s.categoryId) && !hiddenCategoryIds.has(s.categoryId),
-  );
+  const pattern = SMART_TITLE_PATTERNS[activeCategoryId as SmartTitleCategory];
+  return items.filter((s) => isVisible(s) && pattern.test(s.title));
 }

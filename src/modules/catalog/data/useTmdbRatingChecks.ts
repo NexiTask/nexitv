@@ -56,19 +56,65 @@ export interface TmdbRatingCheckOptions {
   categoryNameMap?: Map<string, string> | undefined;
 }
 
+/**
+ * Where a ranking's head comes from: the titles with a provider rating that
+ * the checks look at next, best first, given what TMDB has said so far.
+ */
+export interface RatingHeadSource {
+  /** Identifies the candidate pool in query keys. */
+  scope: string;
+  /** False when the pool is known to be empty. */
+  hasCandidates: boolean;
+  head: (
+    lookups: RatingLookups,
+    genre: string | null,
+    limit: number,
+  ) => Promise<readonly MediaItem[]> | readonly MediaItem[];
+}
+
 export function useTmdbRatingChecks(
   items: readonly MediaItem[],
   mediaType: 'movie' | 'tv',
-  { enabled = true, genre = null, categoryNameMap }: TmdbRatingCheckOptions = {},
+  options: TmdbRatingCheckOptions = {},
 ): RatingLookups {
-  const queryClient = useQueryClient();
-  const tmdb = useTmdbLookupSettings();
+  const { categoryNameMap } = options;
   const pool = useMemo(
     () => items.filter((item) => providerRatingValue(item.rating) !== undefined),
     [items],
   );
-  const poolScope = useMemo(() => getItemSetQueryScope(pool.map((item) => item.id)), [pool]);
-  const active = enabled && tmdb.enabled && pool.length > 0;
+  const source = useMemo<RatingHeadSource>(
+    () => ({
+      scope: getItemSetQueryScope(pool.map((item) => item.id)),
+      hasCandidates: pool.length > 0,
+      head: (lookups, genreFilter, limit) => {
+        // In a genre, a title is a candidate when it belongs to the genre by
+        // what is known, or when it is unchecked and nothing names its genre
+        // yet; checking it either confirms it or moves it out.
+        const candidates = genreFilter
+          ? pool.filter(
+              (item) =>
+                itemMatchesGenre(item, genreFilter, categoryNameMap, lookups) ||
+                (!lookups.has(item.id) && !itemHasKnownGenre(item, categoryNameMap, lookups)),
+            )
+          : pool;
+        return sortCatalogItems([...candidates], 'rating', lookups).slice(0, limit);
+      },
+    }),
+    [pool, categoryNameMap],
+  );
+  return useTmdbRatingChecksFrom(source, mediaType, options);
+}
+
+/** `useTmdbRatingChecks` over a ranking whose head comes from `source`. */
+export function useTmdbRatingChecksFrom(
+  source: RatingHeadSource,
+  mediaType: 'movie' | 'tv',
+  { enabled = true, genre = null }: TmdbRatingCheckOptions = {},
+): RatingLookups {
+  const queryClient = useQueryClient();
+  const tmdb = useTmdbLookupSettings();
+  const poolScope = source.scope;
+  const active = enabled && tmdb.enabled && source.hasCandidates;
   const genreFilter = genre && genre !== 'All' ? genre : null;
   const verdictsKey = queryKeys.tmdbRatingVerdicts(
     mediaType,
@@ -109,17 +155,7 @@ export function useTmdbRatingChecks(
       let spent = 0;
       let failures = 0;
       while (spent < MAX_LOOKUPS) {
-        // In a genre, a title is a candidate when it belongs to the genre by
-        // what is known, or when it is unchecked and nothing names its genre
-        // yet; checking it either confirms it or moves it out.
-        const candidates = genreFilter
-          ? pool.filter(
-              (item) =>
-                itemMatchesGenre(item, genreFilter, categoryNameMap, lookups) ||
-                (!lookups.has(item.id) && !itemHasKnownGenre(item, categoryNameMap, lookups)),
-            )
-          : pool;
-        const head = sortCatalogItems([...candidates], 'rating', lookups).slice(0, CHECKED_HEAD);
+        const head = await source.head(lookups, genreFilter, CHECKED_HEAD);
         const unchecked = head
           .filter((item) => !lookups.has(item.id))
           .slice(0, MAX_LOOKUPS - spent);

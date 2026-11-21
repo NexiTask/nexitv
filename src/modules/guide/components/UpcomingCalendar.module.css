@@ -97,9 +97,6 @@
   line-height: var(--line-height-tight);
   text-align: left;
   cursor: pointer;
-  transition:
-    border-color var(--duration-normal) var(--ease-standard),
-    background-color var(--duration-normal) var(--ease-standard);
 }
 
 .event:hover {

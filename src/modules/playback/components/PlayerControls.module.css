@@ -41,11 +41,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: var(--alpha-80);
-  transition:
-    opacity var(--duration-normal),
-    transform var(--duration-normal),
-    color var(--duration-normal);
+  color: color-mix(in srgb, var(--text-primary) 80%, transparent);
   width: var(--control-height-lg);
   height: var(--control-height-lg);
   padding: 0;
@@ -54,8 +50,7 @@
 }
 
 .iconBtn:hover {
-  opacity: 1;
-  transform: scale(1.1);
+  color: var(--text-primary);
 }
 
 .iconBtn:disabled {
@@ -146,11 +141,6 @@
   cursor: pointer;
   margin-top: calc(-1 * var(--space-1-5));
   box-shadow: var(--shadow-control);
-  transition: transform var(--duration-instant);
-}
-
-.seekbar::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
 }
 
 /* The app-wide focus ring (`:focus-visible` in shared/design/index.css) is
@@ -182,15 +172,12 @@
   height: var(--control-height-sm);
   background: transparent;
   cursor: pointer;
-  opacity: 0;
-  transition:
-    opacity var(--duration-normal),
-    width var(--duration-normal);
+  visibility: hidden;
 }
 
 .volumeContainer:hover .volumeSlider,
-.volumeSlider:focus-visible {
-  opacity: 1;
+.volumeContainer:focus-within .volumeSlider {
+  visibility: visible;
 }
 
 .volumeSlider::-webkit-slider-runnable-track {
@@ -225,17 +212,6 @@
   padding: var(--space-1) var(--space-2-5);
   border-radius: var(--radius-sm);
   letter-spacing: 1px;
-  animation: livePulse var(--duration-loop-pulse) var(--ease-smooth) infinite;
-}
-
-@keyframes livePulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: var(--alpha-70);
-  }
 }
 
 /* ── EPG Container ──────────────────────────────────────── */
@@ -319,24 +295,12 @@
   overflow-y: auto;
   box-shadow: var(--shadow-md);
   z-index: var(--z-player-controls);
-  animation: popoverFadeIn var(--duration-normal) var(--ease-standard);
 }
 
 .audioPopoverMenu {
   width: min(220px, calc(100vw - 24px));
   min-width: 0;
   box-sizing: border-box;
-}
-
-@keyframes popoverFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
 }
 
 .popoverTitle {
@@ -367,9 +331,6 @@
   font-weight: var(--font-weight-medium);
   cursor: pointer;
   text-align: left;
-  transition:
-    background-color var(--duration-normal) var(--ease-standard),
-    color var(--duration-normal) var(--ease-standard);
   white-space: nowrap;
 }
 
@@ -493,9 +454,6 @@
   cursor: pointer;
   padding: var(--space-1) var(--space-1-5);
   border-radius: var(--radius-sm);
-  transition:
-    color var(--duration-normal),
-    background var(--duration-normal);
 }
 
 .imageResetBtn:hover:not(:disabled) {

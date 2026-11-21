@@ -22,9 +22,6 @@
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition:
-    background-color var(--duration-normal) var(--ease-standard),
-    color var(--duration-normal) var(--ease-standard);
 }
 
 .nowBtn {
@@ -94,13 +91,6 @@
   border-radius: var(--radius-full);
   background: var(--text-primary);
   box-shadow: var(--shadow-control);
-  transition:
-    transform var(--duration-fast) var(--ease-standard),
-    box-shadow var(--duration-fast) var(--ease-standard);
-}
-
-.zoomSlider:hover::-webkit-slider-thumb {
-  transform: scale(1.12);
 }
 
 .zoomSlider:focus-visible {
@@ -295,7 +285,6 @@
   color: var(--text-primary);
   cursor: pointer;
   text-align: left;
-  transition: background var(--duration-normal) var(--ease-standard);
 }
 
 .channel:hover {
@@ -373,19 +362,18 @@
   border-radius: var(--radius-full);
   background: var(--surface-control-active);
   color: var(--text-primary);
-  opacity: 0;
-  transition: opacity var(--duration-normal) var(--ease-standard);
+  visibility: hidden;
 }
 
-.channel:hover .channelPlay {
-  opacity: 1;
+.channel:hover .channelPlay,
+.channel:focus-within .channelPlay {
+  visibility: visible;
 }
 
 .lane {
   position: relative;
   flex: 1;
   min-width: 0;
-  transition: background-color var(--duration-normal) var(--ease-standard);
 }
 
 .lanePlaceholder {
@@ -449,10 +437,6 @@
   color: var(--text-primary);
   cursor: pointer;
   text-align: left;
-  transition:
-    background var(--duration-normal) var(--ease-standard),
-    border-color var(--duration-normal) var(--ease-standard),
-    box-shadow var(--duration-normal) var(--ease-standard);
 }
 
 .programme:hover {
@@ -689,9 +673,6 @@
   font-weight: var(--font-weight-semibold);
   line-height: 1;
   cursor: pointer;
-  transition:
-    background-color var(--duration-normal) var(--ease-standard),
-    border-color var(--duration-normal) var(--ease-standard);
 }
 
 .watchBtn:hover {
@@ -714,9 +695,6 @@
   background: var(--surface-control);
   color: var(--text-secondary);
   cursor: pointer;
-  transition:
-    background var(--duration-normal) var(--ease-standard),
-    color var(--duration-normal) var(--ease-standard);
 }
 
 .closeBtn:hover {

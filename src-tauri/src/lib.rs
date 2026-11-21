@@ -2,12 +2,14 @@ mod app_data;
 mod credentials;
 mod downloads;
 mod metadata;
+mod perf;
 mod platform;
 mod player;
 mod sources;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    perf::init();
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -25,6 +27,7 @@ pub fn run() {
         .manage(player::NativePlayerManager::default())
         .manage(downloads::DownloadManager::default())
         .invoke_handler(tauri::generate_handler![
+            perf::perf_log,
             platform::commands::player_set_fullscreen,
             platform::commands::player_set_cursor_hidden,
             credentials::xtream::credential_store,
@@ -50,6 +53,17 @@ pub fn run() {
             sources::catalog_cache::catalog_cache_store,
             sources::catalog_cache::catalog_cache_load,
             sources::catalog_cache::catalog_cache_delete,
+            sources::catalog_index::catalog_index_rows,
+            sources::catalog_index::catalog_index_page_status,
+            sources::catalog_index::catalog_index_page,
+            sources::catalog_index::catalog_index_page_rows,
+            sources::catalog_index::catalog_index_page_stats,
+            sources::catalog_index::catalog_index_rating_head,
+            sources::catalog_index::catalog_index_facet_batch,
+            sources::catalog_index::catalog_index_store_facets,
+            sources::catalog_index::catalog_index_titles,
+            sources::catalog_index::catalog_index_store_ranks,
+            sources::catalog_index::catalog_index_search,
             app_data::app_data_clear,
             app_data::files::settings_config_read,
             app_data::files::settings_config_write,
@@ -88,6 +102,9 @@ pub fn run() {
             // fullscreen off the table — see macos_embed.
             #[cfg(target_os = "macos")]
             platform::macos::prepare_main_window(_app.handle());
+            // Put a GTK video layer under the webview for mpv to render into.
+            #[cfg(target_os = "linux")]
+            platform::linux::prepare_main_window(_app.handle());
 
             // The WebDriver plugin installs its own logger so it can forward
             // backend output to the runner. Registering both panics at startup.

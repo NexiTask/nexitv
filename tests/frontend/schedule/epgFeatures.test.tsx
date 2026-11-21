@@ -50,13 +50,23 @@ vi.mock('@/modules/catalog/data/useCategories', async () => {
 
 vi.mock('@/modules/sources/hooks/useEnabledSources', () => {
   return {
-    useEnabledSources: vi.fn().mockReturnValue({ isAvailable: true }),
+    useEnabledSources: vi.fn().mockReturnValue({
+      isAvailable: true,
+      isLoading: false,
+      queryScope: 'test-scope',
+      xtreamSources: [],
+      availableXtreamSources: [],
+      m3uSources: [],
+      availableM3uSources: [],
+    }),
   };
 });
 
 import { EpgPage } from '@/modules/guide/pages/EpgPage';
 import { epgNowScrollLeft } from '@/modules/guide/lib/epgGeometry';
 import { useLiveStreams } from '@/modules/catalog/data/useCatalog';
+import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
+import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { useCategories, useHiddenCategoryIds } from '@/modules/catalog/data/useCategories';
 
 const channels = [
@@ -155,11 +165,39 @@ describe('EPG TV Guide Features', () => {
     renderEpg();
     const user = userEvent.setup();
 
-    const germany = screen.getByRole('button', { name: /^Germany,/ });
-    await user.click(germany);
+    // The sidebar lists only hubs and pins; a country is found by searching.
+    await user.type(screen.getByRole('searchbox', { name: 'Filter categories' }), 'Germany');
+    await user.click(screen.getByRole('button', { name: /^Germany,/ }));
+    await user.clear(screen.getByRole('searchbox', { name: 'Filter categories' }));
 
-    expect(germany.getAttribute('aria-pressed')).toBe('true');
+    // The chosen country stays in view as the selection.
+    expect(screen.getByText('Selected')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Germany,/ }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
     expect(screen.getByText('BBC One')).toBeTruthy();
     expect(screen.queryByText('CNN International')).toBeNull();
+  });
+
+  it('opens on the favourite channels when nothing is selected, one group at a time', () => {
+    useSettingsStore.getState().setSelectedCategory('live', null);
+    useLibraryStore.setState({
+      favorites: [{ id: 'ch-2', title: 'CNN International', posterUrl: '', type: 'live' }],
+    });
+    renderEpg();
+
+    expect(screen.getByText('CNN International')).toBeTruthy();
+    expect(screen.queryByText('BBC One')).toBeNull();
+    useLibraryStore.setState({ favorites: [] });
+  });
+
+  it('opens on the recently played channels when there are no favourites', () => {
+    useSettingsStore.getState().setSelectedCategory('live', null);
+    useLibraryStore.setState({ favorites: [], recentChannels: ['ch-2'] });
+    renderEpg();
+
+    expect(screen.getByText('CNN International')).toBeTruthy();
+    expect(screen.queryByText('BBC One')).toBeNull();
+    useLibraryStore.setState({ recentChannels: [] });
   });
 });

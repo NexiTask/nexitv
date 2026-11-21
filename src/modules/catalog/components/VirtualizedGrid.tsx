@@ -1,4 +1,4 @@
-import { useCallback, useRef, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useLayoutEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MediaCard } from './MediaCard';
@@ -26,7 +26,13 @@ const TRANSFORM_ORIGIN_STYLES: Record<string, CSSProperties> = {
 };
 
 interface VirtualizedGridProps {
-  items: MediaItem[];
+  /** Every item, in order. Or, for a list held elsewhere, `count` and `getItem`. */
+  items?: MediaItem[] | undefined;
+  count?: number | undefined;
+  /** The item at a position, or undefined while it is still loading. */
+  getItem?: ((index: number) => MediaItem | undefined) | undefined;
+  /** Positions `[start, end)` the grid currently renders. */
+  onRangeChange?: ((start: number, end: number) => void) | undefined;
   onItemClick?: ((item: MediaItem) => void) | undefined;
   onViewDetails?: ((item: MediaItem) => void) | undefined;
   currentCollectionId?: string | undefined;
@@ -37,6 +43,9 @@ interface VirtualizedGridProps {
 
 export function VirtualizedGrid({
   items,
+  count,
+  getItem,
+  onRangeChange,
   onItemClick,
   onViewDetails,
   currentCollectionId,
@@ -101,7 +110,9 @@ export function VirtualizedGrid({
   const actualCardWidth = isListMode ? containerWidth : gridLayout.cardWidth;
   const actualRowHeight = isListMode ? 64 : gridLayout.rowHeight;
 
-  const rowCount = Math.ceil(items.length / columns);
+  const total = items ? items.length : (count ?? 0);
+  const itemAt = (index: number) => (items ? items[index] : getItem?.(index));
+  const rowCount = Math.ceil(total / columns);
   const layoutSignature = `${isListMode ? 'list' : isLiveTv ? 'live' : 'standard'}:${columns}:${actualRowHeight}:${effectiveGap}`;
   const getRowKey = useCallback(
     (index: number) => `${layoutSignature}:${index}`,
@@ -118,6 +129,16 @@ export function VirtualizedGrid({
     // row is enough. Compact Live TV and list rows keep a little more runway.
     overscan: isListMode ? 4 : isLiveTv ? 2 : 1,
   });
+
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const firstIndex = virtualRows.length > 0 ? virtualRows[0]!.index * columns : 0;
+  const lastIndex =
+    virtualRows.length > 0
+      ? Math.min(total, (virtualRows[virtualRows.length - 1]!.index + 1) * columns)
+      : 0;
+  useEffect(() => {
+    if (onRangeChange && lastIndex > firstIndex) onRangeChange(firstIndex, lastIndex);
+  }, [firstIndex, lastIndex, onRangeChange]);
 
   // A geometry-aware row key invalidates cached estimates during the current
   // render. This avoids the expensive measure() + notification + second
@@ -142,9 +163,12 @@ export function VirtualizedGrid({
           position: 'relative',
         }}
       >
-        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+        {virtualRows.map((virtualRow) => {
           const startIndex = virtualRow.index * columns;
-          const rowItems = items.slice(startIndex, startIndex + columns);
+          const rowItems = Array.from(
+            { length: Math.max(0, Math.min(columns, total - startIndex)) },
+            (_, offset) => itemAt(startIndex + offset),
+          );
 
           return (
             <div
@@ -160,6 +184,16 @@ export function VirtualizedGrid({
               }}
             >
               {rowItems.map((item, colIndex) => {
+                // A row still loading keeps its place, so nothing shifts when it arrives.
+                if (!item) {
+                  return (
+                    <div
+                      key={`pending-${startIndex + colIndex}`}
+                      className={styles.itemWrapper}
+                      aria-hidden="true"
+                    />
+                  );
+                }
                 const isFirstCol = colIndex === 0;
                 const isLastCol = colIndex === columns - 1;
                 const isFirstRow = virtualRow.index === 0;

@@ -1,4 +1,5 @@
-import { useMemo, type ReactNode } from 'react';
+import { perfLog, perfSync } from '@/platform/perf';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { PageTransition } from '@/app/shell/PageTransition';
 import { HorizontalCarousel } from '@/modules/catalog/components/HorizontalCarousel';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
@@ -16,6 +17,8 @@ import { useNavigate } from 'react-router-dom';
 import { HeaderSearch } from '@/modules/search/public/components/HeaderSearch';
 import styles from '@/app/shell/AppLayout.module.css';
 import { useVisibleCatalog } from '../data/useCategories';
+import { useIndexPool } from '../data/useHomeRows';
+import { selectFoldedLiveCatalog, type CatalogItem } from '../data/useCatalog';
 import { useTmdbRatingChecks } from '../data/useTmdbRatingChecks';
 import { sortCatalogItems } from '../lib/smartCatalogFilter';
 import { ErrorState } from '@/shared/ui/ErrorState';
@@ -23,6 +26,17 @@ import { getCombinedErrorMessage, getErrorPresentation } from '@/shared/lib/erro
 import { useEnabledSources } from '@/modules/sources/public/hooks/useEnabledSources';
 import { useI18n } from '@/shared/i18n/i18n';
 import { UpcomingReleaseCard } from '@/modules/guide/public/components/UpcomingReleaseCard';
+
+const RECENT_POOL = 400;
+const POPULAR_POOL = 1000;
+const LIVE_POOL = 400;
+const NO_ITEMS: CatalogItem[] = [];
+
+function newestFirst(items: CatalogItem[]): CatalogItem[] {
+  return [...items]
+    .sort((a, b) => Number.parseInt(b.added || '0', 10) - Number.parseInt(a.added || '0', 10))
+    .slice(0, 20);
+}
 
 export function HomePage() {
   const { t, language } = useI18n();
@@ -50,57 +64,83 @@ export function HomePage() {
       }));
   }, [history, language]);
 
-  // Use unified query keys shared across the entire application
-  // Home has no category picker, so hidden material should simply never
-  // appear here — unlike the catalogue pages, where choosing a hidden
-  // category outright still has to work.
-  const moviesQuery = useVisibleCatalog('vod');
-  const { data: movies = [], isLoading: loadingMovies } = moviesQuery;
+  // Home rows come from small candidate pools served by the catalogue index,
+  // ranked below with the same rules as the full catalogue. Hidden categories
+  // are left out by the index. Without an index (first start before anything
+  // is saved, or outside the desktop app) Home loads the full catalogue.
+  const recentMoviePool = useIndexPool('vod', 'added', RECENT_POOL);
+  const popularMoviePool = useIndexPool('vod', 'rating', POPULAR_POOL);
+  const recentSeriesPool = useIndexPool('series', 'added', RECENT_POOL);
+  const popularSeriesPool = useIndexPool('series', 'rating', POPULAR_POOL);
+  const livePool = useIndexPool('live', 'provider', LIVE_POOL);
+  const pools = [recentMoviePool, popularMoviePool, recentSeriesPool, popularSeriesPool, livePool];
+  const poolsSettled = pools.every((pool) => pool.settled);
+  const useFullCatalog = poolsSettled && pools.some((pool) => pool.items === null);
+  const streamFoldingEnabled = useSettingsStore((state) => state.streamFoldingEnabled);
 
-  const seriesQuery = useVisibleCatalog('series');
-  const { data: series = [], isLoading: loadingSeries } = seriesQuery;
+  const moviesQuery = useVisibleCatalog('vod', { enabled: useFullCatalog });
+  const seriesQuery = useVisibleCatalog('series', { enabled: useFullCatalog });
+  const liveQuery = useVisibleCatalog('live', { enabled: useFullCatalog });
+  const movies = useFullCatalog ? moviesQuery.data : NO_ITEMS;
+  const series = useFullCatalog ? seriesQuery.data : NO_ITEMS;
 
-  const liveQuery = useVisibleCatalog('live');
-  const { data: liveChannelsData = [], isLoading: loadingLive } = liveQuery;
+  const recentMovies = useMemo(
+    () => newestFirst(useFullCatalog ? movies : (recentMoviePool.items ?? NO_ITEMS)),
+    [useFullCatalog, movies, recentMoviePool.items],
+  );
+  const recentSeries = useMemo(
+    () => newestFirst(useFullCatalog ? series : (recentSeriesPool.items ?? NO_ITEMS)),
+    [useFullCatalog, series, recentSeriesPool.items],
+  );
 
-  const recentMovies = useMemo(() => {
-    return [...movies]
-      .sort((a, b) => Number.parseInt(b.added || '0', 10) - Number.parseInt(a.added || '0', 10))
-      .slice(0, 20);
-  }, [movies]);
-
-  const recentSeries = useMemo(() => {
-    return [...series]
-      .sort((a, b) => Number.parseInt(b.added || '0', 10) - Number.parseInt(a.added || '0', 10))
-      .slice(0, 20);
-  }, [series]);
-
-  const movieRatingChecks = useTmdbRatingChecks(movies, 'movie');
-  const seriesRatingChecks = useTmdbRatingChecks(series, 'tv');
+  const movieRatingPool = useFullCatalog ? movies : (popularMoviePool.items ?? NO_ITEMS);
+  const seriesRatingPool = useFullCatalog ? series : (popularSeriesPool.items ?? NO_ITEMS);
+  const movieRatingChecks = useTmdbRatingChecks(movieRatingPool, 'movie');
+  const seriesRatingChecks = useTmdbRatingChecks(seriesRatingPool, 'tv');
 
   const popularMovies = useMemo(() => {
-    return sortCatalogItems(movies, 'rating', movieRatingChecks).slice(0, 20);
-  }, [movies, movieRatingChecks]);
+    return perfSync('home:popular_sort:vod', () =>
+      sortCatalogItems(movieRatingPool, 'rating', movieRatingChecks).slice(0, 20),
+    );
+  }, [movieRatingPool, movieRatingChecks]);
 
   const popularSeries = useMemo(() => {
-    return sortCatalogItems(series, 'rating', seriesRatingChecks).slice(0, 20);
-  }, [series, seriesRatingChecks]);
+    return sortCatalogItems(seriesRatingPool, 'rating', seriesRatingChecks).slice(0, 20);
+  }, [seriesRatingPool, seriesRatingChecks]);
 
   const liveChannels = useMemo(() => {
-    return liveChannelsData.slice(0, 20);
-  }, [liveChannelsData]);
+    if (useFullCatalog) return liveQuery.data.slice(0, 20);
+    const pool = livePool.items ?? NO_ITEMS;
+    return (streamFoldingEnabled ? selectFoldedLiveCatalog(pool) : pool).slice(0, 20);
+  }, [useFullCatalog, liveQuery.data, livePool.items, streamFoldingEnabled]);
 
-  const isLoading = loadingMovies || loadingSeries || loadingLive;
+  const isLoading = useFullCatalog
+    ? moviesQuery.isLoading || seriesQuery.isLoading || liveQuery.isLoading
+    : !poolsSettled;
+  const firstRowsLogged = useRef(false);
+  useEffect(() => {
+    if (firstRowsLogged.current || isLoading || !(recentMovies.length || recentSeries.length))
+      return;
+    firstRowsLogged.current = true;
+    perfLog(
+      'home:rows_rendered',
+      undefined,
+      `index=${!useFullCatalog} movies=${recentMovies.length} series=${recentSeries.length} live=${liveChannels.length}`,
+    );
+  }, [isLoading, recentMovies.length, recentSeries.length, liveChannels.length, useFullCatalog]);
+  const fullQueries = useFullCatalog ? [moviesQuery, seriesQuery, liveQuery] : [];
   const catalogError = getCombinedErrorMessage(
-    [moviesQuery.error, seriesQuery.error, liveQuery.error],
+    fullQueries.map((query) => query.error),
     '',
   );
-  const hasCatalogData = movies.length > 0 || series.length > 0 || liveChannelsData.length > 0;
+  const hasCatalogData =
+    recentMovies.length > 0 ||
+    recentSeries.length > 0 ||
+    popularMovies.length > 0 ||
+    liveChannels.length > 0;
   const showLoadError = Boolean(catalogError) && !hasCatalogData;
   const errorPresentation = getErrorPresentation(catalogError, 'Home');
-  const failedCatalogQueries = [moviesQuery, seriesQuery, liveQuery].filter(
-    (query) => query.isError,
-  );
+  const failedCatalogQueries = fullQueries.filter((query) => query.isError);
   const isRetrying = failedCatalogQueries.some((query) => query.isFetching);
   const retryCatalogs = () => {
     void Promise.all(failedCatalogQueries.map((query) => query.refetch()));

@@ -1,3 +1,4 @@
+import { perfAsync } from '@/platform/perf';
 import { create } from 'zustand';
 import { authenticateXtream } from '../data/xtreamClient';
 import { deleteProviderPassword, loadProviderPassword } from '../services/credentialVault';
@@ -332,7 +333,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await Promise.all(
           profiles.map(async (profile) => {
             try {
-              const restored = await loadXtreamCredentials(profile.id);
+              const restored = await perfAsync('auth:keyring_load', () =>
+                loadXtreamCredentials(profile.id),
+              );
               const credentials = restored ? { ...restored, sourceId: profile.id } : null;
               runtimes[profile.id] = {
                 credentials,

@@ -32,16 +32,11 @@
   width: 100%;
   height: var(--grid-row-height);
   contain: layout style;
-  transition: z-index var(--duration-instant) var(--ease-standard);
 }
 
 .itemWrapper {
   width: var(--grid-card-width);
   flex: 0 0 var(--grid-card-width);
-}
-
-.rowWrapper:hover {
-  z-index: var(--z-header) !important;
 }
 
 .listRow {

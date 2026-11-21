@@ -17,16 +17,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition:
-    transform var(--duration-normal) var(--ease-standard),
-    box-shadow var(--duration-normal) var(--ease-standard),
-    border-color var(--duration-normal) var(--ease-standard);
   box-shadow: var(--shadow-xs);
-}
-
-.swatch:hover {
-  transform: scale(1.15);
-  box-shadow: var(--shadow-sm);
 }
 
 .swatch:focus-visible {

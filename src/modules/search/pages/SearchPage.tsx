@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Search as SearchIcon, SearchX, X, Film, MonitorPlay, Tv, LayoutGrid } from 'lucide-react';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { useSearchParams } from 'react-router-dom';
@@ -6,21 +6,15 @@ import { VirtualizedGrid } from '@/modules/catalog/public/components/Virtualized
 import type { MediaItem } from '@/modules/catalog/public/model/media';
 import { PageTransition } from '@/app/shell/PageTransition';
 import { useSearchStore } from '../store/useSearchStore';
-import { smartSearch } from '../lib/search';
+import { useCatalogSearch } from '../data/useCatalogSearch';
 import { GridSkeleton, TextLineSkeleton } from '@/shared/ui/Skeleton';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import { CatalogViewToggle } from '@/modules/catalog/public/components/CatalogViewToggle';
 import { SegmentedControl } from '@/shared/ui/SegmentedControl';
 import styles from '@/app/shell/AppLayout.module.css';
 import searchStyles from './SearchPage.module.css';
-import {
-  useLiveStreams,
-  useVodStreams,
-  useSeriesList,
-} from '@/modules/catalog/public/data/useCatalog';
-import { useWithoutHiddenCategories } from '@/modules/catalog/public/data/useCategories';
 import { ErrorState } from '@/shared/ui/ErrorState';
-import { getCombinedErrorMessage, getErrorPresentation } from '@/shared/lib/error';
+import { getErrorPresentation } from '@/shared/lib/error';
 import { useEnabledSources } from '@/modules/sources/public/hooks/useEnabledSources';
 import { CatalogPageHeader } from '@/modules/catalog/public/components/CatalogPageHeader';
 import { MediaDetailsDialogs } from '@/modules/catalog/public/details/MediaDetailsDialogs';
@@ -28,6 +22,8 @@ import { useMediaDetailState } from '@/modules/catalog/public/hooks/useMediaDeta
 import { useI18n } from '@/shared/i18n/i18n';
 
 type FilterType = 'all' | 'movies' | 'series' | 'live';
+
+const SEARCH_DEBOUNCE_MS = 120;
 
 const FILTER_OPTIONS: { value: FilterType; label: string; icon: typeof LayoutGrid }[] = [
   { value: 'all', label: 'All', icon: LayoutGrid },
@@ -103,61 +99,18 @@ export function SearchPage() {
     }
   };
 
-  // Fetch all data (shares cache with Movies, Series, LiveTV pages)
-  const moviesQuery = useVodStreams({ enabled: filterType === 'all' || filterType === 'movies' });
-  const { data: movies = [], isLoading: loadingMovies } = moviesQuery;
-
-  const seriesQuery = useSeriesList({ enabled: filterType === 'all' || filterType === 'series' });
-  const { data: series = [], isLoading: loadingSeries } = seriesQuery;
-
-  const liveQuery = useLiveStreams({ enabled: filterType === 'all' || filterType === 'live' });
-  const { data: live = [], isLoading: loadingLive } = liveQuery;
-
-  // Hidden categories and countries stay out of search, as they do on Home.
-  const visibleMovies = useWithoutHiddenCategories('vod', movies, {
-    enabled: filterType === 'all' || filterType === 'movies',
+  // Ranked by the catalogue index where it can (no full catalogue is
+  // loaded); typing settles briefly before each search.
+  const [settledQuery, setSettledQuery] = useState(searchQuery);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettledQuery(searchQuery), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+  const search = useCatalogSearch(settledQuery, filterType, {
+    enabled: settledQuery.trim().length > 0,
   });
-  const visibleSeries = useWithoutHiddenCategories('series', series, {
-    enabled: filterType === 'all' || filterType === 'series',
-  });
-  const visibleLive = useWithoutHiddenCategories('live', live, {
-    enabled: filterType === 'all' || filterType === 'live',
-  });
-
-  // A pending hidden set counts as loading: the items are held back until it is
-  // known which of them the user hid, so the alternative would be "no results".
-  const isLoading =
-    filterType === 'movies'
-      ? loadingMovies || visibleMovies.isPending
-      : filterType === 'series'
-        ? loadingSeries || visibleSeries.isPending
-        : filterType === 'live'
-          ? loadingLive || visibleLive.isPending
-          : loadingMovies ||
-            loadingSeries ||
-            loadingLive ||
-            visibleMovies.isPending ||
-            visibleSeries.isPending ||
-            visibleLive.isPending;
-
-  // Memoize combined catalog references to avoid array re-allocations on every input keystroke
-  const combinedCatalog = useMemo(() => {
-    return {
-      all: [...visibleMovies.data, ...visibleSeries.data, ...visibleLive.data],
-      movies: visibleMovies.data,
-      series: visibleSeries.data,
-      live: visibleLive.data,
-    };
-  }, [visibleMovies.data, visibleSeries.data, visibleLive.data]);
-
-  // Filter and rank search results using smart multi-token fuzzy matching
-  const searchResults = useMemo(() => {
-    const trimmed = searchQuery.trim();
-    if (!trimmed) return [];
-
-    const source = combinedCatalog[filterType] || combinedCatalog.all;
-    return smartSearch(source, trimmed);
-  }, [searchQuery, filterType, combinedCatalog]);
+  const isLoading = search.isPending && search.count === 0;
+  const resultCount = settledQuery.trim() ? search.count : 0;
 
   const handleItemClick = (item: MediaItem) => {
     if (searchQuery.trim()) {
@@ -167,30 +120,9 @@ export function SearchPage() {
   };
 
   const hasQuery = searchQuery.trim().length > 0;
-  const selectedQuery =
-    filterType === 'movies'
-      ? moviesQuery
-      : filterType === 'series'
-        ? seriesQuery
-        : filterType === 'live'
-          ? liveQuery
-          : null;
-  const catalogError = getCombinedErrorMessage(
-    selectedQuery ? [selectedQuery.error] : [moviesQuery.error, seriesQuery.error, liveQuery.error],
-    '',
-  );
-  const relevantDataCount =
-    selectedQuery?.data?.length ?? movies.length + series.length + live.length;
-  const showLoadError = Boolean(catalogError) && relevantDataCount === 0;
+  const catalogError = search.error;
+  const showLoadError = Boolean(catalogError) && resultCount === 0;
   const errorPresentation = getErrorPresentation(catalogError, 'Search results');
-  const relevantCatalogQueries = selectedQuery
-    ? [selectedQuery]
-    : [moviesQuery, seriesQuery, liveQuery];
-  const failedCatalogQueries = relevantCatalogQueries.filter((query) => query.isError);
-  const retrySearchCatalog = () => {
-    void Promise.all(failedCatalogQueries.map((query) => query.refetch()));
-  };
-  const isRetrying = failedCatalogQueries.some((query) => query.isFetching);
 
   return (
     <PageTransition>
@@ -201,8 +133,8 @@ export function SearchPage() {
             hasQuery && isLoading ? (
               <TextLineSkeleton width={140} />
             ) : hasQuery ? (
-              tn('{count} result found', '{count} results found', searchResults.length, {
-                count: number(searchResults.length),
+              tn('{count} result found', '{count} results found', resultCount, {
+                count: number(resultCount),
               })
             ) : (
               t('Search across movies, series, and live channels')
@@ -263,11 +195,16 @@ export function SearchPage() {
                 description={errorPresentation.description}
                 detail={errorPresentation.detail}
                 actionLabel="Try Again"
-                onAction={retrySearchCatalog}
-                isRetrying={isRetrying}
+                onAction={search.retry}
+                isRetrying={search.isRetrying}
               />
-            ) : searchResults.length > 0 ? (
-              <VirtualizedGrid items={searchResults} onItemClick={handleItemClick} />
+            ) : resultCount > 0 ? (
+              <VirtualizedGrid
+                count={resultCount}
+                getItem={search.getItem}
+                onRangeChange={search.requestRange}
+                onItemClick={handleItemClick}
+              />
             ) : (
               <EmptyState
                 icon={SearchX}

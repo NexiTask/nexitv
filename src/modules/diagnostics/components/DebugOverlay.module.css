@@ -19,10 +19,6 @@
   cursor: grab;
   user-select: none;
   touch-action: none;
-  transition:
-    border-color var(--duration-normal) var(--ease-standard),
-    color var(--duration-normal) var(--ease-standard),
-    box-shadow var(--duration-normal) var(--ease-standard);
 }
 
 .debugPill:active {
@@ -61,7 +57,6 @@
   box-shadow: var(--shadow-xl);
   color: var(--text-primary);
   font-family: var(--font-family);
-  transition: border-color var(--duration-fast) var(--ease-standard);
 }
 
 .debugOverlayWindow:focus-within {
@@ -130,9 +125,6 @@
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
 }
 
 .iconBtn:hover {
@@ -271,7 +263,6 @@
   font-family: var(--font-family);
   font-size: var(--font-size-caption);
   cursor: pointer;
-  transition: background-color var(--duration-fast) var(--ease-standard);
 }
 
 .signalList button:last-child {
@@ -463,10 +454,6 @@
   font-family: var(--font-family);
   font-size: var(--font-size-caption);
   cursor: pointer;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
 }
 
 .toolbarBtn:hover,
@@ -517,7 +504,6 @@
   font-size: var(--font-size-micro);
   text-align: left;
   cursor: pointer;
-  transition: background-color var(--duration-fast) var(--ease-standard);
 }
 
 .logSummaryButton:hover {
@@ -628,9 +614,6 @@
   color: var(--text-muted);
   cursor: nwse-resize;
   touch-action: none;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
 }
 
 .resizeHandle::after {

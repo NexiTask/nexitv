@@ -18,6 +18,15 @@ import { useCatalogByType } from '@/modules/catalog/data/useCatalog';
 import { useCategories, useHiddenCategoryIds } from '@/modules/catalog/data/useCategories';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { useContextMenuStore } from '@/shared/ui/context-menu/useContextMenuStore';
+import { COUNTRY_NAMES, parseProviderCategoryName } from '@/shared/lib/categoryName';
+
+/** Most of these tests are about the full tree, which "Browse all categories" opens. */
+function renderBrowsing(ui: React.ReactElement) {
+  const view = render(ui);
+  const browse = screen.queryByRole('button', { name: /Browse all categories/ });
+  if (browse) fireEvent.click(browse);
+  return view;
+}
 
 const categoryResult = {
   data: [
@@ -125,7 +134,9 @@ describe('category sidebar M3U country groups', () => {
       refetch,
     } as unknown as ReturnType<typeof useCategories>);
 
-    render(<CategorySidebar type="live" activeCategoryId={null} onSelectCategory={vi.fn()} />);
+    renderBrowsing(
+      <CategorySidebar type="live" activeCategoryId={null} onSelectCategory={vi.fn()} />,
+    );
 
     expect(screen.getByText('Categories unavailable')).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
@@ -136,7 +147,7 @@ describe('category sidebar M3U country groups', () => {
 
   it('clears a saved category that is no longer supplied by an enabled source', async () => {
     const onSelectCategory = vi.fn();
-    render(
+    renderBrowsing(
       <CategorySidebar
         type="live"
         activeCategoryId="removed-source:category:99"
@@ -148,7 +159,9 @@ describe('category sidebar M3U country groups', () => {
   });
 
   it('keeps bulk collapse available without a redundant sidebar heading', async () => {
-    render(<CategorySidebar type="live" activeCategoryId={null} onSelectCategory={vi.fn()} />);
+    renderBrowsing(
+      <CategorySidebar type="live" activeCategoryId={null} onSelectCategory={vi.fn()} />,
+    );
 
     expect(screen.queryByRole('heading', { name: /Categories/i })).toBeNull();
 
@@ -160,7 +173,7 @@ describe('category sidebar M3U country groups', () => {
 
   it('turns a redundant country folder into one directly selectable row', async () => {
     const onSelectCategory = vi.fn();
-    render(
+    renderBrowsing(
       <CategorySidebar type="live" activeCategoryId={null} onSelectCategory={onSelectCategory} />,
     );
 
@@ -175,7 +188,9 @@ describe('category sidebar M3U country groups', () => {
   });
 
   it('absorbs country-equivalent children but retains meaningful siblings', () => {
-    render(<CategorySidebar type="live" activeCategoryId={null} onSelectCategory={vi.fn()} />);
+    renderBrowsing(
+      <CategorySidebar type="live" activeCategoryId={null} onSelectCategory={vi.fn()} />,
+    );
 
     expect(screen.getByRole('button', { name: 'Collapse Spain' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Spain, 1 channel' })).toBeNull();
@@ -224,7 +239,7 @@ describe('category sidebar 4K disclaimer', () => {
 
   it('shows the accuracy notice the first time the 4K Ultra HD hub is opened', async () => {
     const onSelectCategory = vi.fn();
-    render(
+    renderBrowsing(
       <CategorySidebar type="live" activeCategoryId={null} onSelectCategory={onSelectCategory} />,
     );
 
@@ -241,7 +256,7 @@ describe('category sidebar 4K disclaimer', () => {
   it('does not show the notice again once dismissed', async () => {
     useSettingsStore.getState().updateSetting('fourKDisclaimerDismissed', true);
     const onSelectCategory = vi.fn();
-    render(
+    renderBrowsing(
       <CategorySidebar type="live" activeCategoryId={null} onSelectCategory={onSelectCategory} />,
     );
 
@@ -265,7 +280,7 @@ describe('category sidebar "hide all countries except" action', () => {
   };
 
   const renderSidebar = (activeCategoryId: string | null = null, onSelectCategory = vi.fn()) => {
-    render(
+    renderBrowsing(
       <CategorySidebar
         type="live"
         activeCategoryId={activeCategoryId}
@@ -321,5 +336,138 @@ describe('category sidebar "hide all countries except" action', () => {
     const kept = renderSidebar('country:DE');
     hideAllExcept('Collapse Germany', 'DE');
     expect(kept).not.toHaveBeenCalled();
+  });
+});
+
+describe('category sidebar counts from the catalogue index', () => {
+  it('shows the index counts and does not load the full catalogue', () => {
+    renderBrowsing(
+      <CategorySidebar
+        type="live"
+        activeCategoryId={null}
+        onSelectCategory={vi.fn()}
+        indexStats={{
+          categoryCounts: { 'm3u-category-ar': 7 },
+          visibleTotal: 7,
+          favorites: 0,
+          recent: 0,
+          topRated: 0,
+          fourK: 3,
+        }}
+      />,
+    );
+
+    expect(vi.mocked(useCatalogByType)).toHaveBeenCalledWith('live', { enabled: false });
+    expect(screen.getAllByRole('button', { name: 'Argentina, 7 channels' })).toHaveLength(1);
+    expect(screen.getByText('4K Ultra HD')).toBeTruthy();
+  });
+
+  it('shows no counts while the index counts are still pending', () => {
+    renderBrowsing(
+      <CategorySidebar
+        type="live"
+        activeCategoryId={null}
+        onSelectCategory={vi.fn()}
+        indexStats={null}
+      />,
+    );
+
+    expect(vi.mocked(useCatalogByType)).toHaveBeenCalledWith('live', { enabled: false });
+    expect(screen.queryByRole('button', { name: 'Argentina, 2 channels' })).toBeNull();
+  });
+});
+
+describe('category sidebar with many categories', () => {
+  it('builds the first rows at once and the rest over the next frames', async () => {
+    // Many countries, each with a few categories, like a large live line-up.
+    const codes = Object.keys(COUNTRY_NAMES)
+      .filter((code) => parseProviderCategoryName(`${code} | Group`).country !== null)
+      .slice(0, 100);
+    const categories = codes.flatMap((code, country) =>
+      [0, 1, 2, 3].map((index) => ({
+        category_id: `c-${country}-${index}`,
+        category_name: `${code} | Group ${String(country * 4 + index).padStart(3, '0')}`,
+        parent_id: 0,
+      })),
+    );
+    vi.mocked(useCategories).mockReturnValue({
+      ...categoryResult,
+      data: categories,
+    } as unknown as ReturnType<typeof useCategories>);
+    vi.mocked(useCatalogByType).mockReturnValue({ data: [] } as unknown as ReturnType<
+      typeof useCatalogByType
+    >);
+
+    renderBrowsing(
+      <CategorySidebar type="vod" activeCategoryId={null} onSelectCategory={vi.fn()} />,
+    );
+
+    expect(screen.getByText('Group 000')).toBeTruthy();
+    expect(screen.queryByText('Group 399')).toBeNull();
+    expect(await screen.findByText('Group 399', undefined, { timeout: 5000 })).toBeTruthy();
+    expect(screen.getByText('Group 200')).toBeTruthy();
+    // The same rows the sidebar showed when it built them all at once.
+    expect(screen.getAllByText(/^Group \d{3}$/)).toHaveLength(396);
+  });
+});
+
+describe('category sidebar default view', () => {
+  it('shows the hubs and a hint to pin until something is pinned, not the whole tree', async () => {
+    render(<CategorySidebar type="live" activeCategoryId={null} onSelectCategory={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: /All categories/ })).toBeTruthy();
+    expect(screen.getByText('Nothing pinned yet')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Argentina/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /News/ })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: /Browse all categories/ }));
+    expect(screen.getAllByRole('button', { name: /^Argentina/ }).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Show fewer categories' }));
+    expect(screen.queryByRole('button', { name: /^Argentina/ })).toBeNull();
+  });
+
+  it('keeps pinned categories and countries and the current selection in view', () => {
+    const prefs = useSettingsStore.getState();
+    prefs.toggleCategoryPref('pinned', 'live', 'm3u-category-de-news');
+    prefs.toggleCategoryPref('pinnedCountries', 'live', 'AR');
+
+    render(
+      <CategorySidebar
+        type="live"
+        activeCategoryId="m3u-category-es-vod"
+        onSelectCategory={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Pinned')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^News, .*pinned/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Argentina, .*pinned/ })).toBeTruthy();
+    expect(screen.getByText('Selected')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Spain · VOD|^VOD/ })).toBeTruthy();
+    expect(screen.queryByText('Nothing pinned yet')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Sports/ })).toBeNull();
+  });
+
+  it('finds any category or country by name and pins it from the result', async () => {
+    const onSelectCategory = vi.fn();
+    render(
+      <CategorySidebar type="live" activeCategoryId={null} onSelectCategory={onSelectCategory} />,
+    );
+
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Filter categories' }), 'sports');
+    const result = screen.getByRole('button', { name: /^Sports/ });
+    await userEvent.click(result);
+    expect(onSelectCategory).toHaveBeenCalledWith('m3u-category-de-sports');
+
+    await userEvent.click(screen.getByRole('button', { name: /^Actions for .*Sports/ }));
+    const pin = useContextMenuStore.getState().items.find((item) => item.label === 'Pin category');
+    expect(pin).toBeTruthy();
+    pin?.action?.();
+    expect(useSettingsStore.getState().categoryPrefs?.pinned?.live).toContain(
+      'm3u-category-de-sports',
+    );
+
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Filter categories' }));
+    expect(screen.getByRole('button', { name: /^Sports, .*pinned/ })).toBeTruthy();
   });
 });

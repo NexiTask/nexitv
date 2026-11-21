@@ -129,12 +129,6 @@
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
   white-space: nowrap;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard),
-    opacity var(--duration-fast) var(--ease-standard),
-    transform var(--duration-instant) var(--ease-standard);
 }
 
 .playBtn {
@@ -147,13 +141,7 @@
 }
 
 .playBtn:hover {
-  opacity: var(--alpha-90);
-}
-
-.playBtn:active,
-.secondaryBtn:active,
-.favoriteBtn:active {
-  transform: scale(0.98);
+  background: color-mix(in srgb, var(--text-primary) 90%, var(--bg-base));
 }
 
 .playBtnLabel {
@@ -318,7 +306,6 @@
   font-size: var(--font-size-control);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-standard);
 }
 
 .detailsToggle:hover {

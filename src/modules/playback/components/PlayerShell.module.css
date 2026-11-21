@@ -215,8 +215,7 @@
   flex-direction: column;
   justify-content: space-between;
   padding: var(--space-6);
-  opacity: 0;
-  transition: opacity var(--duration-deliberate) var(--ease-standard);
+  visibility: hidden;
   /* No scrim bands: the video reaches the window edges cleanly. Legibility
      comes from the drop shadow on the controls themselves instead. */
   background: transparent;
@@ -233,7 +232,7 @@
 }
 
 .showControls {
-  opacity: 1;
+  visibility: visible;
   pointer-events: auto;
 }
 
@@ -243,10 +242,6 @@
    compositing to that container. */
 .controlsContainer {
   text-shadow: 0 1px 3px rgba(var(--neutral-black-rgb), var(--alpha-65));
-}
-
-.controlsContainer svg {
-  filter: drop-shadow(0 1px 2px rgba(var(--neutral-black-rgb), var(--alpha-60)));
 }
 
 /* Badges carry their own translucent plate, so the shadow would only muddy them. */

@@ -460,21 +460,11 @@ button,
   font-weight: var(--font-weight-semibold);
   line-height: 1;
   cursor: pointer;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard),
-    transform var(--duration-fast) var(--ease-standard),
-    opacity var(--duration-fast) var(--ease-standard);
 }
 
 .uiButton:hover:not(:disabled) {
   border-color: var(--border-strong);
   background: var(--surface-control-hover);
-}
-
-.uiButton:active:not(:disabled) {
-  transform: translateY(1px);
 }
 
 .uiButton[data-variant='primary'] {
@@ -542,10 +532,6 @@ button,
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
 }
 
 .uiIconButton:hover:not(:disabled) {
@@ -569,10 +555,6 @@ button,
   background: var(--surface-input);
   color: var(--text-primary);
   font-size: var(--font-size-control);
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .uiField:hover {
@@ -614,10 +596,6 @@ html.is-playing {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-input);
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .uiFieldGroup:hover {
@@ -641,7 +619,6 @@ html.is-playing {
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  transition: none;
 }
 
 .uiField::placeholder {
@@ -745,7 +722,6 @@ textarea {
 .subtle-scrollbar::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: var(--radius-full);
-  transition: background var(--duration-slow) var(--ease-standard);
 }
 
 .subtle-scrollbar:hover::-webkit-scrollbar-thumb,
@@ -768,7 +744,6 @@ textarea {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
   }
 }
 
@@ -778,7 +753,6 @@ html[data-motion='reduced'] *::after {
   scroll-behavior: auto !important;
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
 }
 
 /* Honor the operating system's stronger-contrast preference without changing

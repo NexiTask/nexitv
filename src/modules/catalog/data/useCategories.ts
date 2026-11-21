@@ -1,5 +1,8 @@
+import { perfLog } from '@/platform/perf';
 import { useMemo } from 'react';
-import { queryOptions, useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
+import { queryClient } from '@/shared/query/queryClient';
+import { desktopApi } from '@/platform/desktop';
 import {
   getVodCategories,
   getSeriesCategories,
@@ -11,6 +14,7 @@ import {
 } from '@/modules/settings/public/store/useSettingsStore';
 import { parseProviderCategoryName } from '@/shared/lib/categoryName';
 import { useCatalogByType } from './useCatalog';
+import { CATALOG_FRESH_MS } from './catalogFreshness';
 import { queryKeys } from '@/modules/sources/public/model/queryKeys';
 import {
   useEnabledSources,
@@ -26,64 +30,146 @@ export interface SourceCategory {
   parent_id: number;
 }
 
-/** The provider's category list for one catalogue, fetched once and shared. */
-export function categoriesQueryOptions(type: CatalogType, sources: EnabledSourcesSnapshot) {
+const SAVED_CATEGORIES_PREFIX = 'movena.categories.v1:';
+
+interface SavedCategories {
+  savedAt: number;
+  list: SourceCategory[];
+}
+
+function readSavedCategories(key: string): SavedCategories | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as Partial<SavedCategories>;
+    return typeof saved.savedAt === 'number' && Array.isArray(saved.list)
+      ? { savedAt: saved.savedAt, list: saved.list }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSavedCategories(key: string, list: SourceCategory[]): void {
+  try {
+    localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), list }));
+  } catch {
+    // Best effort: without a saved copy the next start simply asks the provider.
+  }
+}
+
+const categoryRefreshes = new Set<string>();
+
+/**
+ * The category list for one catalogue. A saved copy is used first, on the same
+ * freshness rule as the catalogue itself, so start-up never waits on a request
+ * queued behind the large catalogue downloads.
+ */
+export function categoriesQueryOptions(
+  type: CatalogType,
+  sources: EnabledSourcesSnapshot,
+  client: QueryClient = queryClient,
+) {
+  const queryKey = queryKeys.categories(type, sources.queryScope);
+  const savedKey = `${SAVED_CATEGORIES_PREFIX}${JSON.stringify(queryKey)}`;
   return queryOptions({
-    queryKey: queryKeys.categories(type, sources.queryScope),
+    queryKey,
     queryFn: async ({ signal }): Promise<SourceCategory[]> => {
-      const groups = new Map<string, SourceCategory>();
-      for (const source of sources.availableM3uSources) {
-        for (const entry of source.runtime?.playlist?.entries ?? []) {
-          if (entry.type !== type) continue;
-          groups.set(entry.categoryId, {
-            category_id: entry.categoryId,
-            category_name: entry.groupTitle,
-            parent_id: 0,
-          });
-        }
+      const refreshLater = () => {
+        if (categoryRefreshes.has(savedKey)) return;
+        categoryRefreshes.add(savedKey);
+        window.setTimeout(() => {
+          fetchCategories(type, sources)
+            .then((list) => {
+              writeSavedCategories(savedKey, list);
+              client.setQueryData(queryKey, list);
+            })
+            .catch(() => undefined)
+            .finally(() => categoryRefreshes.delete(savedKey));
+        }, 5_000);
+      };
+      const saved = desktopApi.isDesktop() ? readSavedCategories(savedKey) : null;
+      if (saved) {
+        if (Date.now() - saved.savedAt >= CATALOG_FRESH_MS) refreshLater();
+        perfLog(`categories:disk:${type}`);
+        return saved.list;
       }
-      const results = await Promise.allSettled(
-        sources.availableXtreamSources.map(async (source) => {
-          let res;
-          if (type === 'vod') res = await getVodCategories(source.credentials!, signal);
-          else if (type === 'series') res = await getSeriesCategories(source.credentials!, signal);
-          else res = await getLiveCategories(source.credentials!, signal);
-          return (Array.isArray(res) ? res : []).map((category) => ({
-            ...category,
-            category_id: xtreamCategoryId(source.id, category.category_id)!,
-            category_name: category.category_name,
-          }));
-        }),
-      );
-      const providerCategories = results.flatMap((result) =>
-        result.status === 'fulfilled' ? result.value : [],
-      );
-      const providerFailures = results.flatMap((result, index) =>
-        result.status === 'rejected'
-          ? [
-              `${sources.availableXtreamSources[index]?.profile.name ?? `Source ${index + 1}`}: ${getErrorMessage(result.reason, 'Category request failed without an error message.')}`,
-            ]
-          : [],
-      );
-      const failedProviders = providerFailures.length;
-      if (groups.size === 0 && results.length > 0 && failedProviders === results.length) {
-        throw new Error(providerFailures.join('\n'));
+      try {
+        const list = await fetchCategories(type, sources, signal);
+        if (desktopApi.isDesktop()) writeSavedCategories(savedKey, list);
+        return list;
+      } catch (error: unknown) {
+        // On a first start the small category request can time out while the
+        // catalogue is being prepared. Try once more when things are quiet, so
+        // the next start has a saved copy.
+        if (desktopApi.isDesktop()) refreshLater();
+        throw error;
       }
-      if (failedProviders > 0 && (providerCategories.length > 0 || groups.size > 0)) {
-        notify.warning(
-          'Some Categories Unavailable',
-          `${failedProviders} enabled source${failedProviders === 1 ? '' : 's'} could not load categories. Available categories are still shown.\n${providerFailures.join('\n')}`,
-          undefined,
-          undefined,
-          'connection',
-        );
-      }
-      return [...providerCategories, ...groups.values()];
     },
-    staleTime: 1000 * 60 * 60,
+    staleTime: CATALOG_FRESH_MS,
     gcTime: 1000 * 60 * 60 * 12,
     retry: false,
   });
+}
+
+async function fetchCategories(
+  type: CatalogType,
+  sources: EnabledSourcesSnapshot,
+  signal?: AbortSignal,
+): Promise<SourceCategory[]> {
+  const perfStart = performance.now();
+  try {
+    const groups = new Map<string, SourceCategory>();
+    for (const source of sources.availableM3uSources) {
+      for (const entry of source.runtime?.playlist?.entries ?? []) {
+        if (entry.type !== type) continue;
+        groups.set(entry.categoryId, {
+          category_id: entry.categoryId,
+          category_name: entry.groupTitle,
+          parent_id: 0,
+        });
+      }
+    }
+    const results = await Promise.allSettled(
+      sources.availableXtreamSources.map(async (source) => {
+        let res;
+        if (type === 'vod') res = await getVodCategories(source.credentials!, signal);
+        else if (type === 'series') res = await getSeriesCategories(source.credentials!, signal);
+        else res = await getLiveCategories(source.credentials!, signal);
+        return (Array.isArray(res) ? res : []).map((category) => ({
+          ...category,
+          category_id: xtreamCategoryId(source.id, category.category_id)!,
+          category_name: category.category_name,
+        }));
+      }),
+    );
+    const providerCategories = results.flatMap((result) =>
+      result.status === 'fulfilled' ? result.value : [],
+    );
+    const providerFailures = results.flatMap((result, index) =>
+      result.status === 'rejected'
+        ? [
+            `${sources.availableXtreamSources[index]?.profile.name ?? `Source ${index + 1}`}: ${getErrorMessage(result.reason, 'Category request failed without an error message.')}`,
+          ]
+        : [],
+    );
+    const failedProviders = providerFailures.length;
+    if (groups.size === 0 && results.length > 0 && failedProviders === results.length) {
+      throw new Error(providerFailures.join('\n'));
+    }
+    if (failedProviders > 0 && (providerCategories.length > 0 || groups.size > 0)) {
+      notify.warning(
+        'Some Categories Unavailable',
+        `${failedProviders} enabled source${failedProviders === 1 ? '' : 's'} could not load categories. Available categories are still shown.\n${providerFailures.join('\n')}`,
+        undefined,
+        undefined,
+        'connection',
+      );
+    }
+    return [...providerCategories, ...groups.values()];
+  } finally {
+    perfLog(`categories:fetch:${type}`, performance.now() - perfStart);
+  }
 }
 
 export function useCategories(type: CatalogType, options?: { enabled?: boolean | undefined }) {
@@ -98,7 +184,7 @@ export function useCategories(type: CatalogType, options?: { enabled?: boolean |
 /** Stable empty list so an unresolved query does not thrash memo identities. */
 const EMPTY_LIST: never[] = [];
 
-interface HiddenCategoryState {
+export interface HiddenCategoryState {
   ids: Set<string>;
   /**
    * False while the answer is still incomplete — a hidden country only maps to
@@ -108,7 +194,7 @@ interface HiddenCategoryState {
   isResolved: boolean;
 }
 
-function useHiddenCategoryState(
+export function useHiddenCategoryState(
   type: CatalogType,
   options?: { enabled?: boolean | undefined },
 ): HiddenCategoryState {
@@ -192,9 +278,9 @@ export function useWithoutHiddenCategories<T extends { categoryId?: string | und
  * pages deliberately keep the unfiltered list: there, picking a hidden category
  * outright still has to show it, or "show hidden" would lead nowhere.
  */
-export function useVisibleCatalog(type: CatalogType) {
-  const query = useCatalogByType(type);
-  const { data, isPending } = useWithoutHiddenCategories(type, query.data ?? EMPTY_LIST);
+export function useVisibleCatalog(type: CatalogType, options?: { enabled?: boolean | undefined }) {
+  const query = useCatalogByType(type, options);
+  const { data, isPending } = useWithoutHiddenCategories(type, query.data ?? EMPTY_LIST, options);
 
   return { ...query, data, isLoading: query.isLoading || isPending };
 }

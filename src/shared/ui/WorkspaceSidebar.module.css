@@ -11,7 +11,6 @@
      trailing inset so secondary sidebars do not double-pad that edge. */
   padding: 0 var(--space-2) 0 0;
   margin-right: var(--space-2);
-  transition: width var(--duration-slow) var(--ease-standard);
 }
 
 .header {
@@ -122,9 +121,6 @@
   text-align: left;
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-medium);
-  transition:
-    background-color var(--duration-normal) var(--ease-standard),
-    color var(--duration-normal) var(--ease-standard);
 }
 
 .navItem:hover {
@@ -183,7 +179,6 @@
   left: 12px;
   width: 2px;
   background-color: transparent;
-  transition: background-color var(--duration-normal) var(--ease-standard);
 }
 
 /* AppLayout stacks secondary workspaces at this width. Match that transition
@@ -196,7 +191,6 @@
     align-self: auto;
     margin: 0 0 var(--space-2);
     padding: 0;
-    transition: none;
   }
 
   .header {
@@ -231,5 +225,4 @@
      step — during an active pointer drag it fights the 1:1 cursor tracking,
      animating a catch-up on every single pixel instead of following it
      instantly. That's the lag. */
-  transition: none;
 }

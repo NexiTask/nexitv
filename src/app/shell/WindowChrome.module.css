@@ -18,18 +18,13 @@
   height: var(--window-chrome-height);
   border: 0;
   border-radius: 0;
-  color: var(--text-muted);
-  opacity: var(--alpha-60);
-  transition:
-    opacity var(--duration-normal) var(--ease-standard),
-    color var(--duration-normal) var(--ease-standard),
-    background-color var(--duration-normal) var(--ease-standard);
+  color: color-mix(in srgb, var(--text-muted) 60%, transparent);
   -webkit-app-region: no-drag;
 }
 
 .windowChrome:hover .windowControl,
 .windowChrome:focus-within .windowControl {
-  opacity: 1;
+  color: var(--text-muted);
 }
 
 .windowChrome .windowControl:hover {
@@ -106,7 +101,6 @@
   justify-content: center;
   opacity: 0;
   color: var(--macos-traffic-light-icon);
-  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
 .windowChromeMac:hover .trafficLightIcon {

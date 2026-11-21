@@ -210,7 +210,6 @@ export function MediaCardMenu({
                 size={12}
                 style={{
                   transform: showCollections ? 'rotate(90deg)' : 'none',
-                  transition: 'transform var(--duration-normal)',
                   flexShrink: 0,
                 }}
               />

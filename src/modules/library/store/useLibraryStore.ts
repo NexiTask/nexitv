@@ -14,6 +14,7 @@ import { persist, type PersistStorage } from 'zustand/middleware';
  */
 const PERSIST_DEBOUNCE_MS = 5000;
 const MAX_HISTORY_ITEMS = 200;
+const MAX_RECENT_CHANNELS = 30;
 
 function createDebouncedStorage<T>(): PersistStorage<T> {
   let pendingValue: string | null = null;
@@ -151,6 +152,12 @@ interface LibraryState {
   collections: Collection[];
   history: HistoryItem[];
   watched: string[];
+  /**
+   * Live channels played most recently, newest first (ids only). Live
+   * playback never enters `history`, which needs a duration.
+   */
+  recentChannels: string[];
+  addRecentChannel: (id: string) => void;
 
   addFavorite: (item: MediaItem) => void;
   removeFavorite: (id: string) => void;
@@ -207,6 +214,11 @@ export function migrateLibraryState(persistedState: unknown): LibraryState {
     collections: Array.isArray(state.collections) ? state.collections : [],
     history: Array.isArray(state.history) ? state.history : [],
     watched: Array.isArray(state.watched) ? state.watched : [],
+    recentChannels: Array.isArray(state.recentChannels)
+      ? state.recentChannels
+          .filter((id): id is string => typeof id === 'string' && id.length > 0)
+          .slice(0, MAX_RECENT_CHANNELS)
+      : [],
   } as LibraryState;
   return { ...normalized, ...sanitizedLibraryData(normalized) };
 }
@@ -221,6 +233,17 @@ export const useLibraryStore = create<LibraryState>()(
       collections: [],
       history: [],
       watched: [],
+      recentChannels: [],
+
+      addRecentChannel: (id) => {
+        if (!id || get().recentChannels[0] === id) return;
+        set((state) => ({
+          recentChannels: [id, ...state.recentChannels.filter((other) => other !== id)].slice(
+            0,
+            MAX_RECENT_CHANNELS,
+          ),
+        }));
+      },
 
       addFavorite: (item) => {
         const exists = get().favorites.some((f) => f.id === item.id);
@@ -465,7 +488,7 @@ export const useLibraryStore = create<LibraryState>()(
       },
 
       clearHistory: () => {
-        set({ history: [] });
+        set({ history: [], recentChannels: [] });
         notify.info(
           'Watch History Cleared',
           'All watch history and progress removed.',
@@ -501,7 +524,7 @@ export const useLibraryStore = create<LibraryState>()(
       },
 
       clearAllData: () => {
-        set({ favorites: [], collections: [], history: [], watched: [] });
+        set({ favorites: [], collections: [], history: [], watched: [], recentChannels: [] });
         notify.warning(
           'Library Reset',
           'All history, favorites, collections, and watched state cleared.',

@@ -87,6 +87,8 @@ export const desktopApi = {
   onDownloadEvent: (handler: (event: DownloadStatusEvent) => void) =>
     listen<DownloadStatusEvent>('download-event', ({ payload }) => handler(payload)),
   onPointerMoved: (handler: () => void) => listen('pointer-moved', handler),
+  onCatalogIndexUpdated: (handler: (kind: string) => void) =>
+    listen<string>('catalog-index-updated', ({ payload }) => handler(payload)),
 
   minimizeWindow: () => getCurrentWindow().minimize(),
   toggleMaximizeWindow: () => getCurrentWindow().toggleMaximize(),

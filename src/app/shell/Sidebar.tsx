@@ -115,8 +115,8 @@ export function Sidebar() {
         <div className={styles.logoHeader} data-tauri-drag-region>
           <div className={styles.logoVisual} aria-hidden="true">
             <span className={styles.logoWordmark}>
-              <span className={styles.logoInitial}>M</span>
-              <span className={styles.logoRemainder}>OVENA</span>
+              <span className={styles.logoInitial}>N</span>
+              <span className={styles.logoRemainder}>EXITV</span>
             </span>
           </div>
         </div>

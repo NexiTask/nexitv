@@ -4,6 +4,12 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import postcss from 'postcss';
 
+// Product decision (NTV-1): the poster play button fills with the accent on
+// hover; a colour change is the only hover feedback that stays instant there.
+const solidAccentAllowances = new Set([
+  'modules/catalog/components/MediaCard.module.css .actionBtn:hover',
+]);
+
 const root = fileURLToPath(new URL('..', import.meta.url));
 const sourceRoot = join(root, 'src');
 
@@ -109,7 +115,10 @@ for (const path of cssFiles) {
     const body = match[2];
     if (
       /(?:button|btn|primary)/i.test(selector) &&
-      /background(?:-color)?\s*:\s*var\(--accent-color\)/i.test(body)
+      /background(?:-color)?\s*:\s*var\(--accent-color\)/i.test(body) &&
+      !solidAccentAllowances.has(
+        `${relative(sourceRoot, path).replaceAll('\\', '/')} ${selector.trim()}`,
+      )
     ) {
       report(path, 'controls cannot use a solid accent background', match);
     }

@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { queryOptions, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
+import { queryClient } from '@/shared/query/queryClient';
 import {
   getLiveStreams,
   getSeries,
@@ -12,9 +12,10 @@ import {
 import { desktopApi } from '@/platform/desktop';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 import { loadProviderList, rememberProviderList } from './catalogDiskCache';
-import type { MediaItem } from '../model/media';
+import { CATALOG_FRESH_MS } from './catalogFreshness';
+import { perfAsync, perfSync } from '@/platform/perf';
 import { queryKeys } from '@/modules/sources/public/model/queryKeys';
-import { parseLiveChannelTitle, parseMediaDisplayTitle, parseMediaTitle } from '../lib/titleParser';
+import { parseLiveChannelTitle, parseMediaTitle } from '../lib/titleParser';
 import {
   useEnabledSources,
   type EnabledSourcesSnapshot,
@@ -25,34 +26,15 @@ import {
   type M3uEntry,
   type M3uPlaylist,
 } from '@/modules/sources/public/data/m3uClient';
-import { xtreamCategoryId, xtreamItemId } from '@/modules/sources/public/lib/sourceIdentity';
 import { foldLiveChannels } from '../lib/streamFolding';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import { notify } from '@/shared/notifications/useNotificationStore';
 import { getErrorMessage } from '@/shared/lib/error';
-import { parseProviderRating } from '@/shared/lib/rating';
 
-export interface CatalogItem extends MediaItem {
-  categoryId?: string | undefined;
-  /** The source's guide id for a channel — how XMLTV listings are matched. */
-  epgChannelId?: string | undefined;
-  radio?: boolean | undefined;
-  radioMetadata?:
-    | {
-        title: string;
-        artist?: string | undefined;
-        album?: string | undefined;
-        genre?: string | undefined;
-        channelNumber?: string | undefined;
-        logoUrl?: string | undefined;
-      }
-    | undefined;
-  catchup?: string | undefined;
-  catchupSource?: string | undefined;
-  catchupDays?: number | undefined;
-  fallbacks?:
-    Array<{ streamUrl: string; httpHeaders?: Record<string, string> | undefined }> | undefined;
-}
+import type { CatalogItem } from '../model/catalogItem';
+import { xtreamLiveFields, xtreamSeriesItem, xtreamVodFields } from '../lib/xtreamItemFields';
+
+export type { CatalogItem } from '../model/catalogItem';
 
 const foldedLiveCatalogs = new WeakMap<CatalogItem[], CatalogItem[]>();
 
@@ -127,7 +109,7 @@ export function mapM3uCatalog(
   });
 }
 
-function playlistCatalog(
+export function playlistCatalog(
   type: 'live' | 'vod' | 'series',
   sources: EnabledSourcesSnapshot,
 ): CatalogItem[] {
@@ -154,99 +136,160 @@ async function fetchXtreamList(
   return Array.isArray(response) ? response : [];
 }
 
-function mapXtreamList(
+/**
+ * Maps a provider list. `indexes` gives each row's position in the full
+ * provider list when `list` is only part of it (rows served by the index),
+ * so positional fallbacks such as channel numbers come out the same.
+ */
+export function mapXtreamList(
   type: 'live' | 'vod' | 'series',
   source: EnabledXtreamSource,
   list: unknown[],
+  indexes?: readonly number[],
 ): CatalogItem[] {
   return type === 'live'
-    ? mapXtreamLive(source, list as XtreamLiveStream[])
+    ? mapXtreamLive(source, list as XtreamLiveStream[], indexes)
     : type === 'vod'
-      ? mapXtreamVod(source, list as XtreamVodStream[])
-      : mapXtreamSeries(source, list as XtreamSeries[]);
+      ? mapXtreamVod(source, list as XtreamVodStream[], indexes)
+      : mapXtreamSeries(source, list as XtreamSeries[], indexes);
 }
 
-const diskSeeds = new Map<string, Promise<void>>();
+/** Saved copies older than this are still shown, but flagged as outdated. */
+const CATALOG_OUTDATED_MS = 7 * 24 * 60 * 60 * 1000;
+/** Background refreshes wait until the saved catalogue has rendered. */
+const BACKGROUND_REFRESH_DELAY_MS = 5_000;
+
+type CatalogType = 'live' | 'vod' | 'series';
+
+const backgroundRefreshes = new Set<string>();
 
 /**
- * Seeds a catalogue query with the copy kept on disk, so a start shows the
- * last catalogue at once instead of waiting for the provider to send several
- * megabytes. It runs beside the query's own fetch: the copy goes in only while
- * the query still has nothing, under the time it was fetched, and the
- * provider's answer replaces it when it lands. Every Xtream source needs a
- * copy for its current account, or the query is left to the network alone.
+ * Fetch one source's list from the provider after start-up and swap that
+ * source's items into the catalogue query. A failure keeps the saved copy.
  */
-export function seedCatalogFromDisk(
+function scheduleBackgroundRefresh(
   client: QueryClient,
-  type: 'live' | 'vod' | 'series',
+  type: CatalogType,
+  source: EnabledXtreamSource,
   sources: EnabledSourcesSnapshot,
-): Promise<void> {
+  savedAt: number,
+): void {
   const queryKey = queryKeys.catalog(type, sources.queryScope);
-  if (
-    !desktopApi.isDesktop() ||
-    sources.availableXtreamSources.length === 0 ||
-    client.getQueryData(queryKey) !== undefined
-  )
-    return Promise.resolve();
-  const seedId = JSON.stringify(queryKey);
-  const running = diskSeeds.get(seedId);
-  if (running) return running;
-
-  const seed = (async () => {
-    const copies = await Promise.all(
-      sources.availableXtreamSources.map((source) =>
-        loadProviderList(source.id, type, source.queryScope),
-      ),
-    );
-    if (copies.some((copy) => copy === null) || client.getQueryData(queryKey) !== undefined) return;
-    const items = [
-      ...sources.availableXtreamSources.flatMap((source, index) =>
-        mapXtreamList(type, source, copies[index]!.list),
-      ),
-      ...playlistCatalog(type, sources),
-    ];
-    // The provider may have answered while the copy was read and mapped.
-    if (client.getQueryData(queryKey) !== undefined) return;
-    client.setQueryData<CatalogItem[]>(queryKey, items, {
-      updatedAt: Math.min(...copies.map((copy) => copy!.savedAt)),
-    });
-  })()
-    .catch((error: unknown) => {
-      debugLog.warn('api', 'Saved catalogue could not be read; waiting for the provider', {
-        type,
-        error: getErrorMessage(error, 'Reading the saved catalogue failed.'),
-      });
-    })
-    .finally(() => diskSeeds.delete(seedId));
-  diskSeeds.set(seedId, seed);
-  return seed;
+  const refreshId = `${JSON.stringify(queryKey)}:${source.id}`;
+  if (backgroundRefreshes.has(refreshId)) return;
+  backgroundRefreshes.add(refreshId);
+  window.setTimeout(() => {
+    void (async () => {
+      try {
+        const list = await perfAsync(
+          `bg:fetch_json:${type}`,
+          () => fetchXtreamList(type, source),
+          (l) => `items=${l.length}`,
+        );
+        if (list.length === 0) throw new Error('The provider returned an empty catalogue');
+        rememberProviderList(source.id, type, source.queryScope, list);
+        const fresh = perfSync(`bg:map:${type}`, () => mapXtreamList(type, source, list));
+        client.setQueryData<CatalogItem[]>(queryKey, (current) =>
+          current ? replaceSourceItems(current, source.id, fresh, sources) : current,
+        );
+      } catch (error: unknown) {
+        debugLog.warn('api', 'Catalogue refresh failed; keeping the saved copy', {
+          type,
+          error: getErrorMessage(error, 'Refreshing the catalogue failed.'),
+        });
+        if (Date.now() - savedAt > CATALOG_OUTDATED_MS) {
+          const days = Math.floor((Date.now() - savedAt) / (24 * 60 * 60 * 1000));
+          notify.warning(
+            'Showing a Saved Catalogue',
+            `${source.profile.name} could not be reached. Its ${type === 'vod' ? 'movie' : type} list is from ${days} days ago.`,
+            undefined,
+            undefined,
+            'connection',
+          );
+        }
+      } finally {
+        backgroundRefreshes.delete(refreshId);
+      }
+    })();
+  }, BACKGROUND_REFRESH_DELAY_MS);
 }
 
-function useCatalogDiskSeed(
-  type: 'live' | 'vod' | 'series',
+/** Replace one source's items, keeping the order the sources are listed in. */
+function replaceSourceItems(
+  current: CatalogItem[],
+  sourceId: string,
+  fresh: CatalogItem[],
   sources: EnabledSourcesSnapshot,
-  enabled: boolean,
-) {
-  const client = useQueryClient();
-  useEffect(() => {
-    if (enabled && sources.isAvailable) void seedCatalogFromDisk(client, type, sources);
-  }, [client, enabled, sources, type]);
+): CatalogItem[] {
+  const xtreamIds = new Set(sources.availableXtreamSources.map((source) => source.id));
+  const bySource = new Map<string, CatalogItem[]>();
+  const others: CatalogItem[] = [];
+  for (const item of current) {
+    if (item.sourceId && xtreamIds.has(item.sourceId)) {
+      const list = bySource.get(item.sourceId) ?? [];
+      list.push(item);
+      bySource.set(item.sourceId, list);
+    } else {
+      others.push(item);
+    }
+  }
+  bySource.set(sourceId, fresh);
+  return [
+    ...sources.availableXtreamSources.flatMap((source) => bySource.get(source.id) ?? []),
+    ...others,
+  ];
+}
+
+/**
+ * The saved copy for one source when there is one; the provider otherwise.
+ * A stale copy is returned at once and refreshed in the background.
+ */
+async function loadSourceList(
+  client: QueryClient,
+  type: CatalogType,
+  source: EnabledXtreamSource,
+  sources: EnabledSourcesSnapshot,
+  signal: AbortSignal | undefined,
+): Promise<CatalogItem[]> {
+  if (desktopApi.isDesktop()) {
+    const saved = await loadProviderList(source.id, type, source.queryScope).catch(
+      (error: unknown) => {
+        debugLog.warn('api', 'Saved catalogue could not be read; asking the provider', {
+          type,
+          error: getErrorMessage(error, 'Reading the saved catalogue failed.'),
+        });
+        return null;
+      },
+    );
+    if (saved) {
+      if (Date.now() - saved.savedAt >= CATALOG_FRESH_MS) {
+        scheduleBackgroundRefresh(client, type, source, sources, saved.savedAt);
+      }
+      return perfSync(`disk:map:${type}`, () => mapXtreamList(type, source, saved.list));
+    }
+  }
+  const list = await perfAsync(
+    `net:fetch_json:${type}`,
+    () => fetchXtreamList(type, source, signal),
+    (l) => `items=${l.length}`,
+  );
+  rememberProviderList(source.id, type, source.queryScope, list);
+  return perfSync(`net:map:${type}`, () => mapXtreamList(type, source, list));
 }
 
 export function catalogQueryOptions(
-  type: 'live' | 'vod' | 'series',
+  type: CatalogType,
   sources: EnabledSourcesSnapshot,
+  client: QueryClient = queryClient,
 ) {
   return queryOptions({
     queryKey: queryKeys.catalog(type, sources.queryScope),
     queryFn: async ({ signal }): Promise<CatalogItem[]> => {
       const playlistItems = playlistCatalog(type, sources);
       const results = await Promise.allSettled(
-        sources.availableXtreamSources.map(async (source) => {
-          const list = await fetchXtreamList(type, source, signal);
-          rememberProviderList(source.id, type, source.queryScope, list);
-          return mapXtreamList(type, source, list);
-        }),
+        sources.availableXtreamSources.map((source) =>
+          loadSourceList(client, type, source, sources, signal),
+        ),
       );
       const providerItems = successful(results);
       const providerFailures = results.flatMap((result, index) =>
@@ -271,9 +314,9 @@ export function catalogQueryOptions(
       }
       return [...providerItems, ...playlistItems];
     },
-    // Source mutations explicitly invalidate these queries. Keep route changes
-    // from turning into provider reloads and main-thread remapping work.
-    staleTime: 1000 * 60 * 60,
+    // The saved copy decides freshness (CATALOG_FRESH_MS). Matching it here
+    // keeps a long-running session from asking again before that copy would.
+    staleTime: CATALOG_FRESH_MS,
     gcTime: 1000 * 60 * 60 * 12,
     retry: false,
   });
@@ -291,113 +334,66 @@ function successful<T>(results: PromiseSettledResult<T[]>[]): T[] {
   return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
 }
 
-function mapXtreamLive(source: EnabledXtreamSource, response: XtreamLiveStream[]): CatalogItem[] {
+function mapXtreamLive(
+  source: EnabledXtreamSource,
+  response: XtreamLiveStream[],
+  indexes?: readonly number[],
+): CatalogItem[] {
   const credentials = source.credentials!;
-  return response.map((stream, index) => {
-    const title = stream.name || 'Unknown Channel';
-    const metadata = parseLiveChannelTitle(title);
-    const providerId = (
-      stream.stream_id ??
-      stream.epg_channel_id ??
-      stream.num ??
-      `live-${index}`
-    ).toString();
+  return response.map((stream, position) => {
+    const fields = xtreamLiveFields(
+      source.id,
+      source.profile.name,
+      stream,
+      indexes?.[position] ?? position,
+    );
+    const providerId = fields.sourceItemId;
     return {
-      id: xtreamItemId(source.id, 'live', providerId),
-      sourceItemId: providerId,
-      title,
-      posterUrl: stream.stream_icon || '',
-      type: 'live',
-      channelNum: stream.num ?? index + 1,
-      added: stream.added,
-      categoryId: xtreamCategoryId(source.id, stream.category_id),
-      epgChannelId: stream.epg_channel_id || undefined,
-      tags: metadata.qualityBadges,
-      country: metadata.country,
+      ...fields,
       streamUrl: stream.direct_source || getStreamUrl(credentials, 'live', providerId),
       fallbacks: stream.direct_source
         ? [{ streamUrl: getStreamUrl(credentials, 'live', providerId) }]
         : undefined,
-      catchup: stream.tv_archive === 1 ? 'xtream' : undefined,
-      catchupDays: stream.tv_archive_duration,
-      sourceId: source.id,
-      subtitle: source.profile.name,
-      radio:
-        stream.stream_type?.toLowerCase() === 'audio' ||
-        stream.stream_type?.toLowerCase() === 'radio',
-      radioMetadata:
-        stream.stream_type?.toLowerCase() === 'audio' ||
-        stream.stream_type?.toLowerCase() === 'radio'
-          ? { title }
-          : undefined,
     };
   });
 }
 
-function mapXtreamVod(source: EnabledXtreamSource, streams: XtreamVodStream[]): CatalogItem[] {
+function mapXtreamVod(
+  source: EnabledXtreamSource,
+  streams: XtreamVodStream[],
+  indexes?: readonly number[],
+): CatalogItem[] {
   const credentials = source.credentials!;
-  return streams.map((stream, index) => {
-    const title = stream.name || 'Unknown Movie';
-    const metadata = parseMediaDisplayTitle(title);
-    const providerId = (stream.stream_id ?? stream.num ?? `movie-${index}`).toString();
-    const rating = parseProviderRating(stream.rating, stream.rating_5based);
+  return streams.map((stream, position) => {
+    const fields = xtreamVodFields(
+      source.id,
+      source.profile.name,
+      stream,
+      indexes?.[position] ?? position,
+    );
     return {
-      id: xtreamItemId(source.id, 'vod', providerId),
-      sourceItemId: providerId,
-      title,
-      posterUrl: stream.stream_icon || '',
-      type: 'vod',
-      rating,
-      year: metadata.releaseYear || undefined,
-      added: stream.added,
-      categoryId: xtreamCategoryId(source.id, stream.category_id),
-      tags: metadata.tags,
-      country: metadata.country,
+      ...fields,
       streamUrl:
         stream.direct_source ||
-        getStreamUrl(credentials, 'vod', providerId, stream.container_extension || 'mp4'),
+        getStreamUrl(credentials, 'vod', fields.sourceItemId!, stream.container_extension || 'mp4'),
       containerExtension: stream.container_extension,
-      sourceId: source.id,
-      subtitle: source.profile.name,
     };
   });
 }
 
-function mapXtreamSeries(source: EnabledXtreamSource, streams: XtreamSeries[]): CatalogItem[] {
-  return streams.map((stream, index) => {
-    let year: string | undefined;
-    if (stream.releaseDate) {
-      const parsed = new Date(stream.releaseDate).getFullYear();
-      if (!Number.isNaN(parsed)) year = parsed.toString();
-    }
-    const title = stream.name || 'Unknown Series';
-    const metadata = parseMediaDisplayTitle(title, year);
-    const providerId = (stream.series_id ?? stream.num ?? `series-${index}`).toString();
-    const rating = parseProviderRating(stream.rating, stream.rating_5based);
-    return {
-      id: xtreamItemId(source.id, 'series', providerId),
-      sourceItemId: providerId,
-      title,
-      posterUrl: stream.cover || '',
-      type: 'series',
-      rating,
-      year: year ?? metadata.releaseYear ?? undefined,
-      added: stream.last_modified,
-      categoryId: xtreamCategoryId(source.id, stream.category_id),
-      tags: metadata.tags,
-      country: metadata.country,
-      genre: stream.genre,
-      sourceId: source.id,
-      subtitle: source.profile.name,
-      description: stream.plot,
-    };
-  });
+function mapXtreamSeries(
+  source: EnabledXtreamSource,
+  streams: XtreamSeries[],
+  indexes?: readonly number[],
+): CatalogItem[] {
+  return streams.map((stream, position) =>
+    xtreamSeriesItem(source.id, source.profile.name, stream, indexes?.[position] ?? position),
+  );
 }
 
 export function useLiveStreams(options?: { enabled?: boolean | undefined }) {
   const sources = useEnabledSources();
   const streamFoldingEnabled = useSettingsStore((s) => s.streamFoldingEnabled);
-  useCatalogDiskSeed('live', sources, options?.enabled ?? true);
   return useQuery({
     ...catalogQueryOptions('live', sources),
     enabled: sources.isAvailable && (options?.enabled ?? true),
@@ -407,7 +403,6 @@ export function useLiveStreams(options?: { enabled?: boolean | undefined }) {
 
 export function useVodStreams(options?: { enabled?: boolean | undefined }) {
   const sources = useEnabledSources();
-  useCatalogDiskSeed('vod', sources, options?.enabled ?? true);
   return useQuery({
     ...catalogQueryOptions('vod', sources),
     enabled: sources.isAvailable && (options?.enabled ?? true),
@@ -416,7 +411,6 @@ export function useVodStreams(options?: { enabled?: boolean | undefined }) {
 
 export function useSeriesList(options?: { enabled?: boolean | undefined }) {
   const sources = useEnabledSources();
-  useCatalogDiskSeed('series', sources, options?.enabled ?? true);
   return useQuery({
     ...catalogQueryOptions('series', sources),
     enabled: sources.isAvailable && (options?.enabled ?? true),
@@ -424,9 +418,13 @@ export function useSeriesList(options?: { enabled?: boolean | undefined }) {
 }
 
 /** Picks the catalogue that belongs to a category sidebar's type. */
-export function useCatalogByType(type: 'live' | 'vod' | 'series') {
-  const live = useLiveStreams({ enabled: type === 'live' });
-  const vod = useVodStreams({ enabled: type === 'vod' });
-  const series = useSeriesList({ enabled: type === 'series' });
+export function useCatalogByType(
+  type: 'live' | 'vod' | 'series',
+  options?: { enabled?: boolean | undefined },
+) {
+  const enabled = options?.enabled ?? true;
+  const live = useLiveStreams({ enabled: enabled && type === 'live' });
+  const vod = useVodStreams({ enabled: enabled && type === 'vod' });
+  const series = useSeriesList({ enabled: enabled && type === 'series' });
   return type === 'live' ? live : type === 'vod' ? vod : series;
 }
