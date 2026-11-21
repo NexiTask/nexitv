@@ -102,6 +102,15 @@ Do not add screenshots, channel logos, provider logos, posters, video, audio,
 or other third-party media without recording the creator, source URL, exact
 license, and retrieval date in this file.
 
+## Unbounded font
+
+`public/fonts/unbounded-latin-800.woff2` (the in-app sidebar wordmark) is
+Unbounded ExtraBold by The Unbounded Project Authors, the Latin subset served by
+Google Fonts, obtained on 21 November 2026. It is licensed under the SIL Open
+Font License 1.1; the complete license is in `public/fonts/OFL-Unbounded.txt`.
+The checked-in WOFF2 SHA-256 is
+`fe6d4ea7ed9647abf1e100a703786338d7898d56d0bedcdfdbc325e8fb02c834`.
+
 ## Righteous font
 
 `public/fonts/righteous-latin-400.woff2` is Righteous by Astigmatic (Brian J.

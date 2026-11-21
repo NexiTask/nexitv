@@ -2,11 +2,11 @@
    (style-src 'self') blocks that stylesheet in the built app — it only ever
    loaded in a plain browser preview, never in the actual packaged window. */
 @font-face {
-  font-family: 'Righteous';
+  font-family: 'Unbounded';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 800;
   font-display: swap;
-  src: url('/fonts/righteous-latin-400.woff2') format('woff2');
+  src: url('/fonts/unbounded-latin-800.woff2') format('woff2');
 }
 
 :root {

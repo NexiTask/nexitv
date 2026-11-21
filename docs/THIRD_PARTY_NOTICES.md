@@ -26,6 +26,8 @@ Important components include:
 - yt-dlp 2026.08.19: Unlicense. Its pinned Windows executable, source URL, and
   checksum are recorded in `scripts/ensure-windows-mpv.mjs`.
 - Righteous font: SIL Open Font License 1.1; see `public/fonts/OFL.txt`.
+- Unbounded font (in-app wordmark): SIL Open Font License 1.1; see
+  `public/fonts/OFL-Unbounded.txt`.
 - `country-flag-icons`: MIT. Movena uses the package's 3:2 SVG flag artwork and
   ISO 3166 country-code list; Unicode regional-indicator symbols are not used as
   the artwork source.
