@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -46,6 +46,9 @@ interface MovieDetailsDialogProps {
   /** The other provider variants behind the grouped card, when grouped. */
   versions?: readonly TitleVariant[] | undefined;
   onSelectVersion?: ((item: MediaItem) => void) | undefined;
+  /** Reports that this variant's details failed, so the caller can try the
+   * next one without making the reader close and reopen the card. */
+  onLoadFailed?: (() => void) | undefined;
   onClose: () => void;
 }
 
@@ -64,6 +67,7 @@ function XtreamMovieDetailsDialog({
   sourceItemId,
   versions,
   onSelectVersion,
+  onLoadFailed,
   onClose,
 }: MovieDetailsDialogProps) {
   const { t, language, number } = useI18n();
@@ -129,6 +133,20 @@ function XtreamMovieDetailsDialog({
       setRetryPresentation(null);
     }
   };
+
+  // A grouped card may represent a variant whose provider call fails; report
+  // it once so the caller can fall back to the next variant on its own.
+  const reportedFailure = useRef<string | null>(null);
+  useEffect(() => {
+    if (data || !error || !credentials) {
+      reportedFailure.current = null;
+      return;
+    }
+    if (reportedFailure.current !== String(providerMovieId)) {
+      reportedFailure.current = String(providerMovieId);
+      onLoadFailed?.();
+    }
+  }, [credentials, data, error, onLoadFailed, providerMovieId]);
 
   const historyItem = useLibraryStore((state) => state.history.find((h) => h.id === movieId));
   const remainingLabel = formatRemaining(historyItem?.currentTime, historyItem?.duration, language);
@@ -229,25 +247,30 @@ function XtreamMovieDetailsDialog({
       stateLayout={showErrorState}
     >
       {showErrorState ? (
-        <ErrorState
-          modal
-          title={visibleErrorPresentation.title}
-          description={visibleErrorPresentation.description}
-          detail={visibleErrorPresentation.detail}
-          actionIcon={!error && !credentials ? Settings : undefined}
-          actionLabel={error ? 'Try Again' : !credentials ? 'Open Settings' : 'Close'}
-          onAction={
-            error
-              ? () => void retryDetails()
-              : !credentials
-                ? () => {
-                    onClose();
-                    navigate('/settings?section=sources');
-                  }
-                : onClose
-          }
-          isRetrying={isRetryingDetails || isFetching}
-        />
+        <div className={styles.errorColumn}>
+          {versions && onSelectVersion && versions.length > 0 && (
+            <VersionSwitcher variants={versions} activeId={movieId} onSelect={onSelectVersion} />
+          )}
+          <ErrorState
+            modal
+            title={visibleErrorPresentation.title}
+            description={visibleErrorPresentation.description}
+            detail={visibleErrorPresentation.detail}
+            actionIcon={!error && !credentials ? Settings : undefined}
+            actionLabel={error ? 'Try Again' : !credentials ? 'Open Settings' : 'Close'}
+            onAction={
+              error
+                ? () => void retryDetails()
+                : !credentials
+                  ? () => {
+                      onClose();
+                      navigate('/settings?section=sources');
+                    }
+                  : onClose
+            }
+            isRetrying={isRetryingDetails || isFetching}
+          />
+        </div>
       ) : isLoading ? (
         <MovieDetailSkeleton />
       ) : data ? (

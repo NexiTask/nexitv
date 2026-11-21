@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import type { MediaItem } from '../model/media';
 import { useTitleVariants } from '../data/useTitleVariants';
 
@@ -54,6 +54,39 @@ export function MediaDetailsDialogs({
     activeSeries?.id,
   );
 
+  // When one variant's provider call fails, the next untried one takes over
+  // automatically; the picker stays on screen for the cases nothing answers.
+  const advanceMovie = (failed: MediaItem, tried: Set<string>) => {
+    tried.add(failed.id);
+    const next = movieVersions.find((variant) => !tried.has(variant.item.id))?.item;
+    if (next && selectedMovie) setMovieVariant({ forId: selectedMovie.id, item: next });
+  };
+  const advanceSeries = (failed: MediaItem, tried: Set<string>) => {
+    tried.add(failed.id);
+    const next = seriesVersions.find((variant) => !tried.has(variant.item.id))?.item;
+    if (next && selectedSeries) setSeriesVariant({ forId: selectedSeries.id, item: next });
+  };
+  const movieFailures = useRef<{ forId: string; tried: Set<string> }>({
+    forId: '',
+    tried: new Set(),
+  });
+  const seriesFailures = useRef<{ forId: string; tried: Set<string> }>({
+    forId: '',
+    tried: new Set(),
+  });
+  if (selectedMovie && movieFailures.current.forId !== selectedMovie.id) {
+    movieFailures.current = { forId: selectedMovie.id, tried: new Set() };
+  }
+  if (selectedSeries && seriesFailures.current.forId !== selectedSeries.id) {
+    seriesFailures.current = { forId: selectedSeries.id, tried: new Set() };
+  }
+  const onMovieLoadFailed = () => {
+    if (activeMovie) advanceMovie(activeMovie, movieFailures.current.tried);
+  };
+  const onSeriesLoadFailed = () => {
+    if (activeSeries) advanceSeries(activeSeries, seriesFailures.current.tried);
+  };
+
   const closeMovie = onCloseMovie || onCloseAll || (() => {});
   const closeSeries = onCloseSeries || onCloseAll || (() => {});
 
@@ -77,6 +110,7 @@ export function MediaDetailsDialogs({
             sourceItemId={activeMovie.sourceItemId}
             versions={movieVersions}
             onSelectVersion={selectMovieVersion}
+            onLoadFailed={onMovieLoadFailed}
             onClose={closeMovie}
           />
         </Suspense>
@@ -95,6 +129,7 @@ export function MediaDetailsDialogs({
             initialEpisodeNumber={positiveNumber(activeSeries.episodeNum)}
             versions={seriesVersions}
             onSelectVersion={selectSeriesVersion}
+            onLoadFailed={onSeriesLoadFailed}
             onClose={closeSeries}
           />
         </Suspense>
