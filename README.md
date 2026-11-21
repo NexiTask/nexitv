@@ -26,7 +26,7 @@
 > [!IMPORTANT]
 > **Use official sources only.** NexiTV is a free, open-source player. It does
 > not sell or provide subscriptions, channels, playlists, or media. Download it
-> only from this repository or the official website.
+> only from this repository.
 
 > [!NOTE]
 > Bring your own authorized content. NexiTV does not bypass DRM; use recording,
