@@ -2,6 +2,8 @@ import type { MediaItem } from './media';
 
 export interface CatalogItem extends MediaItem {
   categoryId?: string | undefined;
+  /** The provider's own adult flag (Xtream `is_adult`). */
+  adult?: boolean | undefined;
   /** The source's guide id for a channel — how XMLTV listings are matched. */
   epgChannelId?: string | undefined;
   radio?: boolean | undefined;

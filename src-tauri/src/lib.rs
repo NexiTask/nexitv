@@ -40,6 +40,9 @@ pub fn run() {
             sources::remote::m3u_probe_stream,
             sources::xmltv::xmltv_fetch,
             metadata::intro_db::introdb_fetch_segments,
+            metadata::imdb::imdb_refresh_status,
+            metadata::imdb::imdb_refresh_start,
+            metadata::imdb::imdb_refresh_set_enabled,
             downloads::download_media_start,
             downloads::download_media_pause,
             downloads::download_media_resume,
@@ -57,6 +60,7 @@ pub fn run() {
             sources::catalog_index::catalog_index_page_status,
             sources::catalog_index::catalog_index_page,
             sources::catalog_index::catalog_index_page_rows,
+            sources::catalog_index::catalog_index_variants,
             sources::catalog_index::catalog_index_page_stats,
             sources::catalog_index::catalog_index_rating_head,
             sources::catalog_index::catalog_index_facet_batch,
@@ -116,6 +120,9 @@ pub fn run() {
                         .build(),
                 )?;
             }
+            // The IMDb refresh loop starts on its own delayed thread; it must
+            // never sit on the startup path.
+            metadata::imdb::schedule(_app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())

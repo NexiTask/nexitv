@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, renderHook, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -290,13 +291,20 @@ describe('useMediaDetailState hook', () => {
   });
 });
 
+const renderDialogs = (ui: React.ReactElement) => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+};
+
 describe('MediaDetailsDialogs component', () => {
   it('renders movie modal when selectedMovie is provided and handles close', async () => {
     const user = userEvent.setup();
     const handleCloseMovie = vi.fn();
     const movieItem: MediaItem = { id: 'm1', title: 'Interstellar', posterUrl: '', type: 'vod' };
 
-    render(<MediaDetailsDialogs selectedMovie={movieItem} onCloseMovie={handleCloseMovie} />);
+    renderDialogs(
+      <MediaDetailsDialogs selectedMovie={movieItem} onCloseMovie={handleCloseMovie} />,
+    );
 
     expect(await screen.findByTestId('mock-movie-modal')).toBeTruthy();
     expect(screen.getByText('Interstellar')).toBeTruthy();
@@ -310,7 +318,9 @@ describe('MediaDetailsDialogs component', () => {
     const handleCloseSeries = vi.fn();
     const seriesItem: MediaItem = { id: 's1', title: 'Severance', posterUrl: '', type: 'series' };
 
-    render(<MediaDetailsDialogs selectedSeries={seriesItem} onCloseSeries={handleCloseSeries} />);
+    renderDialogs(
+      <MediaDetailsDialogs selectedSeries={seriesItem} onCloseSeries={handleCloseSeries} />,
+    );
 
     expect(await screen.findByTestId('mock-series-modal')).toBeTruthy();
     expect(screen.getByText('Severance')).toBeTruthy();
@@ -329,7 +339,7 @@ describe('MediaDetailsDialogs component', () => {
       episodeNum: 5,
     };
 
-    render(<MediaDetailsDialogs selectedSeries={seriesItem} />);
+    renderDialogs(<MediaDetailsDialogs selectedSeries={seriesItem} />);
 
     expect((await screen.findByTestId('mock-series-context')).textContent).toBe('2:5');
   });

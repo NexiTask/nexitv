@@ -336,6 +336,8 @@ export interface XtreamVodStream {
   num: number;
   name: string;
   stream_type: string;
+  /** The provider's own adult flag; "0" on every title it does not flag. */
+  is_adult?: string | number | undefined;
   stream_id: number;
   stream_icon: string;
   rating: string;

@@ -1,5 +1,18 @@
 import { invoke } from '@tauri-apps/api/core';
 
+/** The IMDb pipeline's state (metadata/imdb.rs). Unix seconds where set. */
+export interface ImdbRefreshStatus {
+  running: boolean;
+  /** The automatic refresh (weekly dumps, daily backfill) is on. */
+  enabled: boolean;
+  lastRefresh: number | null;
+  /** Titles the current dumps hold. */
+  titles: number | null;
+  /** Catalogue movies/series with a matched IMDb title, and their total. */
+  matched: number;
+  total: number;
+}
+
 export interface MpvStartOptions {
   /** Frontend-owned identity echoed by every native event for this session. */
   sessionId?: string | undefined;
@@ -88,6 +101,13 @@ export interface CatalogPageQuery {
   orderedIds?: string[] | null | undefined;
   /** Keep titles whose normalized title contains this text. */
   titleFilter?: string | null | undefined;
+  /** The quality view: an IMDb rating floor and its minimum vote count. */
+  imdbMinRating?: number | null | undefined;
+  imdbMinVotes?: number | null | undefined;
+  /** Leave out the titles the provider flags as adult. */
+  excludeAdult?: boolean | undefined;
+  /** Collapse provider variants sharing an IMDb id into one card. */
+  groupTitles?: boolean | undefined;
 }
 
 export interface CatalogSearchResult {
@@ -308,6 +328,16 @@ export const tauriApi = {
   introDbFetchSegments: (imdbId: string, season: number, episode: number) =>
     invoke<unknown>('introdb_fetch_segments', { imdbId, season, episode }),
 
+  /** The IMDb pipeline's state: refresh schedule, coverage, last refresh. */
+  imdbRefreshStatus: () => invoke<ImdbRefreshStatus>('imdb_refresh_status'),
+
+  /** Update the IMDb data now, regardless of the weekly schedule. */
+  imdbRefreshStart: () => invoke<ImdbRefreshStatus>('imdb_refresh_start'),
+
+  /** Turn the automatic refresh (weekly dumps, daily backfill) off or on. */
+  imdbRefreshSetEnabled: (enabled: boolean) =>
+    invoke<void>('imdb_refresh_set_enabled', { enabled }),
+
   /** Start a managed media download; progress and lifecycle arrive on download-event. */
   downloadMediaStart: (options: DownloadMediaOptions & { id: string }) =>
     invoke<void>('download_media_start', { options }),
@@ -377,6 +407,10 @@ export const tauriApi = {
       keys,
       fold,
     }),
+
+  /** The provider variants behind one grouped card, as (source id, raw JSON) pairs. */
+  catalogIndexVariants: (kind: CatalogPageKind, itemId: string) =>
+    invoke<[string, string][]>('catalog_index_variants', { kind, itemId }),
 
   /** The category sidebar's counts, or null while the index cannot serve the page. */
   catalogIndexPageStats: (

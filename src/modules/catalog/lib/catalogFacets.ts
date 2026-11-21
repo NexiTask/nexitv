@@ -3,6 +3,7 @@ import type {
   XtreamSeries,
   XtreamVodStream,
 } from '@/modules/sources/public/data/xtreamClient';
+import { imdbMatchKey } from '@/modules/metadata/public/model/imdbMatchKey';
 import { isUltraHdQuality, mergeMediaTags } from '@/shared/lib/mediaTags';
 import { providerRatingValue } from '@/shared/lib/rating';
 import type { CatalogItem } from '../model/catalogItem';
@@ -21,10 +22,11 @@ import { xtreamLiveFields, xtreamSeriesItem, xtreamVodFields } from './xtreamIte
  * own functions:
  *
  * `[ord, id, title, categoryId, added, hasAdded, year, providerRating, flags, genreMask,
- *   foldKey, foldRank]`
+ *   foldKey, foldRank, matchKey]`
  *
  * Channels also carry what stream folding reads: the group they fold into
- * and their quality rank (null and 0 for movies and series).
+ * and their quality rank (null and 0 for movies and series). The match key is
+ * what the IMDb pipeline joins on (movies and series only, null for channels).
  */
 export type CatalogFacetRow = [
   ord: number,
@@ -39,6 +41,7 @@ export type CatalogFacetRow = [
   genres: number,
   foldKey: string | null,
   foldRank: number,
+  matchKey: string | null,
 ];
 
 /** Declared 4K or 8K (the title/quality/tags path of `isUltraHdQuality`). */
@@ -50,6 +53,10 @@ export const FACET_KIDS = 8;
 export const FACET_TITLE_UHD = 16;
 /** The quality badges this variant brings to a folded channel declare 4K or 8K. */
 export const FACET_BADGE_UHD = 32;
+/** The provider flags the title as adult (its own `is_adult`). */
+export const FACET_ADULT = 64;
+/** The variant's provider copy actually carries a poster. */
+export const FACET_HAS_POSTER = 128;
 
 const isUltraHdTag = (tags: readonly string[]) => tags.includes('4K') || tags.includes('8K');
 
@@ -67,6 +74,10 @@ export function catalogItemFacets(ord: number, item: CatalogItem): CatalogFacetR
     if (isUltraHdTag(mergeMediaTags(...fold.qualityBadges))) flags |= FACET_BADGE_UHD;
   }
   if (isUltraHdQuality(item)) flags |= FACET_ULTRA_HD;
+  if (item.adult) flags |= FACET_ADULT;
+  // A variant without a poster makes a broken group card, so the flag lets
+  // the query engine prefer siblings that have one.
+  if (item.posterUrl) flags |= FACET_HAS_POSTER;
   if (SMART_TITLE_PATTERNS['smart:sports'].test(item.title)) flags |= FACET_SPORTS;
   if (SMART_TITLE_PATTERNS['smart:news'].test(item.title)) flags |= FACET_NEWS;
   if (SMART_TITLE_PATTERNS['smart:kids'].test(item.title)) flags |= FACET_KIDS;
@@ -83,6 +94,7 @@ export function catalogItemFacets(ord: number, item: CatalogItem): CatalogFacetR
     catalogGenreMask(item),
     foldKey,
     foldRank,
+    item.type === 'live' ? null : imdbMatchKey(item.title || '', item.year),
   ];
 }
 

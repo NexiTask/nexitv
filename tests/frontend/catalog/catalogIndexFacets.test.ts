@@ -58,6 +58,9 @@ describe('catalogue index facets', () => {
       bit('Horror'),
       null,
       0,
+      // The key is what a TMDB lookup would search: the parser folds the
+      // quality tag ("4K") and the provider's year copy away.
+      'horrornight',
     ]);
   });
 

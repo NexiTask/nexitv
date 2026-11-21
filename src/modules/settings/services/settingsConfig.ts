@@ -123,6 +123,13 @@ export function sanitizeSettingsConfig(value: unknown): SettingsSnapshot {
     streamFoldingEnabled: booleanOr(source.streamFoldingEnabled, migrated.streamFoldingEnabled),
     customTitleRules: migrated.customTitleRules,
     badgeVisibility: migrated.badgeVisibility,
+    catalogImdbQuality: oneOf(
+      source.catalogImdbQuality,
+      ['all', 'imdb-7-1k', 'imdb-65-5k', 'imdb-6-10k'] as const,
+      migrated.catalogImdbQuality,
+    ),
+    catalogHideAdult: booleanOr(source.catalogHideAdult, migrated.catalogHideAdult),
+    catalogGroupTitles: booleanOr(source.catalogGroupTitles, migrated.catalogGroupTitles),
     smartLogoAspectMode: oneOf(
       source.smartLogoAspectMode,
       ['auto', 'force-16:9', 'off'] as const,

@@ -19,6 +19,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -35,7 +36,11 @@ use super::catalog_query::{
 use super::catalog_search::normalize_text;
 use crate::credentials::source::validate_source_id;
 
-const SCHEMA_VERSION: i64 = 4;
+/// v6: the facet build also reports whether a copy carries a poster (the
+/// variant grouping prefers those); the rebuild replays the facet build once.
+/// The backfilled IMDb columns now travel with the carried facets, so a
+/// rebuild no longer drops the pipeline's matches.
+const SCHEMA_VERSION: i64 = 6;
 /// Rows returned with a page so its first screen needs no second request.
 const PAGE_HEAD_ROWS: usize = 120;
 const MAX_ROWS_PER_REQUEST: usize = 2_000;
@@ -70,6 +75,11 @@ fn open(path: &PathBuf) -> rusqlite::Result<Connection> {
     connection.pragma_update(None, "synchronous", "NORMAL")?;
     let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
     if version != SCHEMA_VERSION {
+        // Facets are re-derived from the stored provider JSON and the IMDb
+        // pipeline keeps its own database, so a rebuild costs no downloads;
+        // the version bump replays the facet build once (see
+        // metadata::imdb for the match-key column).
+        REBUILT.store(true, Ordering::Relaxed);
         connection.execute_batch(
             "DROP TABLE IF EXISTS items;
              DROP TABLE IF EXISTS lists;",
@@ -106,10 +116,19 @@ fn open(path: &PathBuf) -> rusqlite::Result<Connection> {
             f_rank INTEGER,
             f_fold_key TEXT,
             f_fold_rank INTEGER,
+            f_match_key TEXT,
+            imdb_tconst TEXT,
+            imdb_rating REAL,
+            imdb_votes INTEGER,
+            imdb_adult INTEGER,
+            imdb_runtime INTEGER,
+            imdb_genres TEXT,
             PRIMARY KEY (source_id, kind, ord)
          );
          CREATE INDEX IF NOT EXISTS items_added ON items (source_id, kind, added DESC, ord);
          CREATE INDEX IF NOT EXISTS items_rating ON items (source_id, kind, rating DESC, ord);
+         CREATE INDEX IF NOT EXISTS items_imdb ON items (source_id, kind, imdb_rating DESC, ord)
+            WHERE imdb_rating IS NOT NULL;
          CREATE INDEX IF NOT EXISTS items_unranked ON items (source_id, kind, ord)
             WHERE f_rank IS NULL;",
     )?;
@@ -117,7 +136,7 @@ fn open(path: &PathBuf) -> rusqlite::Result<Connection> {
     Ok(connection)
 }
 
-fn with_reader<T>(
+pub(crate) fn with_reader<T>(
     app: &tauri::AppHandle,
     f: impl FnOnce(&Connection) -> rusqlite::Result<T>,
 ) -> Result<T, String> {
@@ -138,17 +157,30 @@ fn with_reader<T>(
     f(connection).map_err(|error| format!("Catalog index error: {error}"))
 }
 
-fn with_connection<T>(
+/// Set when a schema bump dropped the tables: the caller that opened the
+/// connection tells the IMDb pipeline to re-match at once, instead of letting
+/// its daily gate sit on a catalogue that just lost its matches.
+static REBUILT: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn with_connection<T>(
     app: &tauri::AppHandle,
     f: impl FnOnce(&mut Connection) -> rusqlite::Result<T>,
 ) -> Result<T, String> {
     let mut guard = CONNECTION.lock().unwrap_or_else(|e| e.into_inner());
-    if guard.is_none() {
+    let opened = guard.is_none();
+    if opened {
         let path = database_path(app)?;
         *guard = Some(open(&path).map_err(|error| format!("Catalog index unavailable: {error}"))?);
     }
-    let connection = guard.as_mut().expect("connection was just opened");
-    f(connection).map_err(|error| format!("Catalog index error: {error}"))
+    let result = f(guard.as_mut().expect("connection was just opened"))
+        .map_err(|error| format!("Catalog index error: {error}"));
+    // The imdb module takes this lock in turn (its backfill reads the index),
+    // so no lock of ours is held while calling across.
+    drop(guard);
+    if opened && REBUILT.swap(false, Ordering::Relaxed) {
+        crate::metadata::imdb::invalidate_backfill(app);
+    }
+    result
 }
 
 /// JavaScript's `Number.parseInt(value, 10) || 0` for the provider's `added`
@@ -291,9 +323,11 @@ fn ingest_into(
             let mut insert = transaction.prepare(
                 "INSERT INTO items (source_id, kind, ord, added, rating, category_id, raw,
                     raw_hash, f_id, f_title, f_category, f_added, f_has_added, f_year,
-                    f_rating, f_flags, f_genres, f_rank, f_fold_key, f_fold_rank)
+                    f_rating, f_flags, f_genres, f_rank, f_fold_key, f_fold_rank,
+                    f_match_key, imdb_tconst, imdb_rating, imdb_votes, imdb_adult,
+                    imdb_runtime, imdb_genres)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-                    ?16, ?17, ?18, ?19, ?20)",
+                    ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)",
             )?;
             for (ord, raw) in list.iter().enumerate() {
                 let Ok(item) = serde_json::from_str::<Value>(raw.get()) else {
@@ -307,6 +341,9 @@ fn ingest_into(
                 }
                 let hash = raw_hash(raw.get());
                 let facets = carried.get(&hash);
+                // The carried match wins; a provider-embedded IMDb id can be
+                // filled right away.
+                let derived_imdb_id = crate::metadata::imdb::imdb_id_of(&item);
                 insert.execute(params![
                     source_id,
                     kind,
@@ -328,6 +365,18 @@ fn ingest_into(
                     facets.and_then(|f| f.rank),
                     facets.and_then(|f| f.fold_key.as_ref()),
                     facets.map(|f| f.fold_rank),
+                    // The match key arrives with the facet build; the IMDb
+                    // columns travel with the carried facets so a rebuild
+                    // keeps the pipeline's matches.
+                    facets.and_then(|f| f.match_key.as_ref()),
+                    facets
+                        .and_then(|f| f.imdb_tconst.as_ref())
+                        .or(derived_imdb_id.as_ref()),
+                    facets.and_then(|f| f.imdb_rating),
+                    facets.and_then(|f| f.imdb_votes),
+                    facets.and_then(|f| f.imdb_adult),
+                    facets.and_then(|f| f.imdb_runtime),
+                    facets.and_then(|f| f.imdb_genres.as_ref()),
                 ])?;
                 inserted += 1;
             }
@@ -359,6 +408,14 @@ struct StoredFacets {
     rank: Option<i64>,
     fold_key: Option<String>,
     fold_rank: i64,
+    match_key: Option<String>,
+    /// The IMDb pipeline's columns; carried so a rebuild keeps its matches.
+    imdb_tconst: Option<String>,
+    imdb_rating: Option<f64>,
+    imdb_votes: Option<f64>,
+    imdb_adult: Option<i64>,
+    imdb_runtime: Option<i64>,
+    imdb_genres: Option<String>,
 }
 
 fn raw_hash(raw: &str) -> i64 {
@@ -374,7 +431,8 @@ fn carried_facets(
 ) -> rusqlite::Result<HashMap<i64, StoredFacets>> {
     let mut statement = connection.prepare(
         "SELECT raw_hash, f_id, f_title, f_category, f_added, f_has_added, f_year, f_rating,
-            f_flags, f_genres, f_rank, f_fold_key, f_fold_rank
+            f_flags, f_genres, f_rank, f_fold_key, f_fold_rank, f_match_key,
+            imdb_tconst, imdb_rating, imdb_votes, imdb_adult, imdb_runtime, imdb_genres
          FROM items WHERE source_id = ?1 AND kind = ?2 AND f_id IS NOT NULL",
     )?;
     let rows = statement.query_map(params![source_id, kind], |row| {
@@ -393,6 +451,13 @@ fn carried_facets(
                 rank: row.get(10)?,
                 fold_key: row.get(11)?,
                 fold_rank: row.get::<_, Option<i64>>(12)?.unwrap_or(0),
+                match_key: row.get(13)?,
+                imdb_tconst: row.get(14)?,
+                imdb_rating: row.get(15)?,
+                imdb_votes: row.get::<_, Option<i64>>(16)?.map(|votes| votes as f64),
+                imdb_adult: row.get(17)?,
+                imdb_runtime: row.get(18)?,
+                imdb_genres: row.get(19)?,
             },
         ))
     })?;
@@ -404,6 +469,32 @@ pub(crate) fn delete_source(app: &tauri::AppHandle, source_id: &str) -> Result<(
         connection.execute("DELETE FROM items WHERE source_id = ?1", params![source_id])?;
         connection.execute("DELETE FROM lists WHERE source_id = ?1", params![source_id])?;
         Ok(())
+    })
+}
+
+/// The keys and provider IMDb ids the catalogue's IMDb pipeline can match
+/// against: every facet match key, plus the IMDb ids the ingest picked out of
+/// provider JSON. The dumps are pre-filtered to these, which is what keeps
+/// `imdb.sqlite` at megabytes instead of gigabytes.
+pub(crate) fn match_universe(
+    app: &tauri::AppHandle,
+) -> Result<
+    (
+        std::collections::HashSet<String>,
+        std::collections::HashSet<String>,
+    ),
+    String,
+> {
+    with_reader(app, |connection| {
+        let keys: std::collections::HashSet<String> = connection
+            .prepare("SELECT DISTINCT f_match_key FROM items WHERE f_match_key IS NOT NULL")?
+            .query_map([], |row| row.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        let tt_ids: std::collections::HashSet<String> = connection
+            .prepare("SELECT DISTINCT imdb_tconst FROM items WHERE imdb_tconst IS NOT NULL")?
+            .query_map([], |row| row.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok((keys, tt_ids))
     })
 }
 
@@ -622,6 +713,12 @@ fn facet_cache_put(source_id: &str, kind: &str, facets: Arc<SourceFacets>) {
         .insert((source_id.to_string(), kind.to_string()), facets);
 }
 
+/// Drop the cached facets so the next page read reloads them with the IMDb
+/// columns the backfill just filled.
+pub(crate) fn invalidate_imdb_facets() {
+    *FACETS.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
+
 fn list_generation(
     connection: &Connection,
     source_id: &str,
@@ -665,7 +762,8 @@ fn read_source_facets(
     }
     let mut statement = transaction.prepare(
         "SELECT ord, f_id, f_category, f_added, f_has_added, f_year, f_rating, f_flags,
-            f_genres, f_rank, f_fold_key, f_fold_rank, f_title
+            f_genres, f_rank, f_fold_key, f_fold_rank, f_title, imdb_rating, imdb_votes,
+            imdb_tconst
          FROM items WHERE source_id = ?1 AND kind = ?2 ORDER BY ord",
     )?;
     let mut categories: Vec<Box<str>> = Vec::new();
@@ -701,6 +799,11 @@ fn read_source_facets(
             fold_rank: row.get::<_, Option<i64>>(11)?.unwrap_or(0) as u8,
             search_title: normalize_text(&row.get::<_, Option<String>>(12)?.unwrap_or_default())
                 .into(),
+            imdb_rating: row.get(13)?,
+            imdb_votes: row.get::<_, Option<i64>>(14)?.map(|votes| votes as f64),
+            imdb_tconst: row
+                .get::<_, Option<String>>(15)?
+                .map(String::into_boxed_str),
         });
     }
     drop(query);
@@ -1015,6 +1118,41 @@ pub fn catalog_index_page_rows(
     )
 }
 
+/// The provider variants behind one grouped card: the rows sharing the title's
+/// IMDb identity, as (source id, raw JSON) pairs, without the row itself.
+/// Empty when the title has no IMDb identity.
+#[tauri::command(async)]
+pub fn catalog_index_variants(
+    app: tauri::AppHandle,
+    kind: String,
+    item_id: String,
+) -> Result<Vec<(String, String)>, String> {
+    validate_page_kind(&kind)?;
+    with_reader(&app, |connection| {
+        let identity: Option<String> = connection
+            .query_row(
+                "SELECT imdb_tconst FROM items WHERE kind = ?1 AND f_id = ?2",
+                params![kind, item_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(identity) = identity else {
+            return Ok(Vec::new());
+        };
+        let mut statement = connection.prepare(
+            "SELECT source_id, raw FROM items
+             WHERE kind = ?1 AND imdb_tconst = ?2 AND f_id IS NOT NULL AND f_id != ?3
+             ORDER BY source_id, ord",
+        )?;
+        let rows = statement
+            .query_map(params![kind, identity, item_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    })
+}
+
 /// The category sidebar's counts; `None` until the index can serve the page.
 #[tauri::command(async)]
 pub fn catalog_index_page_stats(
@@ -1130,7 +1268,7 @@ pub fn catalog_index_facet_batch(
 }
 
 /// `[ord, id, title, categoryId, added, hasAdded, year, rating, flags, genres,
-/// foldKey, foldRank]`
+/// foldKey, foldRank, matchKey]`
 type FacetIn = (
     u32,
     String,
@@ -1144,6 +1282,7 @@ type FacetIn = (
     u16,
     Option<String>,
     u8,
+    Option<String>,
 );
 
 /// Store facets the worker derived; `false` when the list changed meanwhile.
@@ -1166,7 +1305,8 @@ pub fn catalog_index_store_facets(
             let mut update = transaction.prepare(
                 "UPDATE items SET f_id = ?4, f_title = ?5, f_category = ?6, f_added = ?7,
                     f_has_added = ?8, f_year = ?9, f_rating = ?10, f_flags = ?11,
-                    f_genres = ?12, f_fold_key = ?13, f_fold_rank = ?14, f_rank = NULL
+                    f_genres = ?12, f_fold_key = ?13, f_fold_rank = ?14, f_match_key = ?15,
+                    f_rank = NULL
                  WHERE source_id = ?1 AND kind = ?2 AND ord = ?3",
             )?;
             for (
@@ -1182,11 +1322,12 @@ pub fn catalog_index_store_facets(
                 genres,
                 fold_key,
                 fold_rank,
+                match_key,
             ) in &facets
             {
                 update.execute(params![
                     source_id, kind, ord, id, title, category, added, has_added, year, rating,
-                    flags, genres, fold_key, fold_rank
+                    flags, genres, fold_key, fold_rank, match_key
                 ])?;
             }
         }

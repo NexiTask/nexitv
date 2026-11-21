@@ -2,6 +2,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { UI_LANGUAGE_DEFINITIONS } from '@/shared/i18n/config';
 import { Select } from '@/shared/ui/Select';
 import {
+  SettingsButton,
   SettingsGroup,
   SettingsInput,
   SettingsPageContent,
@@ -9,11 +10,13 @@ import {
   SettingsToggle,
 } from './SettingsControls';
 import { storeTmdbApiKey } from '@/modules/metadata/public/services/tmdbCredentialVault';
+import { useImdbRefresh } from '@/modules/metadata/public/hooks/useImdbRefresh';
 import { notify } from '@/shared/notifications/useNotificationStore';
 import { getErrorMessage } from '@/shared/lib/error';
 
 export function LibraryMetadataSettingsSection() {
   const settings = useSettingsStore();
+  const imdb = useImdbRefresh();
 
   return (
     <SettingsPageContent>
@@ -30,6 +33,16 @@ export function LibraryMetadataSettingsSection() {
             label="Enable live stream folding"
             checked={settings.streamFoldingEnabled}
             onChange={(checked) => settings.updateSetting('streamFoldingEnabled', checked)}
+          />
+        </SettingsRow>
+        <SettingsRow
+          title="Group Identical Titles"
+          description="Collapse the provider's duplicate entries of one title (country copies, 4K/FHD variants) into a single card with the best stream. Needs the catalogue index."
+        >
+          <SettingsToggle
+            label="Group identical titles"
+            checked={settings.catalogGroupTitles}
+            onChange={(checked) => settings.updateSetting('catalogGroupTitles', checked)}
           />
         </SettingsRow>
         <SettingsRow
@@ -172,6 +185,46 @@ export function LibraryMetadataSettingsSection() {
           />
         </SettingsRow>
       </SettingsGroup>
+
+      {/* IMDb Ratings (the bulk pipeline; see metadata/imdb.rs) */}
+      {imdb.status && (
+        <SettingsGroup
+          title="IMDb Ratings"
+          description="Ratings for the whole catalogue from IMDb's daily public datasets, matched by title and year. They power the quality filter and the IMDb sort on Movies and Series."
+        >
+          <SettingsRow
+            title="Automatic Refresh"
+            description="Check weekly for fresh ratings and match newly added titles daily. Runs in the background, never at startup."
+          >
+            <SettingsToggle
+              label="Refresh IMDb ratings automatically"
+              checked={imdb.status.enabled}
+              onChange={(checked) => imdb.setEnabled(checked)}
+            />
+          </SettingsRow>
+          <SettingsRow
+            title="Coverage"
+            description={
+              imdb.status.lastRefresh
+                ? `Last updated ${new Date(imdb.status.lastRefresh * 1000).toLocaleString()}.`
+                : 'Not updated yet; the first pass runs shortly after startup.'
+            }
+          >
+            <span style={{ whiteSpace: 'nowrap' }}>
+              {imdb.status.matched.toLocaleString()} of {imdb.status.total.toLocaleString()} titles
+              rated
+            </span>
+          </SettingsRow>
+          <SettingsRow
+            title="Update Now"
+            description="Download the current IMDb datasets and re-match the catalogue. The first run downloads about 210 MB; afterwards only changed ratings are applied."
+          >
+            <SettingsButton onClick={imdb.start} disabled={imdb.status.running || imdb.isStarting}>
+              {imdb.status.running || imdb.isStarting ? 'Updating…' : 'Update now'}
+            </SettingsButton>
+          </SettingsRow>
+        </SettingsGroup>
+      )}
     </SettingsPageContent>
   );
 }

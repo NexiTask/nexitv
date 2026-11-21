@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -23,10 +24,22 @@ import { MediaCardMenu } from '@/modules/catalog/components/MediaCardMenu';
 import { MediaCard } from '@/modules/catalog/components/MediaCard';
 import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
 
+/** Cards ask react-query for a poster fallback, so they need a client. */
+function renderWithClient(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
+/** A client wrapper for rerenders, which replace the tree the first render made. */
+function withQueryClient(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+}
+
 describe('custom control keyboard contracts', () => {
   it('keeps shared actions on the canonical button contract', async () => {
     const onSave = vi.fn();
-    render(
+    renderWithClient(
       <>
         <Button variant="primary" size="lg" onClick={onSave}>
           Save changes
@@ -49,7 +62,7 @@ describe('custom control keyboard contracts', () => {
 
   it('keeps modal error retry actions accessible and exposes retry progress', async () => {
     const onRetry = vi.fn();
-    const { rerender } = render(
+    const { rerender } = renderWithClient(
       <ErrorState
         modal
         title="Couldn’t load details"
@@ -64,14 +77,16 @@ describe('custom control keyboard contracts', () => {
     expect(screen.getByRole('alert').textContent).toContain('Couldn’t load details');
 
     rerender(
-      <ErrorState
-        modal
-        title="Couldn’t load details"
-        description="The provider did not respond."
-        actionLabel="Try Again"
-        onAction={onRetry}
-        isRetrying
-      />,
+      withQueryClient(
+        <ErrorState
+          modal
+          title="Couldn’t load details"
+          description="The provider did not respond."
+          actionLabel="Try Again"
+          onAction={onRetry}
+          isRetrying
+        />,
+      ),
     );
     expect(
       (screen.getByRole('button', { name: 'Trying again' }) as HTMLButtonElement).disabled,
@@ -93,7 +108,7 @@ describe('custom control keyboard contracts', () => {
       ],
     });
 
-    render(<ToastContainer enabled suppressDuringPlayback={false} />);
+    renderWithClient(<ToastContainer enabled suppressDuringPlayback={false} />);
     expect(screen.getByRole('alert').textContent).toContain('Connection failed');
 
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss notification' }));
@@ -117,7 +132,7 @@ describe('custom control keyboard contracts', () => {
     }
 
     const user = userEvent.setup();
-    render(<Harness />);
+    renderWithClient(<Harness />);
     await user.click(screen.getByRole('radio', { name: 'Grid' }));
     await user.keyboard('{ArrowLeft}');
     expect(screen.getByRole('radio', { name: 'List' }).getAttribute('aria-checked')).toBe('true');
@@ -126,7 +141,7 @@ describe('custom control keyboard contracts', () => {
   });
 
   it('keeps compact icon-only segmented options accessible by their labels', () => {
-    render(
+    renderWithClient(
       <SegmentedControl
         ariaLabel="Editor view"
         value="channels"
@@ -161,7 +176,7 @@ describe('custom control keyboard contracts', () => {
 
   it('keeps settings ranges labelled and reports formatted values', async () => {
     const onChange = vi.fn();
-    render(
+    renderWithClient(
       <SettingsRange
         aria-label="Subtitle opacity"
         min={0}
@@ -183,7 +198,7 @@ describe('custom control keyboard contracts', () => {
   });
 
   it('does not put a retry glyph on non-retry error actions', () => {
-    render(
+    renderWithClient(
       <ErrorState
         modal
         title="Item unavailable"
@@ -197,7 +212,9 @@ describe('custom control keyboard contracts', () => {
 
   it('keeps settings toggles labelled and exposes their native checked state', async () => {
     const onChange = vi.fn();
-    render(<SettingsToggle checked={false} onChange={onChange} label="Autoplay next episode" />);
+    renderWithClient(
+      <SettingsToggle checked={false} onChange={onChange} label="Autoplay next episode" />,
+    );
 
     const toggle = screen.getByRole('checkbox', { name: 'Autoplay next episode' });
     expect((toggle as HTMLInputElement).checked).toBe(false);
@@ -207,7 +224,7 @@ describe('custom control keyboard contracts', () => {
 
   it('gives the media-card quick-create field and submit action accessible names', async () => {
     useLibraryStore.setState({ favorites: [], collections: [], history: [], watched: [] });
-    render(
+    renderWithClient(
       <MediaCardMenu
         item={{ id: 'movie-1', title: 'Movie', posterUrl: '', type: 'vod' }}
         onPlay={vi.fn()}
@@ -225,7 +242,7 @@ describe('custom control keyboard contracts', () => {
   it('keeps the Play quick action while avoiding duplicate menu commands', async () => {
     useLibraryStore.setState({ favorites: [], collections: [], history: [], watched: [] });
     const openDetails = vi.fn();
-    const { unmount } = render(
+    const { unmount } = renderWithClient(
       <MemoryRouter>
         <MediaCard
           item={{ id: 'series-1', title: 'Example Series', posterUrl: '', type: 'series' }}
@@ -242,7 +259,7 @@ describe('custom control keyboard contracts', () => {
     expect(screen.getByRole('button', { name: 'Copy Title' })).toBeTruthy();
 
     unmount();
-    render(
+    renderWithClient(
       <MemoryRouter>
         <MediaCard
           item={{
@@ -264,7 +281,7 @@ describe('custom control keyboard contracts', () => {
   it('opens a media card from the keyboard without re-triggering nested actions', async () => {
     useLibraryStore.setState({ favorites: [], collections: [], history: [], watched: [] });
     const openDetails = vi.fn();
-    render(
+    renderWithClient(
       <MemoryRouter>
         <MediaCard
           item={{ id: 'movie-keyboard', title: 'Keyboard Movie', posterUrl: '', type: 'vod' }}
@@ -282,7 +299,7 @@ describe('custom control keyboard contracts', () => {
   });
 
   it('uses provider marks only for logo-less YouTube and Twitch live cards', () => {
-    render(
+    renderWithClient(
       <MemoryRouter>
         <MediaCard
           item={{
@@ -348,7 +365,7 @@ describe('custom control keyboard contracts', () => {
     }
 
     const user = userEvent.setup();
-    render(<Harness />);
+    renderWithClient(<Harness />);
     const first = screen.getByRole('tab', { name: 'Season 1' });
     await user.click(first);
     await user.keyboard('{ArrowLeft}');
@@ -377,7 +394,7 @@ describe('custom control keyboard contracts', () => {
       );
     }
 
-    render(<Harness />);
+    renderWithClient(<Harness />);
     const trigger = screen.getByRole('button', { name: /One/ });
     fireEvent.keyDown(trigger, { key: 'ArrowDown' });
     const listbox = await screen.findByRole('listbox');
@@ -391,7 +408,7 @@ describe('custom control keyboard contracts', () => {
 
   it('keeps disabled custom selects closed', async () => {
     const user = userEvent.setup();
-    render(
+    renderWithClient(
       <Select disabled value="one" onChange={vi.fn()} options={[{ value: 'one', label: 'One' }]} />,
     );
     await user.click(screen.getByRole('button', { name: /One/ }));
@@ -400,7 +417,7 @@ describe('custom control keyboard contracts', () => {
 
   it('resizes the shared sidebar with bounded keyboard steps and Home reset', () => {
     const onWidthChange = vi.fn();
-    render(
+    renderWithClient(
       <WorkspaceSidebar
         className="embedded-sidebar"
         width={WORKSPACE_SIDEBAR_MAX_WIDTH}

@@ -613,3 +613,14 @@
     padding-right: 0;
   }
 }
+
+/* The failed-variant state: the version picker stays reachable above the
+   error, so the reader can fall back by hand too. */
+.errorColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+}

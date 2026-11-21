@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -12,10 +13,13 @@ import { useStreamVerificationStore } from '@/modules/sources/store/useStreamVer
 const movieItem: MediaItem = { id: 'movie-1', title: 'Inception', posterUrl: '', type: 'vod' };
 
 function renderCard(item: MediaItem, viewMode?: 'grid' | 'list') {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
-      <MediaCard item={item} viewMode={viewMode} />
-    </MemoryRouter>,
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <MediaCard item={item} viewMode={viewMode} />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

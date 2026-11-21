@@ -89,6 +89,13 @@ export const desktopApi = {
   onPointerMoved: (handler: () => void) => listen('pointer-moved', handler),
   onCatalogIndexUpdated: (handler: (kind: string) => void) =>
     listen<string>('catalog-index-updated', ({ payload }) => handler(payload)),
+  /** The IMDb pipeline's stage events: checking/downloading/parsing while a
+   * refresh runs, done when new matches land (also after a quiet daily
+   * backfill), failed when an announced refresh stopped early. */
+  onImdbRefreshed: (handler: (stage: string) => void) =>
+    listen<{ stage: string }>('imdb://refresh', ({ payload }) => {
+      handler(payload.stage);
+    }),
 
   minimizeWindow: () => getCurrentWindow().minimize(),
   toggleMaximizeWindow: () => getCurrentWindow().toggleMaximize(),

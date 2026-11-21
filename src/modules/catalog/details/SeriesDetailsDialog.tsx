@@ -17,6 +17,9 @@ import {
   useAuthStore,
 } from '@/modules/sources/public/store/useAuthStore';
 import type { XtreamEpisode } from '@/modules/sources/public/data/xtreamClient';
+import type { MediaItem } from '../model/media';
+import type { TitleVariant } from '../data/useTitleVariants';
+import { VersionSwitcher } from './VersionSwitcher';
 import { useSeriesInfo } from '../data/useDetails';
 import { usePlayerStore } from '@/modules/playback/public/store/usePlayerStore';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
@@ -64,6 +67,12 @@ interface SeriesDetailsDialogProps {
   sourceItemId?: string | undefined;
   initialSeasonNumber?: number | undefined;
   initialEpisodeNumber?: number | undefined;
+  /** The other provider variants behind the grouped card, when grouped. */
+  versions?: readonly TitleVariant[] | undefined;
+  onSelectVersion?: ((item: MediaItem) => void) | undefined;
+  /** Reports that this variant's details failed, so the caller can try the
+   * next one without making the reader close and reopen the card. */
+  onLoadFailed?: (() => void) | undefined;
   onClose: () => void;
 }
 
@@ -82,6 +91,9 @@ function XtreamSeriesDetailsDialog({
   sourceItemId,
   initialSeasonNumber,
   initialEpisodeNumber,
+  versions,
+  onSelectVersion,
+  onLoadFailed,
   onClose,
 }: SeriesDetailsDialogProps) {
   const { t, tn, number, language } = useI18n();
@@ -158,6 +170,20 @@ function XtreamSeriesDetailsDialog({
       setRetryPresentation(null);
     }
   };
+
+  // A grouped card may represent a variant whose provider call fails; report
+  // it once so the caller can fall back to the next variant on its own.
+  const reportedFailure = useRef<string | null>(null);
+  useEffect(() => {
+    if (data || !error || !credentials) {
+      reportedFailure.current = null;
+      return;
+    }
+    if (reportedFailure.current !== String(providerSeriesId)) {
+      reportedFailure.current = String(providerSeriesId);
+      onLoadFailed?.();
+    }
+  }, [credentials, data, error, onLoadFailed, providerSeriesId]);
 
   const detailPresentation = buildDetailPresentation({
     enriched,
@@ -369,25 +395,30 @@ function XtreamSeriesDetailsDialog({
       stateLayout={showErrorState}
     >
       {showErrorState ? (
-        <ErrorState
-          modal
-          title={visibleErrorPresentation.title}
-          description={visibleErrorPresentation.description}
-          detail={visibleErrorPresentation.detail}
-          actionIcon={!error && !credentials ? Settings : undefined}
-          actionLabel={error ? 'Try Again' : !credentials ? 'Open Settings' : 'Close'}
-          onAction={
-            error
-              ? () => void retryDetails()
-              : !credentials
-                ? () => {
-                    onClose();
-                    navigate('/settings?section=sources');
-                  }
-                : onClose
-          }
-          isRetrying={isRetryingDetails || isFetching}
-        />
+        <div className={styles.errorColumn}>
+          {versions && onSelectVersion && versions.length > 0 && (
+            <VersionSwitcher variants={versions} activeId={seriesId} onSelect={onSelectVersion} />
+          )}
+          <ErrorState
+            modal
+            title={visibleErrorPresentation.title}
+            description={visibleErrorPresentation.description}
+            detail={visibleErrorPresentation.detail}
+            actionIcon={!error && !credentials ? Settings : undefined}
+            actionLabel={error ? 'Try Again' : !credentials ? 'Open Settings' : 'Close'}
+            onAction={
+              error
+                ? () => void retryDetails()
+                : !credentials
+                  ? () => {
+                      onClose();
+                      navigate('/settings?section=sources');
+                    }
+                  : onClose
+            }
+            isRetrying={isRetryingDetails || isFetching}
+          />
+        </div>
       ) : isLoading ? (
         <SeriesDetailSkeleton />
       ) : data ? (
@@ -532,6 +563,14 @@ function XtreamSeriesDetailsDialog({
               >
                 {plot}
               </div>
+
+              {versions && onSelectVersion && (
+                <VersionSwitcher
+                  variants={versions}
+                  activeId={seriesId}
+                  onSelect={onSelectVersion}
+                />
+              )}
 
               {hasMoreDetails && (
                 <button

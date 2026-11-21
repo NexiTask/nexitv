@@ -25,8 +25,15 @@ pub(crate) const FLAG_KIDS: u8 = 8;
 pub(crate) const FLAG_TITLE_UHD: u8 = 16;
 /// A channel variant's quality badges declare 4K/8K.
 pub(crate) const FLAG_BADGE_UHD: u8 = 32;
+/// The provider flags the title as adult (its own `is_adult`).
+pub(crate) const FLAG_ADULT: u8 = 64;
+/// The variant's provider copy carries a poster (the facet build's finding).
+pub(crate) const FLAG_HAS_POSTER: u8 = 128;
 /// `TOP_RATED_MIN_RATING` in rating.ts.
 const TOP_RATED_MIN_RATING: f64 = 7.0;
+/// The votes a title needs behind its IMDb rating to rank in Top Rated (the
+/// lightest quality preset's floor), so a handful of 10s cannot top the hub.
+const TOP_RATED_MIN_VOTES: f64 = 1_000.0;
 /// `CATALOG_GENRES.length` in smartCatalogFilter.ts.
 pub(crate) const GENRE_COUNT: usize = 14;
 /// Keys are `source position << ORD_BITS | ord`.
@@ -51,6 +58,13 @@ pub(crate) struct FacetRow {
     /// Live channels: the stream-folding group and quality rank.
     pub fold_key: Option<Box<str>>,
     pub fold_rank: u8,
+    /// IMDb's rating and vote count for the matched title, when the pipeline
+    /// matched one (null while unmatched — the title may simply be off-IMDb).
+    pub imdb_rating: Option<f64>,
+    pub imdb_votes: Option<f64>,
+    /// The matched IMDb title id: every row that carries the same one is a
+    /// provider variant of the same work.
+    pub imdb_tconst: Option<Box<str>>,
     /// The title as search compares it (`normalizeText`).
     pub search_title: Box<str>,
 }
@@ -101,6 +115,16 @@ pub struct CatalogQuery {
     pub ordered_ids: Option<Vec<String>>,
     /// Keep only titles whose normalized title contains this text.
     pub title_filter: Option<String>,
+    /// The quality view: an IMDb rating floor that only titles with at least
+    /// this many votes can satisfy (step 0: "≥ 7.0 with ≥ 1k votes" is the
+    /// junk killer). Both null: every title passes.
+    pub imdb_min_rating: Option<f64>,
+    pub imdb_min_votes: Option<f64>,
+    /// Leave out the titles the provider flags as adult.
+    pub exclude_adult: bool,
+    /// One card per title: provider variants sharing an IMDb id collapse into
+    /// a single representative.
+    pub group_titles: bool,
 }
 
 #[derive(Debug, Default, Serialize, PartialEq)]
@@ -200,6 +224,9 @@ struct Context<'a> {
     /// Whether TMDB's verdicts take part (the rating checks' candidate pool
     /// is judged on provider data alone).
     use_lookups: bool,
+    /// Whether the IMDb pipeline has matched anything: Top Rated ranks on
+    /// IMDb's votes once it has, and on the provider rating before that.
+    has_imdb: bool,
 }
 
 type Rating = Option<(f64, f64)>;
@@ -266,6 +293,9 @@ impl<'a> Context<'a> {
             categories,
             favorites: query.favorite_ids.iter().map(String::as_str).collect(),
             use_lookups,
+            has_imdb: sources
+                .iter()
+                .any(|source| source.rows.iter().any(|row| row.imdb_rating.is_some())),
         }
     }
 
@@ -309,6 +339,41 @@ impl<'a> Context<'a> {
             }
         }
         row.rating.map(|value| (value, 0.0))
+    }
+
+    /// Top Rated membership: real IMDb votes once the pipeline has matched
+    /// anything, the provider's own rating before that.
+    fn is_top_rated(&self, row: &FacetRow) -> bool {
+        if self.has_imdb {
+            row.imdb_rating.is_some_and(|value| {
+                value >= TOP_RATED_MIN_RATING
+                    && row.imdb_votes.unwrap_or(0.0) >= TOP_RATED_MIN_VOTES
+            })
+        } else {
+            row.rating
+                .is_some_and(|value| value >= TOP_RATED_MIN_RATING)
+        }
+    }
+
+    /// How strongly a variant declares 4K, for picking a group's card:
+    /// measured playback first (the verification store), then the title's own
+    /// tag, then a provider category that declares 4K/UHD.
+    fn quality_rank(&self, entry: Entry) -> u8 {
+        let row = self.row(entry);
+        if self.query.ultra_hd.get(&*row.id).copied() == Some(true) {
+            return 3;
+        }
+        if row.flags & (FLAG_TITLE_UHD | FLAG_BADGE_UHD) != 0 {
+            return 2;
+        }
+        if let Some(category) = row.category {
+            let name = &self.sources[entry.source as usize].categories[category as usize];
+            let lowered = name.to_lowercase();
+            if lowered.contains("4k") || lowered.contains("uhd") {
+                return 1;
+            }
+        }
+        0
     }
 
     fn genre_mask(&self, entry: Entry) -> u16 {
@@ -408,13 +473,9 @@ impl<'a> Context<'a> {
             "smart:top-rated" => {
                 let mut entries: Vec<Entry> = self
                     .all()
-                    .filter(|entry| {
-                        visible(entry)
-                            && self.rating(*entry).map_or(0.0, |(value, _)| value)
-                                >= TOP_RATED_MIN_RATING
-                    })
+                    .filter(|entry| visible(entry) && self.is_top_rated(self.row(*entry)))
                     .collect();
-                self.sort(&mut entries, "rating");
+                self.sort(&mut entries, if self.has_imdb { "imdb" } else { "rating" });
                 entries
             }
             "smart:4k" => self
@@ -468,10 +529,48 @@ impl<'a> Context<'a> {
                         .then_with(|| by_title(a, b))
                 });
             }
+            "imdb" => {
+                let ratings: HashMap<(u32, u32), Rating> = entries
+                    .iter()
+                    .map(|&entry| {
+                        let row = self.row(entry);
+                        (
+                            (entry.source, entry.row),
+                            row.imdb_rating
+                                .map(|value| (value, row.imdb_votes.unwrap_or(0.0))),
+                        )
+                    })
+                    .collect();
+                let rating = |entry: Entry| ratings[&(entry.source, entry.row)];
+                entries.sort_by(|&a, &b| {
+                    compare_ratings(rating(a), rating(b))
+                        .then_with(|| js(year(b) - year(a)))
+                        .then_with(|| by_title(a, b))
+                });
+            }
             "name-asc" => entries.sort_by(|&a, &b| by_title(a, b)),
             "name-desc" => entries.sort_by(|&a, &b| by_title(b, a)),
             _ => {}
         }
+    }
+
+    /// The quality view: adult titles out, and an IMDb floor that an
+    /// unmatched title cannot sit under.
+    fn passes_quality(&self, entry: Entry) -> bool {
+        let row = self.row(entry);
+        if self.query.exclude_adult && row.flags & FLAG_ADULT != 0 {
+            return false;
+        }
+        if let Some(min_rating) = self.query.imdb_min_rating {
+            let votes = row.imdb_votes.unwrap_or(0.0);
+            if votes < self.query.imdb_min_votes.unwrap_or(0.0) {
+                return false;
+            }
+            if row.imdb_rating.unwrap_or(0.0) < min_rating {
+                return false;
+            }
+        }
+        true
     }
 
     fn key(&self, entry: Entry) -> u32 {
@@ -479,10 +578,89 @@ impl<'a> Context<'a> {
     }
 }
 
+/// One collapsed card: the variant the group shows, plus the member flags the
+/// sidebar counts read (a favourite or a recent addition on any variant
+/// belongs to the card).
+struct Group {
+    representative: Entry,
+    favorite: bool,
+    recent: bool,
+}
+
+/// Collapses provider variants of the same IMDb title into one card. The card
+/// goes to the best variant — one with a poster first (a card without one is
+/// broken), then most 4K (measured playback, title tag, provider category),
+/// then the shortest search title, so the plain one beats decorated ones like
+/// "EN - X (2022) (US)", then list order. Titles without an IMDb id keep
+/// their own card.
+fn group_by_identity(context: &Context<'_>, entries: Vec<Entry>) -> Vec<Group> {
+    let mut slots: HashMap<&str, usize> = HashMap::with_capacity(entries.len());
+    let mut cards: Vec<Group> = Vec::with_capacity(entries.len());
+    let mut widths: Vec<usize> = Vec::with_capacity(entries.len());
+    // The card's rank: a poster first (a card without one is broken), then
+    // the 4K tiers, 0..3.
+    let mut ranks: Vec<u8> = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let row = context.row(entry);
+        let favorite = context.favorites.contains(&*row.id);
+        let recent = row.has_added;
+        let rank = u8::from(row.flags & FLAG_HAS_POSTER != 0) * 4 + context.quality_rank(entry);
+        let Some(identity) = row.imdb_tconst.as_deref() else {
+            cards.push(Group {
+                representative: entry,
+                favorite,
+                recent,
+            });
+            widths.push(0);
+            ranks.push(0);
+            continue;
+        };
+        let slot = match slots.get(identity) {
+            Some(&slot) => slot,
+            None => {
+                slots.insert(identity, cards.len());
+                cards.push(Group {
+                    representative: entry,
+                    favorite,
+                    recent,
+                });
+                widths.push(row.search_title.len());
+                ranks.push(rank);
+                continue;
+            }
+        };
+        let card = &mut cards[slot];
+        card.favorite |= favorite;
+        card.recent |= recent;
+        if rank > ranks[slot] || (rank == ranks[slot] && row.search_title.len() < widths[slot]) {
+            card.representative = entry;
+            widths[slot] = row.search_title.len();
+            ranks[slot] = rank;
+        }
+    }
+    cards
+}
+
 /// The ordered keys of one catalogue page, with its genre bar's counts.
 pub(crate) fn page(sources: &[&SourceFacets], query: &CatalogQuery) -> PageResult {
     let context = Context::new(sources, query, true);
-    let category = context.smart_filter();
+    // The quality view applies before the counts, so the genre bar and the
+    // header's total say what the page can actually show.
+    let filtered: Vec<Entry> = context
+        .smart_filter()
+        .into_iter()
+        .filter(|&entry| context.passes_quality(entry))
+        .collect();
+    // Grouping runs on the survivors, so an adult-flagged variant cannot
+    // drag its card in behind the viewer's back.
+    let category: Vec<Entry> = if query.group_titles {
+        group_by_identity(&context, filtered)
+            .into_iter()
+            .map(|group| group.representative)
+            .collect()
+    } else {
+        filtered
+    };
     let mut genre_counts = [0u32; GENRE_COUNT];
     for &entry in &category {
         let mask = context.genre_mask(entry);
@@ -500,7 +678,18 @@ pub(crate) fn page(sources: &[&SourceFacets], query: &CatalogQuery) -> PageResul
             .collect(),
         _ => category,
     };
-    context.sort(&mut entries, &query.sort);
+    // Top Rated is a ranking with its own rule, whatever the page's sort: IMDb's
+    // votes once the pipeline has matched titles, the provider's rating before.
+    let sort_mode: &str = if query.category.as_deref() == Some("smart:top-rated") {
+        if context.has_imdb {
+            "imdb"
+        } else {
+            "rating"
+        }
+    } else {
+        &query.sort
+    };
+    context.sort(&mut entries, sort_mode);
     PageResult {
         keys: entries.iter().map(|&entry| context.key(entry)).collect(),
         category_total,
@@ -557,20 +746,42 @@ pub(crate) fn stats(sources: &[&SourceFacets], query: &CatalogQuery) -> CatalogS
         if let Some(category) = row.category {
             per_category[entry.source as usize][category as usize] += 1;
         }
-        if context.is_hidden(entry) {
-            continue;
-        }
+    }
+    // The title counts follow the cards the pages show: grouped when
+    // grouping is on, with a favourite or a recent addition on any variant
+    // belonging to the card.
+    let visible: Vec<Entry> = context
+        .all()
+        .filter(|&entry| !context.is_hidden(entry))
+        .collect();
+    let cards = if query.group_titles {
+        group_by_identity(&context, visible)
+    } else {
+        visible
+            .into_iter()
+            .map(|entry| {
+                let row = context.row(entry);
+                Group {
+                    representative: entry,
+                    favorite: context.favorites.contains(&*row.id),
+                    recent: row.has_added,
+                }
+            })
+            .collect()
+    };
+    for card in &cards {
+        let row = context.row(card.representative);
         stats.visible_total += 1;
-        if context.favorites.contains(&*row.id) {
+        if card.favorite {
             stats.favorites += 1;
         }
-        if row.has_added {
+        if card.recent {
             stats.recent += 1;
         }
-        if row.rating.unwrap_or(0.0) >= TOP_RATED_MIN_RATING {
+        if context.is_top_rated(row) {
             stats.top_rated += 1;
         }
-        if context.is_ultra_hd(entry) {
+        if context.is_ultra_hd(card.representative) {
             stats.four_k += 1;
         }
     }
@@ -664,6 +875,9 @@ mod tests {
         rank: u32,
         fold_key: Option<&'static str>,
         fold_rank: u8,
+        imdb_rating: Option<f64>,
+        imdb_votes: Option<f64>,
+        imdb_tconst: Option<&'static str>,
     }
 
     fn title(id: &'static str) -> Title {
@@ -679,6 +893,9 @@ mod tests {
             rank: 0,
             fold_key: None,
             fold_rank: 0,
+            imdb_rating: None,
+            imdb_votes: None,
+            imdb_tconst: None,
         }
     }
 
@@ -710,6 +927,9 @@ mod tests {
                     rank: t.rank,
                     fold_key: t.fold_key.map(Into::into),
                     fold_rank: t.fold_rank,
+                    imdb_rating: t.imdb_rating,
+                    imdb_votes: t.imdb_votes,
+                    imdb_tconst: t.imdb_tconst.map(Into::into),
                     search_title: normalize_text(t.id).into(),
                 }
             })
@@ -1135,5 +1355,236 @@ mod tests {
             compare_ratings(Some((7.0, 10.0)), Some((7.0, 20.0))),
             Ordering::Greater
         );
+    }
+
+    fn rated(id: &'static str, imdb: Option<(f64, f64)>, adult: bool) -> Title {
+        Title {
+            imdb_rating: imdb.map(|(value, _)| value),
+            imdb_votes: imdb.map(|(_, votes)| votes),
+            flags: if adult { FLAG_ADULT } else { 0 },
+            ..title(id)
+        }
+    }
+
+    #[test]
+    fn the_quality_floor_hides_unmatched_low_vote_and_adult_titles() {
+        let facets = source(vec![
+            rated("good", Some((7.4, 2_000.0)), false),
+            rated("lowscore", Some((5.9, 40_000.0)), false),
+            rated("lowvotes", Some((9.0, 40.0)), false),
+            rated("unmatched", None, false),
+            rated("adult", Some((8.2, 50_000.0)), true),
+        ]);
+        let mut q = query("default");
+        q.imdb_min_rating = Some(7.0);
+        q.imdb_min_votes = Some(1_000.0);
+        assert_eq!(
+            keys(&page(&[&facets], &q)),
+            vec![0, 4],
+            "the floor keeps 'good' and the adult title"
+        );
+        q.exclude_adult = true;
+        assert_eq!(keys(&page(&[&facets], &q)), vec![0]);
+    }
+
+    #[test]
+    fn the_quality_floor_leaves_the_counts_consistent() {
+        let facets = source(vec![
+            rated("good", Some((7.4, 2_000.0)), false),
+            rated("lowscore", Some((5.9, 40_000.0)), false),
+        ]);
+        let mut q = query("default");
+        q.imdb_min_rating = Some(7.0);
+        q.imdb_min_votes = Some(1_000.0);
+        let result = page(&[&facets], &q);
+        assert_eq!(result.category_total, 1);
+        assert_eq!(result.keys, vec![0]);
+    }
+
+    #[test]
+    fn imdb_sort_orders_by_rating_then_votes() {
+        let facets = source(vec![
+            rated("low", Some((6.0, 90_000.0)), false),
+            rated("highfew", Some((8.9, 300.0)), false),
+            rated("highmany", Some((8.9, 12_000.0)), false),
+            rated("unmatched", None, false),
+        ]);
+        assert_eq!(
+            keys(&page(&[&facets], &query("imdb"))),
+            vec![2, 1, 0, 3],
+            "highmany, highfew, low, and the unmatched title last"
+        );
+    }
+
+    #[test]
+    fn top_rated_ranks_on_imdb_once_it_has_matched() {
+        let facets = source(vec![
+            // The provider's stale 10.0, unknown to IMDb: out once IMDb data exists.
+            Title {
+                rating: Some(10.0),
+                ..title("junk")
+            },
+            rated("good", Some((7.4, 2_000.0)), false),
+            rated("better", Some((8.1, 60_000.0)), false),
+            rated("lowvotes", Some((9.4, 40.0)), false),
+            rated("lowscore", Some((5.9, 40_000.0)), false),
+        ]);
+        let mut q = query("default");
+        q.category = Some("smart:top-rated".into());
+        // The page's sort does not decide the ranking; IMDb's votes do.
+        q.sort = "name-asc".into();
+        assert_eq!(
+            keys(&page(&[&facets], &q)),
+            vec![2, 1],
+            "only the well-voted IMDb ratings stay, best first"
+        );
+        assert_eq!(
+            stats(&[&facets], &q).top_rated,
+            2,
+            "the count matches the hub"
+        );
+        // Before the pipeline has matched anything, the provider rating rules.
+        let legacy = source(vec![
+            Title {
+                rating: Some(7.5),
+                year: Some(2010.0),
+                ..title("old")
+            },
+            Title {
+                rating: Some(9.0),
+                ..title("newer")
+            },
+        ]);
+        assert_eq!(keys(&page(&[&legacy], &q)), vec![1, 0]);
+        assert_eq!(stats(&[&legacy], &q).top_rated, 2);
+    }
+
+    #[test]
+    fn grouping_collapses_provider_variants_into_the_best_card() {
+        let facets = source(vec![
+            // First variant of the title: plain quality, long decorated name.
+            Title {
+                imdb_tconst: Some("tt1"),
+                ..title("en-breaking-bad-decorated")
+            },
+            // An unmatched title keeps its own card.
+            title("solo"),
+            // A 4K-declared variant wins the card despite the longer name.
+            Title {
+                imdb_tconst: Some("tt1"),
+                flags: FLAG_TITLE_UHD,
+                ..title("breaking-bad-4k-copy")
+            },
+            Title {
+                imdb_tconst: Some("tt1"),
+                ..title("bb")
+            },
+        ]);
+        let mut q = query("default");
+        q.group_titles = true;
+        let result = page(&[&facets], &q);
+        assert_eq!(
+            keys(&result),
+            vec![2, 1],
+            "the 4K variant represents tt1; the unmatched title keeps its card"
+        );
+        assert_eq!(result.category_total, 2);
+        // A measured-4K variant outranks a merely declared one.
+        q.ultra_hd.insert("bb".into(), true);
+        assert_eq!(keys(&page(&[&facets], &q)), vec![3, 1]);
+        // Without grouping every variant stays.
+        q.group_titles = false;
+        q.ultra_hd.clear();
+        assert_eq!(keys(&page(&[&facets], &q)), vec![0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn a_4k_category_lends_its_variant_the_card() {
+        let facets = source(vec![
+            Title {
+                imdb_tconst: Some("tt1"),
+                ..title("longer-plain-variant")
+            },
+            Title {
+                imdb_tconst: Some("tt1"),
+                category: Some("4K Movies"),
+                ..title("x")
+            },
+        ]);
+        let mut q = query("default");
+        q.group_titles = true;
+        assert_eq!(
+            keys(&page(&[&facets], &q)),
+            vec![1],
+            "the variant filed under the 4K category represents the title"
+        );
+    }
+
+    #[test]
+    fn a_variant_with_a_poster_represents_the_title() {
+        let facets = source(vec![
+            // Short and 4K-declared, but without a poster: a broken card.
+            Title {
+                imdb_tconst: Some("tt1"),
+                flags: FLAG_TITLE_UHD,
+                ..title("bare-4k-copy")
+            },
+            Title {
+                imdb_tconst: Some("tt1"),
+                flags: FLAG_HAS_POSTER,
+                ..title("longer-copy-with-a-poster")
+            },
+        ]);
+        let mut q = query("default");
+        q.group_titles = true;
+        assert_eq!(
+            keys(&page(&[&facets], &q)),
+            vec![1],
+            "the poster wins the card over quality and a shorter name"
+        );
+    }
+
+    #[test]
+    fn grouped_counts_follow_the_cards() {
+        let facets = source(vec![
+            Title {
+                imdb_tconst: Some("tt1"),
+                imdb_rating: Some(7.5),
+                imdb_votes: Some(2_000.0),
+                ..title("long-variant")
+            },
+            Title {
+                imdb_tconst: Some("tt1"),
+                imdb_rating: Some(7.5),
+                imdb_votes: Some(2_000.0),
+                has_added: true,
+                ..title("b")
+            },
+            Title {
+                has_added: true,
+                ..title("unmatched-recent")
+            },
+        ]);
+        let mut q = query("default");
+        q.group_titles = true;
+        let counted = stats(&[&facets], &q);
+        assert_eq!(
+            counted.visible_total, 2,
+            "the variants collapse; the unmatched title keeps its card"
+        );
+        assert_eq!(
+            counted.top_rated, 1,
+            "both tt1 rows carry the same rating; one card"
+        );
+        assert_eq!(
+            counted.recent, 2,
+            "a recent addition on any variant belongs to the card"
+        );
+        // A favourite on a non-card variant still counts, and the favourites
+        // page shows the card it belongs to.
+        q.favorite_ids = vec!["b".into()];
+        assert_eq!(stats(&[&facets], &q).favorites, 1);
+        q.category = Some("smart:favorites".into());
+        assert_eq!(keys(&page(&[&facets], &q)), vec![1]);
     }
 }

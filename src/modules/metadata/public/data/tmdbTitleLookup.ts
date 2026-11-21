@@ -1,2 +1,2 @@
 /** Focused public entrypoint; importing this contract evaluates only its owner. */
-export { fetchTmdbTitleMatch } from '../../data/tmdbTitleLookup';
+export { fetchTmdbDetails, fetchTmdbTitleMatch } from '../../data/tmdbTitleLookup';
