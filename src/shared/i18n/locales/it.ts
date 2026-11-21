@@ -117,6 +117,8 @@ export const IT_MESSAGES: Record<string, string> = {
   'Search your library': 'Cerca nella tua biblioteca',
   'Search movies, series, or live channels': 'Cerca film, serie o canali live',
   'Search categories...': 'Cerca categorie...',
+  'Search movies...': 'Cerca film...',
+  'Search series...': 'Cerca serie...',
   'Search channels...': 'Cerca canali...',
   'Search settings...': 'Cerca impostazioni...',
   'Search settings': 'Impostazioni di ricerca',

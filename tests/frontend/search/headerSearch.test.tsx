@@ -60,6 +60,21 @@ beforeEach(() => {
 });
 
 describe('header search suggestions', () => {
+  it('searches only its own kind on a catalogue page', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <HeaderSearch scope="series" />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByRole('combobox'), 'Stranger');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(useVodStreams).toHaveBeenLastCalledWith({ enabled: false });
+    expect(screen.queryByText('The Stranger')).toBeNull();
+  });
+
   it('does not activate or combine full catalogs before the user searches', () => {
     render(
       <MemoryRouter>

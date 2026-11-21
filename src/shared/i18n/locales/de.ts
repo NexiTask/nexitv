@@ -123,6 +123,8 @@ export const DE_MESSAGES: Record<string, string> = {
   'Search your library': 'Bibliothek durchsuchen',
   'Search movies, series, or live channels': 'Filme, Serien oder Live-Kanäle suchen',
   'Search categories...': 'Kategorien durchsuchen...',
+  'Search movies...': 'Filme durchsuchen...',
+  'Search series...': 'Serien durchsuchen...',
   'Search channels...': 'Kanäle durchsuchen...',
   'Search settings...': 'Einstellungen durchsuchen...',
   'Search settings': 'Einstellungen durchsuchen',

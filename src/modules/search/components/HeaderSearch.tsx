@@ -16,7 +16,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import type { MediaItem } from '@/modules/catalog/public/model/media';
 import { useSearchStore } from '../store/useSearchStore';
-import { useCatalogSearch } from '../data/useCatalogSearch';
+import { useCatalogSearch, type SearchScope } from '../data/useCatalogSearch';
 import styles from './HeaderSearch.module.css';
 import { getDisplayTitle, parseMediaDisplayTitle } from '@/modules/catalog/public/lib/titleParser';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
@@ -46,12 +46,15 @@ interface HeaderSearchProps {
   onItemClick?: ((item: MediaItem) => void) | undefined;
   placeholder?: string | undefined;
   ariaLabel?: string | undefined;
+  /** What the box searches: a catalogue page searches only its own kind. */
+  scope?: SearchScope | undefined;
 }
 
 export function HeaderSearch({
   onItemClick,
   placeholder = 'Search...',
   ariaLabel = 'Search your library',
+  scope = 'all',
 }: HeaderSearchProps) {
   const { t, tn, number } = useI18n();
   const [query, setQuery] = useState('');
@@ -176,7 +179,7 @@ export function HeaderSearch({
 
   const searchEnabled = suggestionQuery.length >= MIN_SUGGESTION_QUERY_LENGTH;
   // Ranked by the catalogue index where it can; hidden categories stay out.
-  const search = useCatalogSearch(suggestionQuery, 'all', {
+  const search = useCatalogSearch(suggestionQuery, scope, {
     enabled: searchEnabled,
     limit: 5,
   });
@@ -220,19 +223,23 @@ export function HeaderSearch({
     document.getElementById(activeOptionId)?.scrollIntoView({ block: 'nearest' });
   }, [activeOptionId]);
 
+  // The full results page opens on the same kind the box was searching.
+  const searchUrl = (term: string) =>
+    `/search?q=${encodeURIComponent(term)}${scope === 'all' ? '' : `&type=${scope}`}`;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = query.trim();
     if (trimmed) {
       addRecentSearch(trimmed);
-      navigate(`/search?q=${encodeURIComponent(trimmed)}`);
+      navigate(searchUrl(trimmed));
       closeDropdown();
     }
   };
 
   const handleSelectRecent = (term: string) => {
     addRecentSearch(term);
-    navigate(`/search?q=${encodeURIComponent(term)}`);
+    navigate(searchUrl(term));
     setQuery('');
     closeDropdown();
   };
@@ -244,7 +251,7 @@ export function HeaderSearch({
     if (onItemClick) {
       onItemClick(item);
     } else {
-      navigate(`/search?q=${encodeURIComponent(getDisplayTitle(item.title, item.type))}`);
+      navigate(searchUrl(getDisplayTitle(item.title, item.type)));
     }
     setQuery('');
     closeDropdown();
@@ -254,7 +261,7 @@ export function HeaderSearch({
     const trimmed = query.trim();
     if (!trimmed) return;
     addRecentSearch(trimmed);
-    navigate(`/search?q=${encodeURIComponent(trimmed)}`);
+    navigate(searchUrl(trimmed));
     closeDropdown();
   };
 

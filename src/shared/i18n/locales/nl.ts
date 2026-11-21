@@ -117,6 +117,8 @@ export const NL_MESSAGES: Record<string, string> = {
   'Search your library': 'Zoek in uw bibliotheek',
   'Search movies, series, or live channels': 'Zoek films, series of live kanalen',
   'Search categories...': 'Categorieën zoeken...',
+  'Search movies...': 'Films zoeken...',
+  'Search series...': 'Series zoeken...',
   'Search channels...': 'Zenders zoeken...',
   'Search settings...': 'Zoekinstellingen...',
   'Search settings': 'Zoekinstellingen',

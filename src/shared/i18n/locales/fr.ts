@@ -118,6 +118,8 @@ export const FR_MESSAGES: Record<string, string> = {
   'Search movies, series, or live channels':
     'Rechercher des films, des séries ou des chaînes en direct',
   'Search categories...': 'Catégories de recherche...',
+  'Search movies...': 'Rechercher des films...',
+  'Search series...': 'Rechercher des séries...',
   'Search channels...': 'Rechercher des chaînes...',
   'Search settings...': 'Paramètres de recherche...',
   'Search settings': 'Paramètres de recherche',

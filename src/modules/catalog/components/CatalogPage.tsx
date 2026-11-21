@@ -364,7 +364,17 @@ export function CatalogPage({
           meta={getCountMeta()}
           actions={
             <>
-              <HeaderSearch onItemClick={onItemClick} />
+              <HeaderSearch
+                onItemClick={onItemClick}
+                scope={type === 'vod' ? 'movies' : type === 'series' ? 'series' : 'live'}
+                placeholder={
+                  type === 'vod'
+                    ? 'Search movies...'
+                    : type === 'series'
+                      ? 'Search series...'
+                      : 'Search channels...'
+                }
+              />
               {type !== 'live' && (
                 <Select
                   value={imdbQuality}
