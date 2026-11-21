@@ -4,8 +4,8 @@ contact_links:
     url: https://discord.gg/hRHpwVPjBN
     about: Ask questions, get help, or chat with the community.
   - name: Security vulnerability
-    url: https://github.com/movena-app/movena/security/policy
+    url: https://github.com/NexiTask/nexitv/security/policy
     about: Report security issues privately; do not open a public issue.
   - name: Support guide
-    url: https://github.com/movena-app/movena/blob/main/.github/SUPPORT.md
+    url: https://github.com/NexiTask/nexitv/blob/main/.github/SUPPORT.md
     about: Read troubleshooting and privacy guidance before filing.

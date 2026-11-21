@@ -5,7 +5,7 @@ existing issues before opening a new report.
 
 - Installation, source setup, and known platform constraints: [README](../README.md)
 - Community discussion and quick support: [Discord Server](https://discord.gg/hRHpwVPjBN)
-- Bug reports and feature requests: [GitHub Issues](https://github.com/movena-app/movena/issues)
+- Bug reports and feature requests: [GitHub Issues](https://github.com/NexiTask/nexitv/issues)
 - Security vulnerabilities: [SECURITY.md](SECURITY.md)
 - Near-term direction: [Roadmap](../docs/ROADMAP.md)
 

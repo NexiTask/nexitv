@@ -11,7 +11,7 @@ import { redactDiagnosticText } from '@/shared/lib/redact';
 import { Button } from '@/shared/ui/Button';
 import styles from './CrashRecovery.module.css';
 
-const ISSUE_URL = 'https://github.com/movena-app/movena/issues/new?template=bug-report.yml';
+const ISSUE_URL = 'https://github.com/NexiTask/nexitv/issues/new?template=bug-report.yml';
 
 interface CrashRecoveryProps extends CrashDetails {
   title: string;

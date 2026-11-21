@@ -18,19 +18,19 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/movena-app/movena/releases/latest"><img src="https://img.shields.io/github/v/release/movena-app/movena?display_name=tag&sort=semver&style=flat-square" alt="Latest release"></a>
-  <a href="https://github.com/movena-app/movena/actions/workflows/compliance.yml"><img src="https://img.shields.io/github/actions/workflow/status/movena-app/movena/compliance.yml?branch=main&label=verify&style=flat-square" alt="Verify workflow status"></a>
+  <a href="https://github.com/NexiTask/nexitv/releases/latest"><img src="https://img.shields.io/github/v/release/NexiTask/nexitv?display_name=tag&sort=semver&style=flat-square" alt="Latest release"></a>
+  <a href="https://github.com/NexiTask/nexitv/actions/workflows/compliance.yml"><img src="https://img.shields.io/github/actions/workflow/status/NexiTask/nexitv/compliance.yml?branch=main&label=verify&style=flat-square" alt="Verify workflow status"></a>
   <a href="https://discord.gg/hRHpwVPjBN"><img src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord community"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-3b82f6?style=flat-square" alt="GPL-3.0-or-later license"></a>
   <img src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-58677d?style=flat-square" alt="Windows, macOS, and Linux">
 </p>
 
 <p align="center">
-  <strong><a href="https://github.com/movena-app/movena/releases/latest">Download</a></strong>
+  <strong><a href="https://github.com/NexiTask/nexitv/releases/latest">Download</a></strong>
   · <a href="https://apps.microsoft.com/detail/9P2T0QGGHQGQ">Microsoft Store</a>
   · <a href="https://movena.frtx.cc/">Website</a>
   · <a href="https://discord.gg/hRHpwVPjBN">Discord</a>
-  · <a href="https://github.com/movena-app/movena/issues">Report an issue</a>
+  · <a href="https://github.com/NexiTask/nexitv/issues">Report an issue</a>
   · <a href=".github/SUPPORT.md">Support</a>
   · <a href=".github/CONTRIBUTING.md">Contribute</a>
 </p>
@@ -140,9 +140,9 @@ reserved `.test` fixture data. No commercial video is included.
 ## Download and platform support
 
 Download the current packages from the
-[latest release](https://github.com/movena-app/movena/releases/latest). Release
+[latest release](https://github.com/NexiTask/nexitv/releases/latest). Release
 assets also include a
-[SHA-256 checksum file](https://github.com/movena-app/movena/releases/latest/download/SHA256SUMS.txt),
+[SHA-256 checksum file](https://github.com/NexiTask/nexitv/releases/latest/download/SHA256SUMS.txt),
 an SPDX SBOM, GitHub build-provenance attestations, and updater signatures where
 applicable. Platform trust status remains explicitly disclosed below.
 
@@ -154,7 +154,7 @@ applicable. Platform trust status remains explicitly disclosed below.
 | Linux x64           | `.deb`, `.AppImage`                                                                                             | A compatible system libmpv and normal Tauri/WebKit desktop libraries are required. Install `mpv` through your distribution if necessary. |
 
 If installation or playback fails, search the
-[existing issues](https://github.com/movena-app/movena/issues) before opening a
+[existing issues](https://github.com/NexiTask/nexitv/issues) before opening a
 new report. Never include credentials, playlist URLs, provider responses, or
 real viewing data in an issue.
 
@@ -197,7 +197,7 @@ You will need Node.js 20.19+, npm, Rust, the
 development/runtime files.
 
 ```bash
-git clone https://github.com/movena-app/movena.git
+git clone https://github.com/NexiTask/nexitv.git
 cd movena
 npm install
 ```

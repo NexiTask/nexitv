@@ -134,13 +134,13 @@ export function AboutSettingsSection() {
               <DiscordIcon size={15} /> Discord
             </SettingsButton>
             <SettingsButton
-              onClick={() => void desktopApi.openUrl('https://github.com/movena-app/movena')}
+              onClick={() => void desktopApi.openUrl('https://github.com/NexiTask/nexitv')}
             >
               <GithubIcon size={15} /> {t('View on GitHub')}
             </SettingsButton>
             <SettingsButton
               onClick={() =>
-                void desktopApi.openUrl('https://github.com/movena-app/movena/issues/new')
+                void desktopApi.openUrl('https://github.com/NexiTask/nexitv/issues/new')
               }
             >
               <Bug size={15} /> {t('Report an Issue')}
@@ -245,7 +245,7 @@ export function AboutSettingsSection() {
           <div className={styles.aboutLinks}>
             <SettingsButton
               onClick={() =>
-                void desktopApi.openUrl('https://github.com/movena-app/movena/blob/main/LICENSE')
+                void desktopApi.openUrl('https://github.com/NexiTask/nexitv/blob/main/LICENSE')
               }
             >
               <ExternalLink size={15} /> GPL-3.0-or-later
@@ -253,7 +253,7 @@ export function AboutSettingsSection() {
             <SettingsButton
               onClick={() =>
                 void desktopApi.openUrl(
-                  'https://github.com/movena-app/movena/blob/main/docs/PRIVACY.md',
+                  'https://github.com/NexiTask/nexitv/blob/main/docs/PRIVACY.md',
                 )
               }
             >
@@ -262,7 +262,7 @@ export function AboutSettingsSection() {
             <SettingsButton
               onClick={() =>
                 void desktopApi.openUrl(
-                  'https://github.com/movena-app/movena/blob/main/docs/THIRD_PARTY_NOTICES.md',
+                  'https://github.com/NexiTask/nexitv/blob/main/docs/THIRD_PARTY_NOTICES.md',
                 )
               }
             >

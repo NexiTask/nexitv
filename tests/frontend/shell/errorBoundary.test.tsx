@@ -58,7 +58,7 @@ describe('top-level crash recovery', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Report an Issue' }));
     await waitFor(() =>
       expect(desktop.openUrl).toHaveBeenCalledWith(
-        'https://github.com/movena-app/movena/issues/new?template=bug-report.yml',
+        'https://github.com/NexiTask/nexitv/issues/new?template=bug-report.yml',
       ),
     );
   });
