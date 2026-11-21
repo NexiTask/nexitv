@@ -51,3 +51,11 @@ export function resetPosterHosts(): void {
   deadHosts.clear();
   liveHosts.clear();
 }
+
+/** A loaded movie/series cover that is no real poster: a small thumbnail, or
+ * landscape (a screenshot or still where a 2:3 poster belongs). */
+export function isWeakPoster(image: { naturalWidth: number; naturalHeight: number }): boolean {
+  const { naturalWidth: width, naturalHeight: height } = image;
+  if (!width || !height) return false;
+  return width < 150 || width > height;
+}

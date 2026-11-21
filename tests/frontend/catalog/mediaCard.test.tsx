@@ -192,3 +192,13 @@ describe('MediaCard quick remove', () => {
     expect(screen.queryByRole('button', { name: 'Remove from Continue Watching' })).toBeNull();
   });
 });
+
+describe('weak provider covers', () => {
+  it('treats thumbnails and landscape screenshots as no poster', async () => {
+    const { isWeakPoster } = await import('@/modules/catalog/lib/posterHosts');
+    expect(isWeakPoster({ naturalWidth: 120, naturalHeight: 90 })).toBe(true);
+    expect(isWeakPoster({ naturalWidth: 640, naturalHeight: 360 })).toBe(true);
+    expect(isWeakPoster({ naturalWidth: 600, naturalHeight: 900 })).toBe(false);
+    expect(isWeakPoster({ naturalWidth: 0, naturalHeight: 0 })).toBe(false);
+  });
+});

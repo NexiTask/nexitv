@@ -29,6 +29,7 @@ import {
   canTimeOutPosterHost,
   isPosterHostDead,
   markPosterHostDead,
+  isWeakPoster,
   markPosterHostLive,
   POSTER_LOAD_TIMEOUT_MS,
 } from '../lib/posterHosts';
@@ -107,6 +108,9 @@ function MediaCardComponent({
   const queryClient = useQueryClient();
   const [imgError, setImgError] = useState(() => isPosterHostDead(item.posterUrl));
   const [imgLoaded, setImgLoaded] = useState(false);
+  // The provider's cover loaded but is no poster: a thumbnail or a landscape
+  // screenshot ("stalker_portal/screenshots/..."). TMDB's poster replaces it.
+  const [weakPoster, setWeakPoster] = useState(false);
 
   // Fine-grained primitive selectors prevent card re-renders when unrelated store data changes
   const isFav =
@@ -119,6 +123,7 @@ function MediaCardComponent({
   useEffect(() => {
     setImgError(isPosterHostDead(item.posterUrl));
     setImgLoaded(false);
+    setWeakPoster(false);
   }, [item.id, item.posterUrl]);
 
   // A provider poster on a host that hangs never errors; give it a deadline
@@ -192,7 +197,7 @@ function MediaCardComponent({
 
   // A provider copy with no cover, or one whose link no longer loads, shows
   // TMDB's poster instead of a grey card.
-  const needsPosterFallback = !isLive && (!item.posterUrl || imgError);
+  const needsPosterFallback = !isLive && (!item.posterUrl || imgError || weakPoster);
   const tmdbPoster = useTmdbPosterFallback(
     !isLive ? (item.type === 'series' ? 'tv' : 'movie') : undefined,
     needsPosterFallback
@@ -202,7 +207,13 @@ function MediaCardComponent({
         }
       : undefined,
   );
-  const posterSrc = !imgError && item.posterUrl ? item.posterUrl : tmdbPoster;
+  // A weak cover stays until TMDB has a better one (and stays if it has none).
+  const posterSrc =
+    weakPoster && tmdbPoster
+      ? tmdbPoster
+      : !imgError && item.posterUrl
+        ? item.posterUrl
+        : tmdbPoster;
   const showPlaceholder = !posterSrc;
   const verifiedResolutionBadge =
     badgeVisibility?.verified && verifiedMeta
@@ -294,6 +305,10 @@ function MediaCardComponent({
             onLoad={(event) => {
               setImgLoaded(true);
               markPosterHostLive(event.currentTarget.src);
+              const image = event.currentTarget;
+              if (!isLive && image.src === item.posterUrl && isWeakPoster(image)) {
+                setWeakPoster(true);
+              }
             }}
             onError={() => setImgError(true)}
           />
