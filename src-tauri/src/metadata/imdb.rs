@@ -679,7 +679,9 @@ fn status(app: &tauri::AppHandle) -> Result<RefreshStatus, String> {
         Ok((
             meta_get(connection, "last_refresh"),
             meta_get(connection, "titles"),
-            meta_get(connection, "enabled").map(|value| value != 0).unwrap_or(true),
+            meta_get(connection, "enabled")
+                .map(|value| value != 0)
+                .unwrap_or(true),
         ))
     })?;
     let (matched, total) = catalog_index::with_reader(app, |connection| {
@@ -738,7 +740,9 @@ pub(crate) fn schedule(app: tauri::AppHandle) {
         std::thread::sleep(STARTUP_DELAY);
         loop {
             let automatic = with_connection(&app, |connection| {
-                Ok(meta_get(connection, "enabled").map(|value| value != 0).unwrap_or(true))
+                Ok(meta_get(connection, "enabled")
+                    .map(|value| value != 0)
+                    .unwrap_or(true))
             })
             .unwrap_or(true);
             let outcome = if !automatic {

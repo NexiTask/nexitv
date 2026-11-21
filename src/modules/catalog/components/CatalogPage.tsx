@@ -96,13 +96,19 @@ export function CatalogPage({
   const isLegacy = mode === 'legacy';
   const isIndexed = mode === 'index';
   const settingsSortMode = catalogSortModes?.[type] ?? 'default';
+  // Top Rated ranks on IMDb once the index serves the page — the backend
+  // enforces the rule (real votes only), so the TMDB rating checks stay out
+  // of it. The legacy full-catalogue path keeps the provider ranking.
+  const isImdbRanked = isTopRated && isIndexed && type !== 'live';
   // The index sorts by IMDb; the legacy full-catalogue path cannot, so it
   // keeps the default order there.
-  const currentSortMode = isTopRated
-    ? 'rating'
-    : isLegacy && settingsSortMode === 'imdb'
-      ? 'default'
-      : settingsSortMode;
+  const currentSortMode = isImdbRanked
+    ? 'imdb'
+    : isTopRated
+      ? 'rating'
+      : isLegacy && settingsSortMode === 'imdb'
+        ? 'default'
+        : settingsSortMode;
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 
   // Reset genre when category changes

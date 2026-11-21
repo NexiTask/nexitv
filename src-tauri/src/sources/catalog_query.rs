@@ -29,6 +29,9 @@ pub(crate) const FLAG_BADGE_UHD: u8 = 32;
 pub(crate) const FLAG_ADULT: u8 = 64;
 /// `TOP_RATED_MIN_RATING` in rating.ts.
 const TOP_RATED_MIN_RATING: f64 = 7.0;
+/// The votes a title needs behind its IMDb rating to rank in Top Rated (the
+/// lightest quality preset's floor), so a handful of 10s cannot top the hub.
+const TOP_RATED_MIN_VOTES: f64 = 1_000.0;
 /// `CATALOG_GENRES.length` in smartCatalogFilter.ts.
 pub(crate) const GENRE_COUNT: usize = 14;
 /// Keys are `source position << ORD_BITS | ord`.
@@ -213,6 +216,9 @@ struct Context<'a> {
     /// Whether TMDB's verdicts take part (the rating checks' candidate pool
     /// is judged on provider data alone).
     use_lookups: bool,
+    /// Whether the IMDb pipeline has matched anything: Top Rated ranks on
+    /// IMDb's votes once it has, and on the provider rating before that.
+    has_imdb: bool,
 }
 
 type Rating = Option<(f64, f64)>;
@@ -279,6 +285,9 @@ impl<'a> Context<'a> {
             categories,
             favorites: query.favorite_ids.iter().map(String::as_str).collect(),
             use_lookups,
+            has_imdb: sources
+                .iter()
+                .any(|source| source.rows.iter().any(|row| row.imdb_rating.is_some())),
         }
     }
 
@@ -322,6 +331,20 @@ impl<'a> Context<'a> {
             }
         }
         row.rating.map(|value| (value, 0.0))
+    }
+
+    /// Top Rated membership: real IMDb votes once the pipeline has matched
+    /// anything, the provider's own rating before that.
+    fn is_top_rated(&self, row: &FacetRow) -> bool {
+        if self.has_imdb {
+            row.imdb_rating.is_some_and(|value| {
+                value >= TOP_RATED_MIN_RATING
+                    && row.imdb_votes.unwrap_or(0.0) >= TOP_RATED_MIN_VOTES
+            })
+        } else {
+            row.rating
+                .is_some_and(|value| value >= TOP_RATED_MIN_RATING)
+        }
     }
 
     fn genre_mask(&self, entry: Entry) -> u16 {
@@ -421,13 +444,9 @@ impl<'a> Context<'a> {
             "smart:top-rated" => {
                 let mut entries: Vec<Entry> = self
                     .all()
-                    .filter(|entry| {
-                        visible(entry)
-                            && self.rating(*entry).map_or(0.0, |(value, _)| value)
-                                >= TOP_RATED_MIN_RATING
-                    })
+                    .filter(|entry| visible(entry) && self.is_top_rated(self.row(*entry)))
                     .collect();
-                self.sort(&mut entries, "rating");
+                self.sort(&mut entries, if self.has_imdb { "imdb" } else { "rating" });
                 entries
             }
             "smart:4k" => self
@@ -488,7 +507,8 @@ impl<'a> Context<'a> {
                         let row = self.row(entry);
                         (
                             (entry.source, entry.row),
-                            row.imdb_rating.map(|value| (value, row.imdb_votes.unwrap_or(0.0))),
+                            row.imdb_rating
+                                .map(|value| (value, row.imdb_votes.unwrap_or(0.0))),
                         )
                     })
                     .collect();
@@ -556,7 +576,18 @@ pub(crate) fn page(sources: &[&SourceFacets], query: &CatalogQuery) -> PageResul
             .collect(),
         _ => category,
     };
-    context.sort(&mut entries, &query.sort);
+    // Top Rated is a ranking with its own rule, whatever the page's sort: IMDb's
+    // votes once the pipeline has matched titles, the provider's rating before.
+    let sort_mode: &str = if query.category.as_deref() == Some("smart:top-rated") {
+        if context.has_imdb {
+            "imdb"
+        } else {
+            "rating"
+        }
+    } else {
+        &query.sort
+    };
+    context.sort(&mut entries, sort_mode);
     PageResult {
         keys: entries.iter().map(|&entry| context.key(entry)).collect(),
         category_total,
@@ -623,7 +654,7 @@ pub(crate) fn stats(sources: &[&SourceFacets], query: &CatalogQuery) -> CatalogS
         if row.has_added {
             stats.recent += 1;
         }
-        if row.rating.unwrap_or(0.0) >= TOP_RATED_MIN_RATING {
+        if context.is_top_rated(row) {
             stats.top_rated += 1;
         }
         if context.is_ultra_hd(entry) {
@@ -1256,5 +1287,48 @@ mod tests {
             vec![2, 1, 0, 3],
             "highmany, highfew, low, and the unmatched title last"
         );
+    }
+
+    #[test]
+    fn top_rated_ranks_on_imdb_once_it_has_matched() {
+        let facets = source(vec![
+            // The provider's stale 10.0, unknown to IMDb: out once IMDb data exists.
+            Title {
+                rating: Some(10.0),
+                ..title("junk")
+            },
+            rated("good", Some((7.4, 2_000.0)), false),
+            rated("better", Some((8.1, 60_000.0)), false),
+            rated("lowvotes", Some((9.4, 40.0)), false),
+            rated("lowscore", Some((5.9, 40_000.0)), false),
+        ]);
+        let mut q = query("default");
+        q.category = Some("smart:top-rated".into());
+        // The page's sort does not decide the ranking; IMDb's votes do.
+        q.sort = "name-asc".into();
+        assert_eq!(
+            keys(&page(&[&facets], &q)),
+            vec![2, 1],
+            "only the well-voted IMDb ratings stay, best first"
+        );
+        assert_eq!(
+            stats(&[&facets], &q).top_rated,
+            2,
+            "the count matches the hub"
+        );
+        // Before the pipeline has matched anything, the provider rating rules.
+        let legacy = source(vec![
+            Title {
+                rating: Some(7.5),
+                year: Some(2010.0),
+                ..title("old")
+            },
+            Title {
+                rating: Some(9.0),
+                ..title("newer")
+            },
+        ]);
+        assert_eq!(keys(&page(&[&legacy], &q)), vec![1, 0]);
+        assert_eq!(stats(&[&legacy], &q).top_rated, 2);
     }
 }
