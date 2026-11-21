@@ -693,7 +693,11 @@ impl<'a> Context<'a> {
         if !self.passes_filters(entry) {
             return false;
         }
-        if let Some(min_rating) = self.query.imdb_min_rating {
+        // The IMDb floor only means something once the pipeline has matched
+        // titles for the sources on screen. Until then (a source just added,
+        // the first download still running) it would hide the whole catalogue,
+        // so it stands aside, like Top Rated falling back to provider ratings.
+        if let (true, Some(min_rating)) = (self.has_imdb, self.query.imdb_min_rating) {
             let votes = row.imdb_votes.unwrap_or(0.0);
             if votes < self.query.imdb_min_votes.unwrap_or(0.0) {
                 return false;
@@ -1585,6 +1589,24 @@ mod tests {
         );
         q.exclude_adult = true;
         assert_eq!(keys(&page(&[&facets], &q)), vec![0]);
+    }
+
+    #[test]
+    fn the_quality_floor_stands_aside_until_imdb_has_matched_anything() {
+        // A source the IMDb pass has not reached yet: nothing is rated.
+        let facets = source(vec![
+            rated("a", None, false),
+            rated("b", None, false),
+            rated("c", None, false),
+        ]);
+        let mut q = query("default");
+        q.imdb_min_rating = Some(7.0);
+        q.imdb_min_votes = Some(1_000.0);
+        assert_eq!(
+            keys(&page(&[&facets], &q)),
+            vec![0, 1, 2],
+            "the quality floor must not blank a catalogue with no IMDb data"
+        );
     }
 
     #[test]
