@@ -13,6 +13,7 @@ import {
   type ImdbFacts,
 } from '@/platform/tauri';
 import { perfAsync, perfSync } from '@/platform/perf';
+import type { CatalogFilters } from '@/modules/settings/public/store/useSettingsStore';
 import {
   useEnabledSources,
   type EnabledSourcesSnapshot,
@@ -254,6 +255,9 @@ export interface IndexedPageParams {
   orderedIds?: readonly string[] | null | undefined;
   /** Keep titles whose (accent-folded, lower-case) title contains this text. */
   titleFilter?: string | null | undefined;
+  filters?: CatalogFilters | undefined;
+  watchedIds?: readonly string[] | undefined;
+  inProgressIds?: readonly string[] | undefined;
 }
 
 export interface IndexedPage {

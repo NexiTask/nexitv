@@ -31,7 +31,8 @@ use tauri::{Emitter, Manager};
 
 use super::catalog_cache;
 use super::catalog_query::{
-    self, CatalogQuery, CatalogStats, FacetRow, SourceFacets, MAX_SOURCES, ORD_BITS,
+    self, imdb_genre_mask, CatalogQuery, CatalogStats, FacetRow, SourceFacets, MAX_SOURCES,
+    ORD_BITS,
 };
 use super::catalog_search::normalize_text;
 use crate::credentials::source::validate_source_id;
@@ -779,7 +780,7 @@ fn read_source_facets(
     let mut statement = transaction.prepare(
         "SELECT ord, f_id, f_category, f_added, f_has_added, f_year, f_rating, f_flags,
             f_genres, f_rank, f_fold_key, f_fold_rank, f_title, imdb_rating, imdb_votes,
-            imdb_tconst
+            imdb_tconst, imdb_runtime, imdb_genres
          FROM items WHERE source_id = ?1 AND kind = ?2 ORDER BY ord",
     )?;
     let mut categories: Vec<Box<str>> = Vec::new();
@@ -807,7 +808,13 @@ fn read_source_facets(
             year: row.get(5)?,
             rating: row.get(6)?,
             flags: row.get::<_, i64>(7)? as u8,
-            genres: row.get::<_, i64>(8)? as u16,
+            // IMDb's genres join the provider's and the category's: most
+            // provider rows name none.
+            genres: row.get::<_, i64>(8)? as u16
+                | row
+                    .get::<_, Option<String>>(17)?
+                    .as_deref()
+                    .map_or(0, imdb_genre_mask),
             rank: row.get::<_, i64>(9)? as u32,
             fold_key: row
                 .get::<_, Option<String>>(10)?
@@ -820,6 +827,9 @@ fn read_source_facets(
             imdb_tconst: row
                 .get::<_, Option<String>>(15)?
                 .map(String::into_boxed_str),
+            imdb_runtime: row
+                .get::<_, Option<i64>>(16)?
+                .and_then(|minutes| u16::try_from(minutes).ok()),
         });
     }
     drop(query);

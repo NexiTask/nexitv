@@ -56,6 +56,28 @@ export type CatalogSortModes = Record<CatalogType, CatalogSortMode>;
  */
 export type ImdbQualityPreset = 'all' | 'imdb-7-1k' | 'imdb-65-5k' | 'imdb-6-10k';
 
+export type CatalogWatchFilter = 'all' | 'unwatched' | 'in-progress' | 'watched';
+export type CatalogFilterKind = 'vod' | 'series';
+
+/** The Movies/Series filter panel. Null bounds and empty lists filter nothing. */
+export interface CatalogFilters {
+  yearMin: number | null;
+  yearMax: number | null;
+  /** IMDb runtime in minutes (a series: its typical episode). */
+  runtimeMin: number | null;
+  runtimeMax: number | null;
+  /** Combined with the quality preset: the stricter of the two applies. */
+  minRating: number | null;
+  minVotes: number | null;
+  /** Genre bar names: at least one of `genres`, none of `excludeGenres`. */
+  genres: string[];
+  excludeGenres: string[];
+  addedWithinDays: number | null;
+  ultraHdOnly: boolean;
+  ratedOnly: boolean;
+  watch: CatalogWatchFilter;
+}
+
 export const IMDB_QUALITY_PRESETS: Record<
   Exclude<ImdbQualityPreset, 'all'>,
   { minRating: number; minVotes: number }
@@ -156,6 +178,7 @@ export interface SettingsState {
    * (Hyprland) manage windows themselves and do not need them. */
   showWindowControls: boolean;
   catalogSortModes: CatalogSortModes;
+  catalogFilters: Record<CatalogFilterKind, CatalogFilters>;
 
   // UI & Desktop
   sidebarWidth: number;
@@ -219,6 +242,7 @@ export interface SettingsState {
       | 'setHiddenCountries'
       | 'setSelectedCategory'
       | 'setCatalogSort'
+      | 'setCatalogFilters'
       | 'addCustomTitleRule'
       | 'removeCustomTitleRule'
       | 'toggleCustomTitleRule'
@@ -236,6 +260,7 @@ export interface SettingsState {
   setHiddenCountries: (type: CatalogType, keys: string[]) => void;
   setSelectedCategory: (type: CatalogType, id: string | null) => void;
   setCatalogSort: (type: CatalogType, sort: CatalogSortMode) => void;
+  setCatalogFilters: (type: CatalogFilterKind, filters: CatalogFilters) => void;
   addCustomTitleRule: (pattern: string, isRegex?: boolean) => void;
   removeCustomTitleRule: (id: string) => void;
   toggleCustomTitleRule: (id: string) => void;

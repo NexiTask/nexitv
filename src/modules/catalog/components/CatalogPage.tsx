@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { VirtualizedGrid } from './VirtualizedGrid';
 import type { MediaItem } from '../model/media';
@@ -9,12 +9,15 @@ import { CatalogViewToggle } from './CatalogViewToggle';
 import { CatalogSortSelect } from './CatalogSortSelect';
 import { GenreFilterBar } from './GenreFilterBar';
 import filterBarStyles from './GenreFilterBar.module.css';
+import { CatalogFilterPanel } from './CatalogFilterPanel';
+import filterPanelStyles from './CatalogFilterPanel.module.css';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { HeaderSearch } from '@/modules/search/public/components/HeaderSearch';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { CatalogPageHeader } from './CatalogPageHeader';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import {
+  EMPTY_CATALOG_FILTERS,
   IMDB_QUALITY_PRESETS,
   type ImdbQualityPreset,
 } from '@/modules/settings/public/store/useSettingsStore';
@@ -40,7 +43,7 @@ import {
   sortCatalogItems,
   type RatingLookups,
 } from '../lib/smartCatalogFilter';
-import { categoryGenreMasks, ultraHdOverrides } from '../lib/catalogPageQuery';
+import { activeFilterCount, categoryGenreMasks, ultraHdOverrides } from '../lib/catalogPageQuery';
 import type { GenreCounts } from './GenreFilterBar';
 import { getCombinedErrorMessage, getErrorPresentation } from '@/shared/lib/error';
 import { useI18n } from '@/shared/i18n/i18n';
@@ -111,6 +114,11 @@ export function CatalogPage({
         ? 'default'
         : settingsSortMode;
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const allCatalogFilters = useSettingsStore((state) => state.catalogFilters);
+  const setCatalogFilters = useSettingsStore((state) => state.setCatalogFilters);
+  const watchedIds = useLibraryStore((state) => state.watched);
+  const watchHistory = useLibraryStore((state) => state.history);
 
   // Reset genre when category changes
   useEffect(() => {
@@ -188,11 +196,25 @@ export function CatalogPage({
   // IMDb data to filter by (its control stays disabled until the index serves
   // the page).
   const imdbQuality: ImdbQualityPreset = isIndexed && type !== 'live' ? catalogImdbQuality : 'all';
+  // The filter panel is an index query too, per page type.
+  const filterKind = type === 'live' ? null : type;
+  const storedFilters = filterKind ? allCatalogFilters[filterKind] : EMPTY_CATALOG_FILTERS;
+  const filters = isIndexed && filterKind ? storedFilters : undefined;
+  const filterCount = filterKind ? activeFilterCount(storedFilters) : 0;
+  // The panel's IMDb floor and the quality preset combine: the stricter wins.
   const imdbQualityParams = useMemo(() => {
-    if (imdbQuality === 'all') return {};
-    const preset = IMDB_QUALITY_PRESETS[imdbQuality];
-    return { imdbMinRating: preset.minRating, imdbMinVotes: preset.minVotes };
-  }, [imdbQuality]);
+    const preset = imdbQuality === 'all' ? null : IMDB_QUALITY_PRESETS[imdbQuality];
+    const minRating = Math.max(preset?.minRating ?? -1, filters?.minRating ?? -1);
+    const minVotes = Math.max(preset?.minVotes ?? 0, filters?.minVotes ?? 0);
+    if (minRating < 0 && minVotes === 0) return {};
+    return { imdbMinRating: Math.max(minRating, 0), imdbMinVotes: minVotes };
+  }, [imdbQuality, filters?.minRating, filters?.minVotes]);
+  // Watch state is only sent while the watch filter asks for it.
+  const watchFilterOn = (filters?.watch ?? 'all') !== 'all';
+  const inProgressIds = useMemo(
+    () => (watchFilterOn ? watchHistory.map((entry) => entry.id) : undefined),
+    [watchFilterOn, watchHistory],
+  );
   const excludeAdult = isIndexed && type !== 'live' && catalogHideAdult;
   // Variant grouping is an index rule too: the legacy full-catalogue path
   // has no IMDb identities to group by.
@@ -216,6 +238,8 @@ export function CatalogPage({
       ...imdbQualityParams,
       excludeAdult,
       groupTitles,
+      filters,
+      ...(watchFilterOn ? { watchedIds, inProgressIds } : {}),
     }),
     [
       activeCategoryId,
@@ -232,6 +256,10 @@ export function CatalogPage({
       imdbQualityParams,
       excludeAdult,
       groupTitles,
+      filters,
+      watchFilterOn,
+      watchedIds,
+      inProgressIds,
     ],
   );
   const headParams = useMemo<IndexedPageParams>(
@@ -403,6 +431,23 @@ export function CatalogPage({
                   {catalogHideAdult ? t('Adult hidden') : t('Adult shown')}
                 </button>
               )}
+              {filterKind && (
+                <button
+                  type="button"
+                  className={`${filterBarStyles.chip} ${
+                    filtersOpen || filterCount > 0 ? filterBarStyles.activeChip : ''
+                  }`}
+                  aria-expanded={filtersOpen}
+                  disabled={isLegacy}
+                  onClick={() => setFiltersOpen((open) => !open)}
+                >
+                  <SlidersHorizontal size={14} />
+                  {t('Filters')}
+                  {filterCount > 0 && (
+                    <span className={filterPanelStyles.badge}>{number(filterCount)}</span>
+                  )}
+                </button>
+              )}
               <CatalogSortSelect
                 value={currentSortMode}
                 onChange={(sort) => setCatalogSort(type, sort)}
@@ -413,6 +458,14 @@ export function CatalogPage({
             </>
           }
         />
+
+        {filtersOpen && filterKind && !isLegacy && (
+          <CatalogFilterPanel
+            type={filterKind}
+            filters={storedFilters}
+            onChange={(next) => setCatalogFilters(filterKind, next)}
+          />
+        )}
 
         {isLoading ? (
           <div className={styles.catalogContent}>

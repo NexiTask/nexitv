@@ -108,6 +108,19 @@ export interface CatalogPageQuery {
   excludeAdult?: boolean | undefined;
   /** Collapse provider variants sharing an IMDb id into one card. */
   groupTitles?: boolean | undefined;
+  /** The filter panel (catalog_query.rs: inclusive bounds, null = open). */
+  yearMin?: number | null | undefined;
+  yearMax?: number | null | undefined;
+  runtimeMin?: number | null | undefined;
+  runtimeMax?: number | null | undefined;
+  genresAny?: number | undefined;
+  genresExclude?: number | undefined;
+  addedSince?: number | null | undefined;
+  ultraHdOnly?: boolean | undefined;
+  ratedOnly?: boolean | undefined;
+  watch?: 'unwatched' | 'in-progress' | 'watched' | null | undefined;
+  watchedIds?: string[] | undefined;
+  inProgressIds?: string[] | undefined;
 }
 
 export interface CatalogSearchResult {

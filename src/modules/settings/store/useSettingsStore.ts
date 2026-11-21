@@ -23,12 +23,16 @@ import {
   type ThemePreference,
   type UpcomingHistoryDays,
   IMDB_QUALITY_PRESETS,
+  type CatalogFilters,
   type ImdbQualityPreset,
 } from './settingsTypes';
 
 export { SETTINGS_SNAPSHOT_KEYS, IMDB_QUALITY_PRESETS } from './settingsTypes';
 export type {
   BadgeVisibilitySettings,
+  CatalogFilters,
+  CatalogFilterKind,
+  CatalogWatchFilter,
   CatalogSortMode,
   CatalogSortModes,
   CatalogType,
@@ -160,6 +164,60 @@ const defaultBadgeVisibility = (): BadgeVisibilitySettings => ({
   verified: true,
 });
 
+export const EMPTY_CATALOG_FILTERS: CatalogFilters = Object.freeze({
+  yearMin: null,
+  yearMax: null,
+  runtimeMin: null,
+  runtimeMax: null,
+  minRating: null,
+  minVotes: null,
+  genres: [],
+  excludeGenres: [],
+  addedWithinDays: null,
+  ultraHdOnly: false,
+  ratedOnly: false,
+  watch: 'all',
+}) as CatalogFilters;
+
+const finiteOrNull = (value: unknown, min: number, max: number): number | null =>
+  typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max
+    ? value
+    : null;
+
+const genreList = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? [...new Set(value.filter((entry): entry is string => typeof entry === 'string'))].slice(0, 32)
+    : [];
+
+/** Persisted filter state is user data from disk: keep only sane values. */
+export function normalizeCatalogFilters(value: unknown): CatalogFilters {
+  if (!value || typeof value !== 'object') return EMPTY_CATALOG_FILTERS;
+  const source = value as Record<string, unknown>;
+  const watch = source.watch;
+  return {
+    yearMin: finiteOrNull(source.yearMin, 1800, 2200),
+    yearMax: finiteOrNull(source.yearMax, 1800, 2200),
+    runtimeMin: finiteOrNull(source.runtimeMin, 0, 10_000),
+    runtimeMax: finiteOrNull(source.runtimeMax, 0, 10_000),
+    minRating: finiteOrNull(source.minRating, 0, 10),
+    minVotes: finiteOrNull(source.minVotes, 0, 100_000_000),
+    genres: genreList(source.genres),
+    excludeGenres: genreList(source.excludeGenres),
+    addedWithinDays: finiteOrNull(source.addedWithinDays, 1, 36_500),
+    ultraHdOnly: source.ultraHdOnly === true,
+    ratedOnly: source.ratedOnly === true,
+    watch: watch === 'unwatched' || watch === 'in-progress' || watch === 'watched' ? watch : 'all',
+  };
+}
+
+function normalizeCatalogFilterSet(value: unknown): SettingsState['catalogFilters'] {
+  const source = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  return {
+    vod: normalizeCatalogFilters(source.vod),
+    series: normalizeCatalogFilters(source.series),
+  };
+}
+
 const DEFAULT_SETTINGS = {
   smartLogoAspectMode: 'auto' as SmartLogoAspectMode,
   channelLogoAspectOverrides: {} as Record<string, ChannelLogoAspect>,
@@ -239,6 +297,7 @@ const DEFAULT_SETTINGS = {
   catalogHiddenKeywords: [] as string[],
   showWindowControls: true,
   catalogSortModes: emptyCatalogSortModes(),
+  catalogFilters: { vod: EMPTY_CATALOG_FILTERS, series: EMPTY_CATALOG_FILTERS },
   sidebarWidth: 260,
   viewMode: 'grid' as const,
   alwaysOnTop: false,
@@ -484,6 +543,7 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
     showWindowControls:
       typeof state.showWindowControls === 'boolean' ? state.showWindowControls : true,
     catalogSortModes: normalizeCatalogSortModes(state.catalogSortModes),
+    catalogFilters: normalizeCatalogFilterSet(state.catalogFilters),
     lastCollectionId:
       typeof state.lastCollectionId === 'string' && state.lastCollectionId.length <= 512
         ? state.lastCollectionId
@@ -572,6 +632,13 @@ export const useSettingsStore = create<SettingsState>()(
           selectedCategoryIds: {
             ...normalizeSelectedCategoryIds(state.selectedCategoryIds),
             [type]: typeof id === 'string' && id.length <= 512 ? id : null,
+          },
+        })),
+      setCatalogFilters: (type, filters) =>
+        set((state) => ({
+          catalogFilters: {
+            ...normalizeCatalogFilterSet(state.catalogFilters),
+            [type]: normalizeCatalogFilters(filters),
           },
         })),
       setCatalogSort: (type, sort) =>

@@ -66,6 +66,8 @@ pub(crate) struct FacetRow {
     /// The matched IMDb title id: every row that carries the same one is a
     /// provider variant of the same work.
     pub imdb_tconst: Option<Box<str>>,
+    /// IMDb's runtime in minutes (a series: its typical episode).
+    pub imdb_runtime: Option<u16>,
     /// The title as search compares it (`normalizeText`).
     pub search_title: Box<str>,
 }
@@ -126,6 +128,58 @@ pub struct CatalogQuery {
     /// One card per title: provider variants sharing an IMDb id collapse into
     /// a single representative.
     pub group_titles: bool,
+    /// The filter panel. Every bound is inclusive; null leaves it open.
+    pub year_min: Option<f64>,
+    pub year_max: Option<f64>,
+    /// IMDb runtime in minutes; titles without one fail an active bound.
+    pub runtime_min: Option<f64>,
+    pub runtime_max: Option<f64>,
+    /// Genre bits a title must have at least one of (0: no constraint).
+    pub genres_any: u16,
+    /// Genre bits a title must have none of.
+    pub genres_exclude: u16,
+    /// Only titles the provider added at or after this unix time.
+    pub added_since: Option<f64>,
+    pub ultra_hd_only: bool,
+    /// Only titles with an IMDb rating.
+    pub rated_only: bool,
+    /// `unwatched`, `in-progress` or `watched`, judged per title: watching
+    /// any variant of an IMDb title counts for all of them.
+    pub watch: Option<String>,
+    pub watched_ids: Vec<String>,
+    pub in_progress_ids: Vec<String>,
+}
+
+/// The watch states of the titles the viewer has touched, by row id and by
+/// IMDb identity (so every variant of a title shares its state).
+#[derive(Default)]
+struct WatchState<'a> {
+    watched: HashSet<&'a str>,
+    in_progress: HashSet<&'a str>,
+}
+
+/// IMDb's genre names onto the genre bar's bits (`CATALOG_GENRES`).
+pub(crate) fn imdb_genre_mask(genres: &str) -> u16 {
+    const NAMES: [&str; GENRE_COUNT] = [
+        "Action",
+        "Comedy",
+        "Drama",
+        "Sci-Fi",
+        "Thriller",
+        "Horror",
+        "Animation",
+        "Adventure",
+        "Romance",
+        "Crime",
+        "Documentary",
+        "Fantasy",
+        "Family",
+        "Mystery",
+    ];
+    genres
+        .split(',')
+        .filter_map(|genre| NAMES.iter().position(|name| *name == genre.trim()))
+        .fold(0, |mask, bit| mask | (1 << bit))
 }
 
 #[derive(Debug, Default, Serialize, PartialEq)]
@@ -228,9 +282,32 @@ struct Context<'a> {
     /// Whether the IMDb pipeline has matched anything: Top Rated ranks on
     /// IMDb's votes once it has, and on the provider rating before that.
     has_imdb: bool,
+    /// Present while the watch filter is on.
+    watch: Option<WatchState<'a>>,
 }
 
 type Rating = Option<(f64, f64)>;
+
+/// The listed ids, plus the IMDb identity of every row they name.
+fn watch_state<'a>(sources: &'a [&'a SourceFacets], query: &'a CatalogQuery) -> WatchState<'a> {
+    let mut state = WatchState::default();
+    let watched: HashSet<&str> = query.watched_ids.iter().map(String::as_str).collect();
+    let in_progress: HashSet<&str> = query.in_progress_ids.iter().map(String::as_str).collect();
+    state.watched.extend(watched.iter().copied());
+    state.in_progress.extend(in_progress.iter().copied());
+    for row in sources.iter().flat_map(|source| source.rows.iter()) {
+        let Some(identity) = row.imdb_tconst.as_deref() else {
+            continue;
+        };
+        if watched.contains(&*row.id) {
+            state.watched.insert(identity);
+        }
+        if in_progress.contains(&*row.id) {
+            state.in_progress.insert(identity);
+        }
+    }
+    state
+}
 
 fn sign(value: f64) -> Ordering {
     // JavaScript's `a - b || next`: zero and NaN fall through.
@@ -297,6 +374,7 @@ impl<'a> Context<'a> {
             has_imdb: sources
                 .iter()
                 .any(|source| source.rows.iter().any(|row| row.imdb_rating.is_some())),
+            watch: query.watch.as_ref().map(|_| watch_state(sources, query)),
         }
     }
 
@@ -562,12 +640,80 @@ impl<'a> Context<'a> {
         if self.query.exclude_adult && row.flags & FLAG_ADULT != 0 {
             return false;
         }
+        if !self.passes_filters(entry) {
+            return false;
+        }
         if let Some(min_rating) = self.query.imdb_min_rating {
             let votes = row.imdb_votes.unwrap_or(0.0);
             if votes < self.query.imdb_min_votes.unwrap_or(0.0) {
                 return false;
             }
             if row.imdb_rating.unwrap_or(0.0) < min_rating {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// The filter panel's bounds (see `CatalogQuery`).
+    fn passes_filters(&self, entry: Entry) -> bool {
+        let row = self.row(entry);
+        let query = self.query;
+        let within = |value: Option<f64>, min: Option<f64>, max: Option<f64>| {
+            if min.is_none() && max.is_none() {
+                return true;
+            }
+            value.is_some_and(|value| {
+                min.map_or(true, |min| value >= min) && max.map_or(true, |max| value <= max)
+            })
+        };
+        if !within(row.year, query.year_min, query.year_max) {
+            return false;
+        }
+        if !within(
+            row.imdb_runtime.map(f64::from),
+            query.runtime_min,
+            query.runtime_max,
+        ) {
+            return false;
+        }
+        if query.genres_any != 0 || query.genres_exclude != 0 {
+            let mask = self.genre_mask(entry);
+            if query.genres_any != 0 && mask & query.genres_any == 0 {
+                return false;
+            }
+            if mask & query.genres_exclude != 0 {
+                return false;
+            }
+        }
+        if let Some(since) = query.added_since {
+            if !row.has_added || row.added < since {
+                return false;
+            }
+        }
+        if query.ultra_hd_only && !self.is_ultra_hd(entry) {
+            return false;
+        }
+        if query.rated_only && row.imdb_rating.is_none() {
+            return false;
+        }
+        if let (Some(mode), Some(state)) = (query.watch.as_deref(), self.watch.as_ref()) {
+            let knows = |set: &HashSet<&str>| {
+                set.contains(&*row.id)
+                    || row
+                        .imdb_tconst
+                        .as_deref()
+                        .is_some_and(|identity| set.contains(identity))
+            };
+            let in_progress = knows(&state.in_progress);
+            let watched = !in_progress && knows(&state.watched);
+            let passes = match mode {
+                "in-progress" => in_progress,
+                "watched" => watched,
+                "unwatched" => !in_progress && !watched,
+                _ => true,
+            };
+            if !passes {
                 return false;
             }
         }
@@ -879,6 +1025,7 @@ mod tests {
         imdb_rating: Option<f64>,
         imdb_votes: Option<f64>,
         imdb_tconst: Option<&'static str>,
+        imdb_runtime: Option<u16>,
     }
 
     fn title(id: &'static str) -> Title {
@@ -897,6 +1044,7 @@ mod tests {
             imdb_rating: None,
             imdb_votes: None,
             imdb_tconst: None,
+            imdb_runtime: None,
         }
     }
 
@@ -931,6 +1079,7 @@ mod tests {
                     imdb_rating: t.imdb_rating,
                     imdb_votes: t.imdb_votes,
                     imdb_tconst: t.imdb_tconst.map(Into::into),
+                    imdb_runtime: t.imdb_runtime,
                     search_title: normalize_text(t.id).into(),
                 }
             })
@@ -1458,6 +1607,82 @@ mod tests {
         ]);
         assert_eq!(keys(&page(&[&legacy], &q)), vec![1, 0]);
         assert_eq!(stats(&[&legacy], &q).top_rated, 2);
+    }
+
+    #[test]
+    fn imdb_genres_map_onto_the_genre_bar() {
+        assert_eq!(imdb_genre_mask("Action,Drama"), 0b101);
+        assert_eq!(imdb_genre_mask("Sci-Fi, Mystery"), (1 << 3) | (1 << 13));
+        assert_eq!(imdb_genre_mask("Western,Music"), 0);
+    }
+
+    #[test]
+    fn filters_bound_year_runtime_genres_added_and_rating() {
+        let facets = source(vec![
+            Title {
+                year: Some(1999.0),
+                imdb_runtime: Some(136),
+                genres: 0b1,
+                imdb_rating: Some(8.7),
+                has_added: true,
+                added: 100.0,
+                ..title("matrix")
+            },
+            Title {
+                year: Some(2015.0),
+                imdb_runtime: Some(90),
+                genres: 0b10,
+                has_added: true,
+                added: 500.0,
+                ..title("comedy")
+            },
+            Title {
+                year: Some(2020.0),
+                genres: 0b101,
+                ..title("action-drama")
+            },
+        ]);
+        let run = |edit: &dyn Fn(&mut CatalogQuery)| {
+            let mut q = query("default");
+            edit(&mut q);
+            keys(&page(&[&facets], &q))
+        };
+        assert_eq!(run(&|q| q.year_min = Some(2000.0)), vec![1, 2]);
+        assert_eq!(run(&|q| q.year_max = Some(2015.0)), vec![0, 1]);
+        // A runtime bound drops titles IMDb gives no runtime for.
+        assert_eq!(run(&|q| q.runtime_min = Some(120.0)), vec![0]);
+        assert_eq!(run(&|q| q.runtime_max = Some(120.0)), vec![1]);
+        assert_eq!(run(&|q| q.genres_any = 0b1), vec![0, 2]);
+        assert_eq!(run(&|q| q.genres_exclude = 0b100), vec![0, 1]);
+        assert_eq!(run(&|q| q.added_since = Some(200.0)), vec![1]);
+        assert_eq!(run(&|q| q.rated_only = true), vec![0]);
+    }
+
+    #[test]
+    fn watch_state_follows_the_title_across_its_variants() {
+        let facets = source(vec![
+            Title {
+                imdb_tconst: Some("tt1"),
+                ..title("copy-a")
+            },
+            Title {
+                imdb_tconst: Some("tt1"),
+                ..title("copy-b")
+            },
+            title("fresh"),
+            title("halfway"),
+        ]);
+        let run = |mode: &str| {
+            let mut q = query("default");
+            q.watch = Some(mode.to_string());
+            q.watched_ids = vec!["copy-a".to_string()];
+            q.in_progress_ids = vec!["halfway".to_string()];
+            keys(&page(&[&facets], &q))
+        };
+        // Watching one copy marks the other copy of the same title too.
+        assert_eq!(run("watched"), vec![0, 1]);
+        assert_eq!(run("unwatched"), vec![2]);
+        assert_eq!(run("in-progress"), vec![3]);
     }
 
     #[test]

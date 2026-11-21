@@ -1,0 +1,120 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0 var(--space-4) var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-subtle);
+}
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-5);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  min-width: 0;
+}
+
+.label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: var(--alpha-75);
+}
+
+.yearRange {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+
+.yearInput {
+  width: 72px;
+  min-height: var(--control-height-md);
+  padding: 0 var(--space-2-5);
+  font-variant-numeric: tabular-nums;
+}
+
+.rangeDash {
+  color: var(--text-muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+}
+
+.genreChip {
+  border-color: var(--border-subtle);
+}
+
+.excludedChip,
+.excludedChip:hover {
+  border-color: rgba(var(--color-error-rgb), var(--alpha-40));
+  background: rgba(var(--color-error-rgb), var(--alpha-12));
+  color: var(--text-primary);
+  text-decoration: line-through;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.clear {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.clear:hover {
+  color: var(--accent-foreground);
+}
+
+/* The Filters button's count. */
+.badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--accent-color);
+  color: var(--text-on-accent);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}

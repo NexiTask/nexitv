@@ -1,4 +1,5 @@
 import type { CatalogPageQuery } from '@/platform/tauri';
+import type { CatalogFilters } from '@/modules/settings/public/store/useSettingsStore';
 import { isUltraHdQuality } from '@/shared/lib/mediaTags';
 import { resolveMediaRating } from '@/shared/lib/rating';
 import {
@@ -84,6 +85,72 @@ export interface CatalogPageQueryInput {
   excludeAdult?: boolean | undefined;
   /** Collapse provider variants sharing an IMDb id into one card. */
   groupTitles?: boolean | undefined;
+  /** The filter panel, its IMDb floor already merged into imdbMin*. */
+  filters?: CatalogFilters | undefined;
+  /** The library's watch state, sent only while the watch filter is on. */
+  watchedIds?: readonly string[] | undefined;
+  inProgressIds?: readonly string[] | undefined;
+  /** "Now" for the added-within filter, in unix seconds. */
+  now?: number | undefined;
+}
+
+const DAY_SECONDS = 86_400;
+
+function genreBits(names: readonly string[]): number {
+  let mask = 0;
+  for (const name of names) {
+    const bit = CATALOG_GENRES.indexOf(name as (typeof CATALOG_GENRES)[number]);
+    if (bit >= 0) mask |= 1 << bit;
+  }
+  return mask;
+}
+
+/** The panel's fields as the index query takes them; empty when unfiltered. */
+export function filterQueryFields(
+  filters: CatalogFilters | undefined,
+  watchedIds: readonly string[] = [],
+  inProgressIds: readonly string[] = [],
+  now = Date.now() / 1000,
+): Partial<CatalogPageQuery> {
+  if (!filters) return {};
+  const fields: Partial<CatalogPageQuery> = {};
+  if (filters.yearMin != null) fields.yearMin = filters.yearMin;
+  if (filters.yearMax != null) fields.yearMax = filters.yearMax;
+  if (filters.runtimeMin != null) fields.runtimeMin = filters.runtimeMin;
+  if (filters.runtimeMax != null) fields.runtimeMax = filters.runtimeMax;
+  const any = genreBits(filters.genres);
+  const exclude = genreBits(filters.excludeGenres);
+  if (any) fields.genresAny = any;
+  if (exclude) fields.genresExclude = exclude;
+  if (filters.addedWithinDays != null) {
+    // Whole days, so the query (and its cache key) holds still within a day.
+    const today = Math.floor(now / DAY_SECONDS) * DAY_SECONDS;
+    fields.addedSince = today - filters.addedWithinDays * DAY_SECONDS;
+  }
+  if (filters.ultraHdOnly) fields.ultraHdOnly = true;
+  if (filters.ratedOnly) fields.ratedOnly = true;
+  if (filters.watch !== 'all') {
+    fields.watch = filters.watch;
+    fields.watchedIds = [...watchedIds].sort();
+    fields.inProgressIds = [...inProgressIds].sort();
+  }
+  return fields;
+}
+
+/** How many of the panel's filters are on (the button's badge). */
+export function activeFilterCount(filters: CatalogFilters): number {
+  return [
+    filters.yearMin != null || filters.yearMax != null,
+    filters.runtimeMin != null || filters.runtimeMax != null,
+    filters.minRating != null,
+    filters.minVotes != null,
+    filters.genres.length > 0,
+    filters.excludeGenres.length > 0,
+    filters.addedWithinDays != null,
+    filters.ultraHdOnly,
+    filters.ratedOnly,
+    filters.watch !== 'all',
+  ].filter(Boolean).length;
 }
 
 /** The index query for exactly what CatalogPage would compute in memory. */
@@ -113,6 +180,7 @@ export function buildCatalogPageQuery(input: CatalogPageQueryInput): CatalogPage
     ...(input.imdbMinRating != null ? { imdbMinVotes: input.imdbMinVotes ?? 0 } : {}),
     ...(input.excludeAdult ? { excludeAdult: true } : {}),
     ...(input.groupTitles ? { groupTitles: true } : {}),
+    ...filterQueryFields(input.filters, input.watchedIds, input.inProgressIds, input.now),
     ...lookupOverrides(input.ratingLookups),
   };
 }
