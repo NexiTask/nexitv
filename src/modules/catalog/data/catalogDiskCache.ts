@@ -1,6 +1,7 @@
 import { tauriApi, type CatalogCacheKind } from '@/platform/tauri';
 import { desktopApi } from '@/platform/desktop';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
+import { trackDataActivity } from '@/shared/lib/dataActivity';
 import { getErrorMessage } from '@/shared/lib/error';
 import { perfAsync, perfSync } from '@/platform/perf';
 
@@ -27,7 +28,7 @@ export function rememberProviderList(
       (s) => `chars=${s.length}`,
     );
     void perfAsync(`store:ipc:${kind}`, () =>
-      tauriApi.catalogCacheStore(sourceId, kind, scope, content),
+      trackDataActivity('index', () => tauriApi.catalogCacheStore(sourceId, kind, scope, content)),
     ).catch((error: unknown) => {
       debugLog.warn('api', 'Catalogue could not be saved for the next start', {
         kind,

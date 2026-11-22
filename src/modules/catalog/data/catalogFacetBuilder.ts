@@ -2,6 +2,7 @@ import { tauriApi, type CatalogPageKind } from '@/platform/tauri';
 import { perfLog } from '@/platform/perf';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 import { getErrorMessage } from '@/shared/lib/error';
+import { trackDataActivity } from '@/shared/lib/dataActivity';
 import {
   runCatalogFacetTask,
   type CatalogFacetTask,
@@ -149,7 +150,7 @@ export function buildCatalogFacets(
     rerun.set(kind, sources);
     return running;
   }
-  const run = build(kind, sources).finally(() => {
+  const run = trackDataActivity('index', () => build(kind, sources)).finally(() => {
     runs.delete(kind);
     const next = rerun.get(kind);
     if (next) {

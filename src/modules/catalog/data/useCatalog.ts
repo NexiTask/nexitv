@@ -1,5 +1,6 @@
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
 import { queryClient } from '@/shared/query/queryClient';
+import { trackDataActivity } from '@/shared/lib/dataActivity';
 import {
   getLiveStreams,
   getSeries,
@@ -121,19 +122,21 @@ export function playlistCatalog(
 }
 
 /** The provider's raw list for one catalogue type, as the provider sent it. */
-async function fetchXtreamList(
+function fetchXtreamList(
   type: 'live' | 'vod' | 'series',
   source: EnabledXtreamSource,
   signal?: AbortSignal,
 ): Promise<unknown[]> {
-  const credentials = source.credentials!;
-  const response =
-    type === 'live'
-      ? await getLiveStreams(credentials, undefined, signal)
-      : type === 'vod'
-        ? await getVodStreams(credentials, undefined, signal)
-        : await getSeries(credentials, undefined, signal);
-  return Array.isArray(response) ? response : [];
+  return trackDataActivity('catalog', async () => {
+    const credentials = source.credentials!;
+    const response =
+      type === 'live'
+        ? await getLiveStreams(credentials, undefined, signal)
+        : type === 'vod'
+          ? await getVodStreams(credentials, undefined, signal)
+          : await getSeries(credentials, undefined, signal);
+    return Array.isArray(response) ? response : [];
+  });
 }
 
 /**

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { desktopApi } from '@/platform/desktop';
+import { trackDataActivity } from '@/shared/lib/dataActivity';
 import {
   tauriApi,
   type CatalogKeyRow,
@@ -56,6 +57,10 @@ function pageSources(sources: EnabledSourcesSnapshot): CatalogPageSource[] {
     sourceId: source.id,
     scope: source.queryScope,
   }));
+}
+
+function prepareCatalogPage(kind: CatalogPageKind, sources: CatalogPageSource[]) {
+  return trackDataActivity('index', () => tauriApi.catalogIndexPageStatus(kind, sources));
 }
 
 /** Whether these sources could be served from the index at all. */
@@ -129,7 +134,7 @@ export function useCatalogPageMode(type: 'live' | 'vod' | 'series'): {
 
   const status = useQuery({
     queryKey: [STATUS_ROOT, kind, sources.queryScope],
-    queryFn: () => tauriApi.catalogIndexPageStatus(kind!, pageSources(sources)),
+    queryFn: () => prepareCatalogPage(kind!, pageSources(sources)),
     enabled: candidate && decided === null && !sources.isLoading,
     // Index and facet changes invalidate it (useIndexInvalidation).
     staleTime: Infinity,
@@ -557,11 +562,10 @@ export function useCatalogFacetBuilds(delayMs = 3_000): void {
     const run = (kind: CatalogPageKind) => {
       void buildCatalogFacets(kind, buildSources).then(() =>
         // Warm the facet cache, so the first page visit only filters and sorts.
-        tauriApi
-          .catalogIndexPageStatus(
-            kind,
-            buildSources.map(({ id, queryScope: scope }) => ({ sourceId: id, scope })),
-          )
+        prepareCatalogPage(
+          kind,
+          buildSources.map(({ id, queryScope: scope }) => ({ sourceId: id, scope })),
+        )
           .then((status) => client.setQueryData([STATUS_ROOT, kind, queryScope], status))
           .catch(() => undefined),
       );

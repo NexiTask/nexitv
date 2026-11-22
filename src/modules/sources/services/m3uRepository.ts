@@ -1,4 +1,5 @@
 import { tauriApi, type M3uDocument } from '@/platform/tauri';
+import { trackDataActivity } from '@/shared/lib/dataActivity';
 
 export interface M3uConnectionSecret {
   location: string;
@@ -41,15 +42,17 @@ export async function deleteM3uConnection(sourceId: string): Promise<void> {
   await tauriApi.sourceSecretDelete(sourceId);
 }
 
-export async function fetchRemoteM3u(
+export function fetchRemoteM3u(
   secret: M3uConnectionSecret,
   sourceId?: string,
 ): Promise<M3uDocument> {
-  return tauriApi.m3uFetch({ url: secret.location, headers: secret.headers, cacheKey: sourceId });
+  return trackDataActivity('playlist', () =>
+    tauriApi.m3uFetch({ url: secret.location, headers: secret.headers, cacheKey: sourceId }),
+  );
 }
 
-export async function readLocalM3u(path: string): Promise<M3uDocument> {
-  return tauriApi.m3uReadFile(path);
+export function readLocalM3u(path: string): Promise<M3uDocument> {
+  return trackDataActivity('playlist', () => tauriApi.m3uReadFile(path));
 }
 
 export async function writeLocalM3u(path: string, content: string): Promise<void> {
@@ -60,8 +63,8 @@ export async function storeM3uCache(sourceId: string, document: M3uDocument): Pr
   await tauriApi.m3uCacheStore(sourceId, document);
 }
 
-export async function loadM3uCache(sourceId: string): Promise<M3uDocument | null> {
-  return tauriApi.m3uCacheLoad(sourceId);
+export function loadM3uCache(sourceId: string): Promise<M3uDocument | null> {
+  return trackDataActivity('playlist', () => tauriApi.m3uCacheLoad(sourceId));
 }
 
 export async function deleteM3uCache(sourceId: string): Promise<void> {

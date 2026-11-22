@@ -4,6 +4,7 @@ import type { EpgProgramme } from './useEpg';
 import { useEnabledSources } from '@/modules/sources/public/hooks/useEnabledSources';
 import { getUrlQueryScope } from '@/modules/sources/public/model/queryKeys';
 import { tauriApi } from '@/platform/tauri';
+import { trackDataActivity } from '@/shared/lib/dataActivity';
 import { hydrateXmltvGuide, parseXmltvTime, type XmltvGuide } from '../model/xmltvNormalizer';
 
 export { hydrateXmltvGuide, parseXmltvTime } from '../model/xmltvNormalizer';
@@ -76,12 +77,14 @@ export function parseXmltv(xml: string): XmltvGuide {
   return { byChannel, idByName, nameById, channelCount: byChannel.size, programmeCount };
 }
 
-export async function fetchXmltvGuide(
+export function fetchXmltvGuide(
   url: string,
   _signal?: AbortSignal,
   headers?: Record<string, string>,
 ): Promise<XmltvGuide> {
-  return hydrateXmltvGuide(await tauriApi.xmltvFetch({ url, headers }));
+  return trackDataActivity('guide', async () =>
+    hydrateXmltvGuide(await tauriApi.xmltvFetch({ url, headers })),
+  );
 }
 
 type Settled<T> = { status: 'fulfilled'; value: T } | { status: 'rejected'; reason: unknown };

@@ -5,6 +5,7 @@ import { CATALOG_FRESH_MS } from '@/modules/catalog/data/catalogFreshness';
 import { catalogQueryOptions, selectFoldedLiveCatalog } from '@/modules/catalog/data/useCatalog';
 import { queryKeys } from '@/modules/sources/model/queryKeys';
 import { categoriesQueryOptions } from '@/modules/catalog/data/useCategories';
+import { useDataActivities } from '@/shared/lib/dataActivity';
 import type { EnabledSourcesSnapshot } from '@/modules/sources/hooks/useEnabledSources';
 
 const xc = vi.hoisted(() => ({
@@ -332,10 +333,19 @@ describe('source-scoped catalog and category queries', () => {
     });
 
     it('keeps each provider list for the next start under its account scope', async () => {
-      xc.getVodStreams.mockResolvedValue(streams);
+      let resolveProvider!: (value: typeof streams) => void;
+      xc.getVodStreams.mockReturnValueOnce(
+        new Promise<typeof streams>((resolve) => {
+          resolveProvider = resolve;
+        }),
+      );
+      const request = runQuery<any[]>(catalogQueryOptions('vod', sources()));
 
-      await runQuery<any[]>(catalogQueryOptions('vod', sources()));
+      await vi.waitFor(() => expect(useDataActivities.getState().catalog).toBe(1));
+      resolveProvider(streams);
+      await request;
 
+      expect(useDataActivities.getState().catalog).toBe(0);
       expect(disk.rememberProviderList).toHaveBeenCalledWith(
         'xtream-one',
         'vod',
