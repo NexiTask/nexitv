@@ -11,7 +11,7 @@ const THEMES = ['dark', 'light'] as const;
 const UI_QA_FIXED_TIME = new Date('2026-08-28T21:53:00.000Z');
 
 function withHarnessOptions(route: string, locale: string, theme: string) {
-  return `${route}${route.includes('?') ? '&' : '?'}locale=${locale}&theme=${theme}`;
+  return `${route}${route.includes('?') ? '&' : '?'}locale=${locale}&theme=${theme}&qa=1`;
 }
 
 // axe 4.14 moved label-content-name-mismatch (WCAG 2.5.3, label in name) out

@@ -4,7 +4,8 @@ use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use chrono::{FixedOffset, Local, NaiveDate, TimeZone};
+use jiff::civil::DateTime;
+use jiff::tz::{AmbiguousOffset, Offset, TimeZone};
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
 use serde::{Deserialize, Serialize};
@@ -117,20 +118,21 @@ fn parse_xmltv_time(value: &str) -> Option<i64> {
         return None;
     }
     let date = &value[..digit_count];
-    let parse = |range: std::ops::Range<usize>| date.get(range)?.parse::<u32>().ok();
-    let year = date.get(0..4)?.parse::<i32>().ok()?;
+    let parse = |range: std::ops::Range<usize>| date.get(range)?.parse::<i8>().ok();
+    let year = date.get(0..4)?.parse::<i16>().ok()?;
     let month = parse(4..6)?;
     let day = parse(6..8)?;
     let hour = parse(8..10)?;
     let minute = parse(10..12)?;
     let second = if digit_count == 14 { parse(12..14)? } else { 0 };
-    let naive = NaiveDate::from_ymd_opt(year, month, day)?.and_hms_opt(hour, minute, second)?;
+    let datetime = DateTime::new(year, month, day, hour, minute, second, 0).ok()?;
     let offset = value[digit_count..].trim();
     if offset.is_empty() {
-        return Local
-            .from_local_datetime(&naive)
-            .earliest()
-            .map(|value| value.timestamp_millis());
+        let local = TimeZone::system().to_ambiguous_timestamp(datetime);
+        if matches!(local.offset(), AmbiguousOffset::Gap { .. }) {
+            return None;
+        }
+        return local.earlier().ok().map(|value| value.as_millisecond());
     }
     if offset.len() != 5 || !matches!(offset.as_bytes()[0], b'+' | b'-') {
         return None;
@@ -141,11 +143,11 @@ fn parse_xmltv_time(value: &str) -> Option<i64> {
         return None;
     }
     let sign = if offset.starts_with('-') { -1 } else { 1 };
-    let offset = FixedOffset::east_opt(sign * (hours * 3600 + minutes * 60))?;
+    let offset = Offset::from_seconds(sign * (hours * 3600 + minutes * 60)).ok()?;
     offset
-        .from_local_datetime(&naive)
-        .single()
-        .map(|value| value.timestamp_millis())
+        .to_timestamp(datetime)
+        .ok()
+        .map(|value| value.as_millisecond())
 }
 
 fn attribute_value(

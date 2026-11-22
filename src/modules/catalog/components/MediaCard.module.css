@@ -279,8 +279,8 @@
 .imdbBadge {
   padding: 0 var(--space-0-75);
   border-radius: var(--radius-xs);
-  background: #f5c518;
-  color: #000;
+  background: var(--color-imdb);
+  color: var(--neutral-black);
   font-size: var(--font-size-micro);
   font-weight: var(--font-weight-bold);
   line-height: 1.4;

@@ -1,3 +1,7 @@
+# Aurora adds these files to local checkouts.
+/.agents/rules/aurora-workspace.md
+/AGENTS.override.md
+
 # Dependencies and generated output
 node_modules/
 dist/

@@ -70,34 +70,33 @@ const SOURCE_ID = 'm3u-readme-fixture';
 const XTREAM_SOURCE_ID = 'xtream-readme-fixture';
 const GUIDE_URL = 'https://guide.example.test/movena.xml';
 
-// Local data-URI artwork keeps visual QA independent of network availability.
-/** TMDB's poster images for the showcase titles, served by TMDB's image
- * CDN. The catalogue keeps these as provider artwork; the README uses them
- * descriptively, with TMDB's attribution below. */
-const tmdbPoster = (file: string) => `https://image.tmdb.org/t/p/w500/${file}`;
+// QA uses synthetic artwork so a slow CDN cannot change a screenshot.
+const useSyntheticPosters = new URLSearchParams(window.location.search).get('qa') === '1';
+const fixturePoster = (file: string, seed: number) =>
+  useSyntheticPosters ? artwork(seed) : `https://image.tmdb.org/t/p/w500/${file}`;
 const POSTERS = {
-  dunepartwo: tmdbPoster('1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg'),
-  parasite: tmdbPoster('7IiTTgloJzvGI1TAYymCfbfl3vT.jpg'),
-  spiritedaway: tmdbPoster('39wmItIWsg5sZMyRUHLkWBcuVCM.jpg'),
-  thematrix: tmdbPoster('f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg'),
-  arrival: tmdbPoster('pEzNVQfdzYDzVK0XqxERIw2x2se.jpg'),
-  thegrandbudapesthotel: tmdbPoster('eWdyYQreja6JGCzqHWXpWHDrrPo.jpg'),
-  madmaxfuryroad: tmdbPoster('oLy2V6AWSEfdPgKOtrSGnwB3Q2R.jpg'),
-  thegodfather: tmdbPoster('3bhkrj58Vtu7enYsRolD1fZdja1.jpg'),
-  severance: tmdbPoster('lFf6LLrQjYldcZItzOkGmMMigP7.jpg'),
-  inception: tmdbPoster('oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg'),
-  interstellar: tmdbPoster('gEU2QniE6E77NI6lCU6MxlNBvIx.jpg'),
-  theempirestrikesback: tmdbPoster('nNAeTmF4CtdSgMDplXTDPOpYzsX.jpg'),
-  terminator2judgmentday: tmdbPoster('weVXMD5QBGeQil4HEATZqAkXeEc.jpg'),
-  theprestige: tmdbPoster('37Fr7lY4QBHsuxlLJIfTNxW6nGW.jpg'),
-  backtothefuture: tmdbPoster('7lyBcpYB0Qt8gYhXYaEZUNlNQAv.jpg'),
-  spidermanintothespiderverse: tmdbPoster('iiZZdoQBEYBv6id8su7ImL0oCbD.jpg'),
-  aliens: tmdbPoster('r1x5JGpyqZU8PYhbs4UcrO1Xb6x.jpg'),
-  her: tmdbPoster('n1sY9uAsQKOus91A4FtvN3JdHYH.jpg'),
-  thebear: tmdbPoster('6FVNnVk0SZFdzb9dkvOr13XyyM4.jpg'),
-  dark: tmdbPoster('5LoHuHWA4H8jElFlZDvsmU2n63b.jpg'),
-  arcane: tmdbPoster('fqldf2t8ztc9aiwn3k6mlX3tvRT.jpg'),
-  shogun: tmdbPoster('7O4iVfOMQmdCSxhOg1WnzG1AgYT.jpg'),
+  dunepartwo: fixturePoster('1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg', 0),
+  parasite: fixturePoster('7IiTTgloJzvGI1TAYymCfbfl3vT.jpg', 1),
+  spiritedaway: fixturePoster('39wmItIWsg5sZMyRUHLkWBcuVCM.jpg', 2),
+  thematrix: fixturePoster('f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg', 3),
+  arrival: fixturePoster('pEzNVQfdzYDzVK0XqxERIw2x2se.jpg', 4),
+  thegrandbudapesthotel: fixturePoster('eWdyYQreja6JGCzqHWXpWHDrrPo.jpg', 5),
+  madmaxfuryroad: fixturePoster('oLy2V6AWSEfdPgKOtrSGnwB3Q2R.jpg', 6),
+  thegodfather: fixturePoster('3bhkrj58Vtu7enYsRolD1fZdja1.jpg', 7),
+  severance: fixturePoster('lFf6LLrQjYldcZItzOkGmMMigP7.jpg', 8),
+  inception: fixturePoster('oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg', 9),
+  interstellar: fixturePoster('gEU2QniE6E77NI6lCU6MxlNBvIx.jpg', 10),
+  theempirestrikesback: fixturePoster('nNAeTmF4CtdSgMDplXTDPOpYzsX.jpg', 11),
+  terminator2judgmentday: fixturePoster('weVXMD5QBGeQil4HEATZqAkXeEc.jpg', 12),
+  theprestige: fixturePoster('37Fr7lY4QBHsuxlLJIfTNxW6nGW.jpg', 13),
+  backtothefuture: fixturePoster('7lyBcpYB0Qt8gYhXYaEZUNlNQAv.jpg', 14),
+  spidermanintothespiderverse: fixturePoster('iiZZdoQBEYBv6id8su7ImL0oCbD.jpg', 15),
+  aliens: fixturePoster('r1x5JGpyqZU8PYhbs4UcrO1Xb6x.jpg', 16),
+  her: fixturePoster('n1sY9uAsQKOus91A4FtvN3JdHYH.jpg', 17),
+  thebear: fixturePoster('6FVNnVk0SZFdzb9dkvOr13XyyM4.jpg', 18),
+  dark: fixturePoster('5LoHuHWA4H8jElFlZDvsmU2n63b.jpg', 19),
+  arcane: fixturePoster('fqldf2t8ztc9aiwn3k6mlX3tvRT.jpg', 20),
+  shogun: fixturePoster('7O4iVfOMQmdCSxhOg1WnzG1AgYT.jpg', 21),
 } as const;
 
 const TMDB_ARTWORK = {
@@ -1411,13 +1410,9 @@ const ROUTES: Record<ReadmeSurface, string> = {
   'light-theme': '/',
 };
 
-export function ReadmeHarness({
-  surface,
-  settingsSection,
-}: {
-  surface: ReadmeSurface | ReadmeFeatureSurface;
-  settingsSection?: string | null | undefined;
-}) {
+// Seed the fixture before mounting components that subscribe to its stores.
+// eslint-disable-next-line react-refresh/only-export-components
+export function createReadmeFixture(surface: ReadmeSurface | ReadmeFeatureSurface) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Number.POSITIVE_INFINITY, refetchOnWindowFocus: false },
@@ -1425,6 +1420,19 @@ export function ReadmeHarness({
   });
   const fixtureSurface: ReadmeSurface = surface === 'movies-filters' ? 'movies' : surface;
   seedFixture(queryClient, fixtureSurface);
+  return { queryClient, fixtureSurface };
+}
+
+export function ReadmeHarness({
+  surface,
+  settingsSection,
+  fixture,
+}: {
+  surface: ReadmeSurface | ReadmeFeatureSurface;
+  settingsSection?: string | null | undefined;
+  fixture: ReturnType<typeof createReadmeFixture>;
+}) {
+  const { queryClient, fixtureSurface } = fixture;
   const isPlayerSurface = surface === 'player-vod' || surface === 'player-series';
 
   const resolvedSettingsSection: SettingsSectionId = resolveSettingsSectionId(
