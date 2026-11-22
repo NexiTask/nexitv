@@ -304,7 +304,7 @@ fn pick_candidate<'a>(
     if pool.is_empty() {
         return (None, "year-miss");
     }
-    pool.sort_by(|a, b| b.votes.cmp(&a.votes));
+    pool.sort_by_key(|candidate| std::cmp::Reverse(candidate.votes));
     let top = pool[0];
     if let Some(second) = pool.get(1) {
         if second.year != top.year && second.votes * 2 > top.votes {

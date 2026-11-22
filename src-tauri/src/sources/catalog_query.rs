@@ -1026,7 +1026,7 @@ pub(crate) fn search(
             (points > 0).then(|| (context.key(entry), points))
         })
         .collect();
-    found.sort_by(|a, b| b.1.cmp(&a.1));
+    found.sort_by_key(|&(_, score)| std::cmp::Reverse(score));
     found
 }
 
