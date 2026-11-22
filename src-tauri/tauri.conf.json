@@ -64,7 +64,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlENzJEMTlGNjk0OUNCRTkKUldUcHkwbHBuOUZ5bmQ5bU4rL1NnNmdlS2lhbEtUL3U2RFBvMjZaR1FwdjMwZS9WTUszMXFqZ2EK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMxMzZEQkVDQzA2REQ4QkIKUldTNzJHM0E3TnMyTVJjeUVUbzh4ZUIwR0JGblZxbTBoeDh3Sm1DT2ErY0N0L0cySjV5b1lmUUwK",
       "endpoints": ["https://github.com/NexiTask/nexitv/releases/latest/download/latest.json"]
     }
   }
