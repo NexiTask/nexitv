@@ -58,8 +58,8 @@
   display: flex;
   align-items: center;
   font-family: 'Unbounded', sans-serif;
-  font-size: 32px;
-  font-weight: 800;
+  font-size: var(--font-size-wordmark);
+  font-weight: var(--font-weight-extra-bold);
   line-height: 1;
   color: var(--text-primary);
   white-space: nowrap;

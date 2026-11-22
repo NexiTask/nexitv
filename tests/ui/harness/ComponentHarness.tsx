@@ -257,13 +257,6 @@ function OverlaysSurface() {
 }
 
 function DeveloperHudSurface() {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: { queries: { retry: false } },
-      }),
-  );
-
   useEffect(() => {
     const settings = useSettingsStore.getState();
     settings.updateSetting('debugMode', true);
@@ -290,15 +283,10 @@ function DeveloperHudSurface() {
     return () => {
       usePlayerStore.getState().closePlayer();
       useSettingsStore.getState().updateSetting('showDebugOverlay', false);
-      queryClient.clear();
     };
-  }, [queryClient]);
+  }, []);
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <DebugOverlay />
-    </QueryClientProvider>
-  );
+  return <DebugOverlay />;
 }
 
 const SURFACE_COMPONENTS: Record<UiQaSurface, () => React.JSX.Element> = {
@@ -321,6 +309,12 @@ export function ComponentHarness({ language }: { language: UiLanguage }) {
     'developer-hud': copy.developerHud,
   };
   const Surface = SURFACE_COMPONENTS[surface];
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+      }),
+  );
 
   return (
     <main className={styles.harness} data-ui-qa-surface={surface}>
@@ -343,7 +337,9 @@ export function ComponentHarness({ language }: { language: UiLanguage }) {
         </nav>
       </header>
       <section className={styles.canvas} aria-label={titleBySurface[surface]}>
-        <Surface />
+        <QueryClientProvider client={queryClient}>
+          <Surface />
+        </QueryClientProvider>
       </section>
     </main>
   );

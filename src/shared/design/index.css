@@ -15,6 +15,7 @@
   --neutral-white-rgb: 255, 255, 255;
   --neutral-black-rgb: 0, 0, 0;
   --neutral-black: #000000;
+  --color-imdb: #f5c518;
   --alpha-0: 0;
   --alpha-2: 0.02;
   --alpha-4: 0.04;
@@ -176,6 +177,8 @@
   --font-size-heading: 20px;
   --font-size-section: 28px;
   --font-size-page: 34px;
+  --font-size-wordmark: 32px;
+  --font-size-detail-title: clamp(var(--font-size-section), 3.4vw, 42px);
   --font-size-display: clamp(var(--font-size-heading), 3vw, var(--font-size-page));
   --line-height-tight: 1.25;
   --line-height-normal: 1.45;
@@ -184,6 +187,7 @@
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
+  --font-weight-extra-bold: 800;
 
   /* Layout and controls. */
   --control-height-sm: 32px;
@@ -209,6 +213,7 @@
   --space-16: 96px;
   --window-chrome-height: 32px;
   --page-top-inset: var(--space-2);
+  --radius-xxs: 2px;
   --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;

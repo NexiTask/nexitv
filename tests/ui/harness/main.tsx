@@ -6,7 +6,7 @@ import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { applyAppearanceTheme, COLOR_THEMES, type ColorTheme } from '@/shared/design/appearance';
 import '@/shared/design/index.css';
 import { ComponentHarness } from './ComponentHarness';
-import { ReadmeHarness } from './ReadmeHarness';
+import { createReadmeFixture, ReadmeHarness } from './ReadmeHarness';
 import {
   README_FEATURE_SURFACES,
   README_SURFACES,
@@ -47,17 +47,18 @@ async function renderHarness() {
   document.documentElement.lang = language;
   document.documentElement.dataset.motion = 'reduced';
 
-  const readmeSurface = searchParams.get('readme');
+  const readmeSurface = searchParams.get('readme') as ReadmeSurface | ReadmeFeatureSurface | null;
   const isReadmeSurface =
     README_SURFACES.includes(readmeSurface as ReadmeSurface) ||
     README_FEATURE_SURFACES.includes(readmeSurface as ReadmeFeatureSurface);
   const settingsSection = searchParams.get('settingsSection');
 
   createRoot(document.getElementById('root')!).render(
-    isReadmeSurface ? (
+    readmeSurface && isReadmeSurface ? (
       <ReadmeHarness
-        surface={readmeSurface as ReadmeSurface | ReadmeFeatureSurface}
+        surface={readmeSurface}
         settingsSection={settingsSection}
+        fixture={createReadmeFixture(readmeSurface)}
       />
     ) : (
       <BrowserRouter>

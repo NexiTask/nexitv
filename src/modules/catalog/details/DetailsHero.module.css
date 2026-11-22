@@ -105,7 +105,7 @@
   margin: 0;
   padding-right: var(--space-10);
   color: var(--text-primary);
-  font-size: clamp(28px, 3.4vw, 42px);
+  font-size: var(--font-size-detail-title);
   font-weight: var(--font-weight-bold);
   line-height: 1.05;
   letter-spacing: -0.02em;
@@ -136,7 +136,7 @@
 }
 
 .tag {
-  padding: var(--space-px, 1px) var(--space-1-5);
+  padding: var(--space-px) var(--space-1-5);
   border: 1px solid currentColor;
   border-radius: var(--radius-xs);
   color: var(--badge-accent, var(--text-primary));
@@ -178,6 +178,7 @@
 }
 
 .moreToggle {
+  min-height: var(--space-5);
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);

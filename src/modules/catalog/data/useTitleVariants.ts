@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { tauriApi } from '@/platform/tauri';
-import { useEnabledSources } from '@/modules/sources/hooks/useEnabledSources';
+import { useEnabledSources } from '@/modules/sources/public/hooks/useEnabledSources';
 import { parseProviderCategoryName } from '@/shared/lib/categoryName';
 import { mapXtreamList } from './useCatalog';
 import { useCategories } from './useCategories';
