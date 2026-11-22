@@ -153,6 +153,20 @@ disclosed below.
 | macOS Intel         | `.dmg` (`x86_64`)                    | Bundles its own mpv runtime, nothing else to install. Current builds are ad-hoc signed rather than Developer ID notarized.               |
 | Linux x64           | `.deb`, `.AppImage`                  | A compatible system libmpv and normal Tauri/WebKit desktop libraries are required. Install `mpv` through your distribution if necessary. |
 
+### Opening NexiTV on macOS for the first time
+
+The macOS builds are not notarized by Apple yet, so macOS blocks the app the
+first time it opens. To allow it:
+
+1. Open the `.dmg` and drag NexiTV into Applications.
+2. Open NexiTV from Applications. macOS says it cannot verify the app; click
+   **Done** (or **OK**).
+3. Open **System Settings → Privacy & Security** and scroll down to
+   **Security**. Next to the message about NexiTV, click **Open Anyway**.
+4. Confirm with **Open Anyway** again and enter your password if asked.
+
+macOS remembers this choice, so NexiTV opens normally after that.
+
 If installation or playback fails, search the
 [existing issues](https://github.com/NexiTask/nexitv/issues) before opening a
 new report. Never include credentials, playlist URLs, provider responses, or
