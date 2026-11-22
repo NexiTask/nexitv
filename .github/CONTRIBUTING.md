@@ -44,11 +44,13 @@ npm run check
 npm run check:licenses
 ```
 
-UI work should also run `npm run test:ui`; visual changes use
-`npm run test:ui:visual`. The feature-gated packaged-desktop journey is built and
-run with `npm run test:desktop:all`. It verifies the React/Tauri boundary, but
-native libmpv compositing and process teardown still require the manual matrix
-in [the release policy](../docs/RELEASING.md).
+CI runs `npm run test:ui` for accessibility and layout checks. For optional
+screenshot comparisons on Windows, run `npm run test:ui:visual`.
+
+Build and run the feature-gated packaged-desktop journey with
+`npm run test:desktop:all` to verify the React/Tauri boundary. Native libmpv
+compositing and process teardown require the manual matrix in
+[the release policy](../docs/RELEASING.md).
 
 Coverage is a ratchet, not a target. Repository-wide thresholds prevent broad
 regression, while higher per-file gates protect credential, source, player,

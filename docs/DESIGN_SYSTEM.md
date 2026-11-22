@@ -147,7 +147,7 @@ It renders production primitives, content states, settings controls, and
 overlays without adding a development route or fixture code to the app.
 `npm run test:ui` checks accessibility and the 960×600 logical-pixel geometry
 contract, plus a 2× device-scale pass that preserves that viewport.
-`npm run test:ui:visual` also compares the representative Windows screenshots.
+Run `npm run test:ui:visual` on Windows for optional screenshot comparisons.
 Update a baseline only after reviewing the rendered difference.
 
 Shared controls should have role-based tests for keyboard navigation, focus,
