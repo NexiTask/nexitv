@@ -15,7 +15,6 @@ import { usePlayerContextMenus } from '@/modules/playback/hooks/usePlayerContext
 import { usePlayerStore } from '@/modules/playback/store/usePlayerStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { ConnectionStatus } from './components/ConnectionStatus';
-import { DataActivityStatus } from './components/DataActivityStatus';
 import { AppProviders } from './providers/AppProviders';
 import { AppRoutes } from './router/AppRoutes';
 import { Sidebar } from './shell/Sidebar';
@@ -143,7 +142,6 @@ function AppShell() {
           <div className={styles.pageContainer}>
             <AppRoutes />
           </div>
-          <DataActivityStatus />
         </main>
       </div>
 

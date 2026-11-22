@@ -26,7 +26,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: var(--space-2) var(--space-3) var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-6);
   overflow-y: auto;
 }
 
@@ -90,13 +90,18 @@
   margin-right: 0;
 }
 
-.bottomBar {
+.footer {
   position: relative;
   z-index: 1;
-  flex: 0 0 auto;
+  flex-shrink: 0;
+  padding: 0 var(--space-3) var(--space-3);
+  background: var(--bg-sidebar);
+}
+
+.bottomBar {
+  position: relative;
   height: calc(var(--control-height-md) + var(--space-3));
   border-top: 1px solid var(--border-subtle);
-  background: var(--bg-sidebar);
 }
 
 .sidebar.collapsed .bottomBar {
@@ -327,9 +332,4 @@
   height: 0;
   max-width: 0;
   padding: 0;
-}
-
-.spacer {
-  flex: 1;
-  min-height: var(--space-6);
 }

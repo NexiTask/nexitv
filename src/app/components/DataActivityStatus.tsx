@@ -7,7 +7,13 @@ import styles from './DataActivityStatus.module.css';
 const ACTIVITIES = ['catalog', 'index', 'playlist', 'guide'] as const;
 const SHOW_DELAY_MS = 400;
 
-function ActivityLabels({ active }: { active: (typeof ACTIVITIES)[number][] }) {
+function ActivityLabels({
+  active,
+  compact,
+}: {
+  active: (typeof ACTIVITIES)[number][];
+  compact: boolean;
+}) {
   const { t } = useI18n();
   const [visible, setVisible] = useState(false);
 
@@ -24,22 +30,26 @@ function ActivityLabels({ active }: { active: (typeof ACTIVITIES)[number][] }) {
     playlist: t('Loading playlists…'),
     guide: t('Loading the TV guide…'),
   };
+  const label = active.map((activity) => labels[activity]).join(' ');
 
   return (
-    <>
-      <LoaderCircle size={16} aria-hidden="true" className={styles.spinner} />
-      <span>{active.map((activity) => labels[activity]).join(' ')}</span>
-    </>
+    <div
+      className={compact ? `${styles.row} ${styles.compact}` : styles.row}
+      title={compact ? label : undefined}
+    >
+      <LoaderCircle size={20} aria-hidden="true" className={styles.spinner} />
+      <span className={styles.label}>{label}</span>
+    </div>
   );
 }
 
-export function DataActivityStatus() {
+export function DataActivityStatus({ compact }: { compact: boolean }) {
   const counts = useDataActivities();
   const active = ACTIVITIES.filter((activity) => counts[activity] > 0);
 
   return (
-    <div className={styles.status} role="status">
-      {active.length > 0 && <ActivityLabels active={active} />}
+    <div role="status">
+      {active.length > 0 && <ActivityLabels active={active} compact={compact} />}
     </div>
   );
 }

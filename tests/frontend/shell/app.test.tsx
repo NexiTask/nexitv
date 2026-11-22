@@ -43,7 +43,6 @@ import App from '@/app/App';
 import { useAuthStore } from '@/modules/sources/store/useAuthStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { useSourceStore } from '@/modules/sources/store/useSourceStore';
-import { trackDataActivity } from '@/shared/lib/dataActivity';
 
 beforeEach(() => {
   Object.defineProperty(window, 'requestIdleCallback', {
@@ -106,66 +105,7 @@ describe('application shell', () => {
 
     expect(await screen.findByText('Mock home')).toBeTruthy();
     expect(screen.getByRole('navigation', { name: 'Mock sidebar' })).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toBe('');
-  });
-
-  it('shows ongoing data tasks and clears them as they finish', async () => {
-    render(<App />);
-    await screen.findByText('Mock home');
-    const status = screen.getByRole('status');
-    let finishCatalog!: () => void;
-    let failIndex!: (error: Error) => void;
-
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    try {
-      act(() => {
-        void trackDataActivity(
-          'guide',
-          () => new Promise<void>((resolve) => window.setTimeout(resolve, 100)),
-        );
-      });
-      await act(() => vi.advanceTimersByTimeAsync(100));
-      act(() => vi.advanceTimersByTime(400));
-      expect(status.textContent).toBe('');
-
-      let catalog!: Promise<void>;
-      let index!: Promise<void>;
-      act(() => {
-        catalog = trackDataActivity(
-          'catalog',
-          () =>
-            new Promise<void>((resolve) => {
-              finishCatalog = resolve;
-            }),
-        );
-        index = trackDataActivity(
-          'index',
-          () =>
-            new Promise<void>((_, reject) => {
-              failIndex = reject;
-            }),
-        );
-      });
-      expect(status.textContent).toBe('');
-
-      act(() => vi.advanceTimersByTime(400));
-      expect(status.textContent).toBe('Loading the provider catalog… Preparing the library index…');
-
-      await act(async () => {
-        finishCatalog();
-        await catalog;
-      });
-      expect(status.textContent).toBe('Preparing the library index…');
-
-      await act(async () => {
-        const error = new Error('Index unavailable');
-        failIndex(error);
-        await expect(index).rejects.toBe(error);
-      });
-      expect(status.textContent).toBe('');
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('synchronizes theme changes to the document immediately', async () => {

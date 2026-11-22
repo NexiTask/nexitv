@@ -31,6 +31,7 @@ import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { StateIcon } from '@/shared/ui/StateIcon';
 import { useEnabledSources } from '@/modules/sources/hooks/useEnabledSources';
 import { prefetchNavigationData } from '../bootstrap/prefetch';
+import { DataActivityStatus } from '../components/DataActivityStatus';
 import styles from './Sidebar.module.css';
 import { useI18n } from '@/shared/i18n/i18n';
 import { useMediaQuery } from '@/modules/catalog/hooks/useMediaQuery';
@@ -215,14 +216,14 @@ export function Sidebar() {
             </NavLink>
           ))}
         </nav>
+      </div>
 
-        <div className={styles.spacer} />
-
-        {/* BOTTOM SETTINGS & COLLAPSE */}
-        <div
-          className={styles.bottomBar}
-          data-seasonal-decor={isCollapsed ? undefined : 'sidebar-footer'}
-        >
+      <div
+        className={styles.footer}
+        data-seasonal-decor={isCollapsed ? undefined : 'sidebar-footer'}
+      >
+        <DataActivityStatus compact={isCollapsed} />
+        <div className={styles.bottomBar}>
           <NavLink
             to="/settings"
             title={isCollapsed ? t('Settings') : undefined}

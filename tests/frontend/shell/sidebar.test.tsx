@@ -1,14 +1,15 @@
 // @vitest-environment happy-dom
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { LiveTvViewToggle } from '@/modules/catalog/components/LiveTvViewToggle';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from '@/app/shell/Sidebar';
 import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
+import { trackDataActivity } from '@/shared/lib/dataActivity';
 
-describe('Sidebar library counts', () => {
+describe('Sidebar', () => {
   const originalMatchMedia = window.matchMedia;
 
   beforeEach(() => {
@@ -26,6 +27,76 @@ describe('Sidebar library counts', () => {
       favorites: [],
       collections: [],
     });
+  });
+
+  it('shows ongoing data tasks above Settings and clears them as they finish', async () => {
+    useSettingsStore.setState({ sidebarCollapsed: false });
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>,
+    );
+
+    const settings = screen.getByRole('link', { name: 'Settings' });
+    const status = screen.getByRole('status');
+    let finishCatalog!: () => void;
+    let failIndex!: (error: Error) => void;
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      act(() => {
+        void trackDataActivity(
+          'guide',
+          () => new Promise<void>((resolve) => window.setTimeout(resolve, 100)),
+        );
+      });
+      await act(() => vi.advanceTimersByTimeAsync(100));
+      act(() => vi.advanceTimersByTime(400));
+      expect(status.textContent).toBe('');
+
+      let catalog!: Promise<void>;
+      let index!: Promise<void>;
+      act(() => {
+        catalog = trackDataActivity(
+          'catalog',
+          () =>
+            new Promise<void>((resolve) => {
+              finishCatalog = resolve;
+            }),
+        );
+        index = trackDataActivity(
+          'index',
+          () =>
+            new Promise<void>((_, reject) => {
+              failIndex = reject;
+            }),
+        );
+      });
+      expect(status.textContent).toBe('');
+
+      act(() => vi.advanceTimersByTime(400));
+      const activeLabel = 'Loading the provider catalog… Preparing the library index…';
+      expect(status.textContent).toBe(activeLabel);
+      expect(status.nextElementSibling?.contains(settings)).toBe(true);
+
+      act(() => useSettingsStore.setState({ sidebarCollapsed: true }));
+      expect(screen.getByTitle(activeLabel).textContent).toBe(activeLabel);
+
+      await act(async () => {
+        finishCatalog();
+        await catalog;
+      });
+      expect(status.textContent).toBe('Preparing the library index…');
+
+      await act(async () => {
+        const error = new Error('Index unavailable');
+        failIndex(error);
+        await expect(index).rejects.toBe(error);
+      });
+      expect(status.textContent).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows a collapsed library count while announcing its full label', () => {
