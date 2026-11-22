@@ -43,6 +43,7 @@ function wrapperFactory() {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   vi.clearAllMocks();
   useLibraryStore.setState({
     favorites: [

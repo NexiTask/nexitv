@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MediaItem } from '@/modules/catalog/public/model/media';
 import { uiLanguageDefinition } from '@/shared/i18n/config';
@@ -40,6 +41,37 @@ const SEARCH_STALE_TIME = 1000 * 60 * 60 * 24 * 30;
 const DETAILS_STALE_TIME = 1000 * 60 * 60 * 12;
 const TVMAZE_STALE_TIME = 1000 * 60 * 60 * 12;
 const MAX_CONCURRENT_LOOKUPS = 3;
+
+const SNAPSHOT_STORAGE_KEY = 'nexitv-upcoming-snapshots';
+const MAX_SNAPSHOTS = 12;
+
+interface UpcomingSnapshot {
+  key: string;
+  day: string;
+  savedAt: number;
+  releases: UpcomingRelease[];
+}
+
+function readSnapshots(): UpcomingSnapshot[] {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(SNAPSHOT_STORAGE_KEY) ?? '[]');
+    return Array.isArray(parsed) ? (parsed as UpcomingSnapshot[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSnapshot(snapshot: UpcomingSnapshot): void {
+  try {
+    const rest = readSnapshots().filter((entry) => entry.key !== snapshot.key);
+    localStorage.setItem(
+      SNAPSHOT_STORAGE_KEY,
+      JSON.stringify([snapshot, ...rest].slice(0, MAX_SNAPSHOTS)),
+    );
+  } catch {
+    // Persisting is a start-up convenience; the live query still works without it.
+  }
+}
 
 function titleForTmdb(item: MediaItem): string {
   return parseMediaDisplayTitle(item.title, item.year)?.cleanTitle ?? item.title.trim();
@@ -138,8 +170,19 @@ export function useUpcomingReleases(hookOptions: UpcomingReleaseOptions = {}) {
   };
   const scope = favoriteScope(trackedFavorites);
   const calendarDay = calendarDayKey(new Date());
+  // The snapshot key leaves out the calendar day so yesterday's schedule can
+  // still fill the screen instantly while today's is fetched.
+  const snapshotKey = JSON.stringify([
+    scope,
+    language,
+    tmdbIncludeAdult,
+    tmdbImageSize,
+    exactTimesEnabled,
+    historyDays,
+  ]);
+  const snapshot = enabled ? readSnapshots().find((entry) => entry.key === snapshotKey) : undefined;
 
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.tmdbUpcoming(
       scope,
       language,
@@ -152,6 +195,14 @@ export function useUpcomingReleases(hookOptions: UpcomingReleaseOptions = {}) {
     enabled,
     staleTime: DETAILS_STALE_TIME,
     retry: 1,
+    // Show the last saved schedule immediately; a snapshot from an earlier day
+    // counts as stale, so it refreshes in the background.
+    ...(snapshot
+      ? {
+          initialData: snapshot.releases,
+          initialDataUpdatedAt: snapshot.day === calendarDay ? snapshot.savedAt : 0,
+        }
+      : {}),
     queryFn: async (): Promise<UpcomingRelease[]> => {
       const windowStart = releaseWindowStartKey(new Date(), historyDays);
       const scheduleEnrichmentFailures: string[] = [];
@@ -303,4 +354,12 @@ export function useUpcomingReleases(hookOptions: UpcomingReleaseOptions = {}) {
         );
     },
   });
+
+  const { data, dataUpdatedAt, isFetching } = query;
+  useEffect(() => {
+    if (!enabled || !data || isFetching || !dataUpdatedAt) return;
+    writeSnapshot({ key: snapshotKey, day: calendarDay, savedAt: dataUpdatedAt, releases: data });
+  }, [enabled, data, dataUpdatedAt, isFetching, snapshotKey, calendarDay]);
+
+  return query;
 }
