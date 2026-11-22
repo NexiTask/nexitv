@@ -3,12 +3,15 @@ import { createRoot } from 'react-dom/client';
 import '@/shared/design/index.css';
 import App from './App';
 import { perfLog } from '@/platform/perf';
+import { isWebKitGtk } from '@/platform/runtime';
 import { ensureUiMessages } from '@/shared/i18n/i18n';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { initializeTmdbApiKey } from '@/modules/metadata/services/tmdbCredentialVault';
 import { activeSeason, applyAppearanceTheme } from '@/shared/design/appearance';
 
 perfLog('boot:main_module');
+// Scoped CSS fixes for the Linux webview (see .subtle-scrollbar in index.css).
+if (isWebKitGtk()) document.documentElement.dataset.engine = 'webkitgtk';
 const initialSettings = useSettingsStore.getState();
 applyAppearanceTheme(
   initialSettings.themePreference,

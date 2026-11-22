@@ -737,6 +737,20 @@ textarea {
   background: var(--scrollbar-thumb-active);
 }
 
+/* WebKitGTK scrolls an element with a visible custom ::-webkit-scrollbar on the
+   main thread, which halves scrolling to 60 fps on a 120 Hz monitor. With the
+   standard properties set it ignores the custom styling and draws its own
+   scrollbar, which keeps threaded scrolling at the display's refresh rate. */
+:root[data-engine='webkitgtk'] .subtle-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+:root[data-engine='webkitgtk'] .subtle-scrollbar:hover,
+:root[data-engine='webkitgtk'] .subtle-scrollbar:focus-within {
+  scrollbar-color: var(--scrollbar-thumb-hover) transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html:not([data-motion='full']) *,
   html:not([data-motion='full']) *::before,

@@ -12,3 +12,13 @@ export function isMacOS(): boolean {
   if (typeof navigator === 'undefined') return false;
   return /Mac/.test(navigator.userAgent);
 }
+
+/**
+ * Whether the app runs in WebKitGTK (the Linux webview). Its user agent says
+ * Linux and AppleWebKit without Chrome; Chromium-based webviews always say Chrome.
+ */
+export function isWebKitGtk(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /Linux/.test(ua) && /AppleWebKit/.test(ua) && !/Chrome|Chromium/.test(ua);
+}
