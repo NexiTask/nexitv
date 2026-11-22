@@ -139,12 +139,10 @@ enabled channels, catalogues, categories, and guides in one workspace.
 
 ## Download and platform support
 
-NexiTV has no published release yet. Until the first one appears on the
-[releases page](https://github.com/NexiTask/nexitv/releases), build it from
-source (see [Build from source](#build-from-source)). The build produces the
-packages below; a release will also carry a SHA-256 checksum file, an SPDX SBOM,
-and build-provenance attestations. Platform trust status remains explicitly
-disclosed below.
+Download the package for your platform from the
+[releases page](https://github.com/NexiTask/nexitv/releases). Releases include
+SHA-256 checksums, an SPDX SBOM, and build-provenance attestations.
+You can also [build from source](#build-from-source).
 
 | Platform            | Packages the build produces          | Important notes                                                                                                                          |
 | ------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |

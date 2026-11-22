@@ -32,7 +32,7 @@ the CLI version because its package-input contract is release-sensitive.
 2. Run `npm ci`, `npm run setup:mpv` on Windows,
    `npm run check:advisories` (needs `cargo-deny`), `npm run licenses:generate`,
    `npm run check:licenses`, `npm run check:public-tree`, `npm run check`,
-   `npm run build`, and `npm run test:ui:visual`. The build cleans `dist/`
+   `npm run build`, and `npm run test:ui`. The build cleans `dist/`
    first and rejects unexpected output extensions afterward.
 3. Run secret scanning and verify that no playlists, provider records,
    credentials, private URLs, diagnostics, recordings, downloads, or
@@ -58,8 +58,8 @@ artifacts and are separate from Authenticode or Apple Developer ID signing.
 Current v0.x packages have these disclosed limitations:
 
 - Windows packages are not Authenticode-signed and may trigger SmartScreen.
-- macOS packages are ad-hoc signed, are not notarized, and depend on a Homebrew
-  libmpv installation.
+- macOS packages bundle libmpv. They use ad-hoc signing, so first launch may
+  require the Open Anyway steps in the README.
 - Linux packages depend on compatible system libmpv and WebKit/Tauri libraries.
 
 Do not describe a build as Authenticode-signed, Developer ID signed, notarized,

@@ -1,12 +1,25 @@
 # Changelog
 
-All notable changes to Movena are documented in this file.
+This file records NexiTV releases and the inherited Movena changelog.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 for tagged releases.
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-11-22
+
+The first NexiTV release includes macOS DMGs for Apple Silicon and Intel,
+Windows installers and a portable build, and Linux packages.
+
+### Changes since Movena
+
+- Browse movies and series with IMDb ratings, filters, grouped versions, and Watch Next.
+- Switch between channels and the guide in Live TV.
+- Customize the color theme, catalog layout, and card size.
+
+## Movena release history
 
 ## [0.1.33] - 2026-11-22
 
