@@ -9,6 +9,14 @@
   position: relative;
   padding: 0 var(--space-4) var(--space-4);
   box-sizing: border-box;
+  overscroll-behavior: contain;
+}
+
+/* .subtle-scrollbar turns on smooth scroll-behavior. Here it would animate
+   programmatic jumps (scroll restoration, scrollToIndex) on the main thread
+   while the virtualizer re-renders rows, so the grid jumps directly instead. */
+.gridContainer.gridContainer {
+  scroll-behavior: auto;
 }
 
 .listContainer {

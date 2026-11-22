@@ -1,6 +1,6 @@
 import { Play, Heart, Check, Film, Clapperboard, Radio, HardDriveDownload, X } from 'lucide-react';
 import styles from './MediaCard.module.css';
-import { memo, useState, useEffect } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import { useDownloadStore } from '@/modules/downloads/public/store/useDownloadStore';
 import { useMediaContextMenus } from '../hooks/useMediaContextMenus';
@@ -22,8 +22,10 @@ import {
   useStreamVerificationStore,
 } from '@/modules/sources/public/store/useStreamVerificationStore';
 import { useLogoAspect } from '../hooks/useLogoAspect';
+import { getCachedLogoAspect, type LogoAspect } from '../lib/logoAspectDetector';
 import { useTmdbPosterFallback } from '../data/useTmdbPosterFallback';
 import { quickPlay } from '../lib/quickPlay';
+import { canThumbPoster, posterThumbUrl } from '@/platform/posterThumb';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   canTimeOutPosterHost,
@@ -91,6 +93,44 @@ function ProviderFallbackLogo({ provider }: { provider: StreamProviderBrand }) {
   );
 }
 
+/** Looks up TMDB's poster for a card whose own cover is missing or broken. Only
+ * those cards mount it, so ordinary cards carry no query observer or settings
+ * subscriptions. */
+function TmdbPosterProbe({
+  mediaType,
+  lookup,
+  onPoster,
+}: {
+  mediaType: 'movie' | 'tv';
+  lookup: { title: string; year?: string | undefined };
+  onPoster: (url: string | null) => void;
+}) {
+  const poster = useTmdbPosterFallback(mediaType, lookup);
+  useEffect(() => {
+    onPoster(poster);
+  }, [poster, onPoster]);
+  return null;
+}
+
+/** Corrects the aspect of a live channel logo; only live cards mount it. */
+function LogoAspectProbe({
+  posterUrl,
+  channelKey,
+  sourceId,
+  onAspect,
+}: {
+  posterUrl: string | undefined;
+  channelKey: string;
+  sourceId: string | undefined;
+  onAspect: (aspect: LogoAspect) => void;
+}) {
+  const aspect = useLogoAspect(posterUrl, channelKey, sourceId);
+  useEffect(() => {
+    onAspect(aspect);
+  }, [aspect, onAspect]);
+  return null;
+}
+
 function MediaCardComponent({
   item,
   onClick,
@@ -108,9 +148,20 @@ function MediaCardComponent({
   const queryClient = useQueryClient();
   const [imgError, setImgError] = useState(() => isPosterHostDead(item.posterUrl));
   const [imgLoaded, setImgLoaded] = useState(false);
+  // The hover overlay (play, favourite, menu, badges) is built on first hover or
+  // focus. Mounting it on every card made each new grid row cost tens of ms.
+  const [hot, setHot] = useState(false);
   // The provider's cover loaded but is no poster: a thumbnail or a landscape
   // screenshot ("stalker_portal/screenshots/..."). TMDB's poster replaces it.
   const [weakPoster, setWeakPoster] = useState(false);
+  // Reported by TmdbPosterProbe / LogoAspectProbe, which only the cards that need
+  // them mount.
+  const [tmdbPoster, setTmdbPoster] = useState<string | null>(null);
+  // The backend's thumbnail could not be made (or is not wanted): load the original.
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const [logoAspect, setLogoAspect] = useState<LogoAspect>(() =>
+    item.type === 'live' ? (getCachedLogoAspect(item.posterUrl) ?? 'original') : 'original',
+  );
 
   // Fine-grained primitive selectors prevent card re-renders when unrelated store data changes
   const isFav =
@@ -124,6 +175,8 @@ function MediaCardComponent({
     setImgError(isPosterHostDead(item.posterUrl));
     setImgLoaded(false);
     setWeakPoster(false);
+    setTmdbPoster(null);
+    setThumbFailed(false);
   }, [item.id, item.posterUrl]);
 
   // A provider poster on a host that hangs never errors; give it a deadline
@@ -189,25 +242,20 @@ function MediaCardComponent({
   const badgeVisibility = useSettingsStore((s) => s.badgeVisibility);
   const verifiedMeta = useStreamVerificationStore((s) => s.verifiedStreams[item.id]);
 
-  const parsedTitle = isLive ? parseLiveChannelTitle(item.title, customRules) : null;
-  const parsedMediaTitle = !isLive
-    ? parseMediaDisplayTitle(item.title, item.year, customRules)
-    : null;
+  const parsedTitle = useMemo(
+    () => (isLive ? parseLiveChannelTitle(item.title, customRules) : null),
+    [isLive, item.title, customRules],
+  );
+  const parsedMediaTitle = useMemo(
+    () => (!isLive ? parseMediaDisplayTitle(item.title, item.year, customRules) : null),
+    [isLive, item.title, item.year, customRules],
+  );
   const displayTitle = parsedTitle?.cleanTitle ?? parsedMediaTitle?.cleanTitle ?? item.title;
   const displayYear = parsedMediaTitle?.releaseYear ?? null;
 
   // A provider copy with no cover, or one whose link no longer loads, shows
   // TMDB's poster instead of a grey card.
   const needsPosterFallback = !isLive && (!item.posterUrl || imgError || weakPoster);
-  const tmdbPoster = useTmdbPosterFallback(
-    !isLive ? (item.type === 'series' ? 'tv' : 'movie') : undefined,
-    needsPosterFallback
-      ? {
-          title: parsedMediaTitle?.cleanTitle ?? item.title,
-          year: parsedMediaTitle?.releaseYear ?? item.year,
-        }
-      : undefined,
-  );
   // A weak cover stays until TMDB has a better one (and stays if it has none).
   const posterSrc =
     weakPoster && tmdbPoster
@@ -215,6 +263,7 @@ function MediaCardComponent({
       : !imgError && item.posterUrl
         ? item.posterUrl
         : tmdbPoster;
+  const useThumb = !isLive && !thumbFailed && canThumbPoster(posterSrc ?? undefined);
   const showPlaceholder = !posterSrc;
   const verifiedResolutionBadge =
     badgeVisibility?.verified && verifiedMeta
@@ -251,12 +300,14 @@ function MediaCardComponent({
       ? number(item.imdbRating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
       : null;
   const numericRating =
-    item.rating !== undefined && !isNaN(Number(item.rating)) && Number(item.rating) > 0
+    viewMode === 'list' &&
+    item.rating !== undefined &&
+    !isNaN(Number(item.rating)) &&
+    Number(item.rating) > 0
       ? number(Number(item.rating), { minimumFractionDigits: 1, maximumFractionDigits: 1 })
       : null;
 
   const channelKey = item.sourceItemId || item.id;
-  const logoAspect = useLogoAspect(isLive ? item.posterUrl : undefined, channelKey, item.sourceId);
   const logoAspectClass = isLive
     ? logoAspect === '16:9'
       ? styles.posterUnsquish169
@@ -281,6 +332,8 @@ function MediaCardComponent({
       tabIndex={onClick ? 0 : undefined}
       onClick={() => onClick?.(item)}
       onKeyDown={handleCardKeyDown}
+      onPointerEnter={hot ? undefined : () => setHot(true)}
+      onFocus={hot ? undefined : () => setHot(true)}
       onContextMenu={(e) =>
         handleMediaCardContextMenu(e, item, {
           onPlay: isLive ? (i) => onClick?.(i) : undefined,
@@ -289,6 +342,24 @@ function MediaCardComponent({
         })
       }
     >
+      {needsPosterFallback && !isLive && (
+        <TmdbPosterProbe
+          mediaType={item.type === 'series' ? 'tv' : 'movie'}
+          lookup={{
+            title: parsedMediaTitle?.cleanTitle ?? item.title,
+            year: parsedMediaTitle?.releaseYear ?? item.year,
+          }}
+          onPoster={setTmdbPoster}
+        />
+      )}
+      {isLive && (
+        <LogoAspectProbe
+          posterUrl={item.posterUrl}
+          channelKey={channelKey}
+          sourceId={item.sourceId}
+          onAspect={setLogoAspect}
+        />
+      )}
       {viewMode === 'list' && isLive && (
         <span className={styles.listChannelNumber}>{formatChannelNumber(item.channelNum)}</span>
       )}
@@ -298,20 +369,21 @@ function MediaCardComponent({
       >
         {!showPlaceholder ? (
           <img
-            src={posterSrc}
+            src={useThumb && posterSrc ? posterThumbUrl(posterSrc) : posterSrc}
             alt={displayTitle}
             className={`${styles.poster} ${isLive ? styles.posterLive : ''} ${logoAspectClass}`}
             loading="lazy"
             decoding="async"
             onLoad={(event) => {
               setImgLoaded(true);
-              markPosterHostLive(event.currentTarget.src);
+              // posterSrc is the provider URL even when a thumbnail was shown.
+              if (posterSrc) markPosterHostLive(posterSrc);
               const image = event.currentTarget;
-              if (!isLive && image.src === item.posterUrl && isWeakPoster(image)) {
+              if (!isLive && posterSrc === item.posterUrl && isWeakPoster(image)) {
                 setWeakPoster(true);
               }
             }}
-            onError={() => setImgError(true)}
+            onError={() => (useThumb ? setThumbFailed(true) : setImgError(true))}
           />
         ) : (
           <div className={styles.placeholder}>
@@ -394,73 +466,79 @@ function MediaCardComponent({
 
         {viewMode !== 'list' && (
           <div className={styles.overlay}>
-            <button
-              type="button"
-              className={styles.actionBtn}
-              onClick={handlePlayClick}
-              title={t('Play Content')}
-              aria-label={t('Play {title}', { title: displayTitle })}
-            >
-              <Play size={20} fill="currentColor" />
-            </button>
-
-            <div className={styles.topActions}>
-              {onRemove && (
+            {hot && (
+              <>
                 <button
                   type="button"
-                  className={`${styles.iconBtn} ${styles.removeBtn}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onRemove(item);
-                  }}
-                  title={t(removeLabel)}
-                  aria-label={t(removeLabel)}
+                  className={styles.actionBtn}
+                  onClick={handlePlayClick}
+                  title={t('Play Content')}
+                  aria-label={t('Play {title}', { title: displayTitle })}
                 >
-                  <X size={16} />
+                  <Play size={20} fill="currentColor" />
                 </button>
-              )}
-              <button
-                type="button"
-                className={styles.iconBtn}
-                onClick={handleFavoriteClick}
-                title={t(isFav ? 'Remove from Favorites' : 'Add to Favorites')}
-                aria-label={t(isFav ? 'Remove from Favorites' : 'Add to Favorites')}
-              >
-                <Heart
-                  size={16}
-                  fill={isFav ? 'var(--color-favorite)' : 'transparent'}
-                  color={isFav ? 'var(--color-favorite)' : 'currentColor'}
-                />
-              </button>
 
-              <MediaCardMenu
-                item={item}
-                currentCollectionId={currentCollectionId}
-                onPlay={play}
-                onViewDetails={() => (onViewDetails ? onViewDetails(item) : onClick?.(item))}
-              />
-            </div>
-
-            <div className={styles.overlayMeta}>
-              {visibleQualityBadges.length > 0 && (
-                <div className={styles.overlayBadges}>
-                  {visibleQualityBadges.map((badge) => (
-                    <span
-                      key={badge}
-                      className={styles.overlayBadge}
-                      data-tag-type={getTagColorType(badge)}
+                <div className={styles.topActions}>
+                  {onRemove && (
+                    <button
+                      type="button"
+                      className={`${styles.iconBtn} ${styles.removeBtn}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRemove(item);
+                      }}
+                      title={t(removeLabel)}
+                      aria-label={t(removeLabel)}
                     >
-                      {badge}
-                    </span>
-                  ))}
+                      <X size={16} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={styles.iconBtn}
+                    onClick={handleFavoriteClick}
+                    title={t(isFav ? 'Remove from Favorites' : 'Add to Favorites')}
+                    aria-label={t(isFav ? 'Remove from Favorites' : 'Add to Favorites')}
+                  >
+                    <Heart
+                      size={16}
+                      fill={isFav ? 'var(--color-favorite)' : 'transparent'}
+                      color={isFav ? 'var(--color-favorite)' : 'currentColor'}
+                    />
+                  </button>
+
+                  <MediaCardMenu
+                    item={item}
+                    currentCollectionId={currentCollectionId}
+                    onPlay={play}
+                    onViewDetails={() => (onViewDetails ? onViewDetails(item) : onClick?.(item))}
+                  />
                 </div>
-              )}
-              {item.progress !== undefined && item.progress > 0 && (
-                <span className={styles.overlayProgressText}>
-                  {t('{percent}% watched', { percent: number(Math.round(item.progress * 100)) })}
-                </span>
-              )}
-            </div>
+
+                <div className={styles.overlayMeta}>
+                  {visibleQualityBadges.length > 0 && (
+                    <div className={styles.overlayBadges}>
+                      {visibleQualityBadges.map((badge) => (
+                        <span
+                          key={badge}
+                          className={styles.overlayBadge}
+                          data-tag-type={getTagColorType(badge)}
+                        >
+                          {badge}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {item.progress !== undefined && item.progress > 0 && (
+                    <span className={styles.overlayProgressText}>
+                      {t('{percent}% watched', {
+                        percent: number(Math.round(item.progress * 100)),
+                      })}
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
 

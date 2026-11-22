@@ -5,6 +5,7 @@ mod metadata;
 mod perf;
 mod platform;
 mod player;
+mod posters;
 mod sources;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -29,6 +30,7 @@ pub fn run() {
         .plugin(tauri_plugin_wdio_webdriver::init());
 
     builder
+        .register_asynchronous_uri_scheme_protocol(posters::SCHEME, posters::handle)
         .manage(player::NativePlayerManager::default())
         .manage(downloads::DownloadManager::default())
         .invoke_handler(tauri::generate_handler![

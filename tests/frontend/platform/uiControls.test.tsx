@@ -251,6 +251,8 @@ describe('custom control keyboard contracts', () => {
       </MemoryRouter>,
     );
 
+    // The hover overlay is built on first hover.
+    await userEvent.hover(screen.getByRole('group'));
     await userEvent.click(screen.getByRole('button', { name: 'Play Example Series' }));
     expect(openDetails).toHaveBeenCalledOnce();
     await userEvent.click(screen.getByRole('button', { name: 'More options' }));
@@ -273,6 +275,7 @@ describe('custom control keyboard contracts', () => {
         />
       </MemoryRouter>,
     );
+    await userEvent.hover(screen.getByRole('group'));
     await userEvent.click(screen.getByRole('button', { name: 'More options' }));
     expect(screen.getByRole('button', { name: 'Tune Channel' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'View Details' })).toBeNull();

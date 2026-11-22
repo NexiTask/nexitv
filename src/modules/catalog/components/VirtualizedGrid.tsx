@@ -131,9 +131,9 @@ export function VirtualizedGrid({
     getItemKey: getRowKey,
     estimateSize: () => actualRowHeight,
     gap: effectiveGap,
-    // Poster rows are visually tall and expensive to composite; one buffered
-    // row is enough. Compact Live TV and list rows keep a little more runway.
-    overscan: isListMode ? 4 : isLiveTv ? 2 : 1,
+    // A few buffered rows keep fast wheel/trackpad scrolling from outrunning
+    // mounting (blank rows, then a hitch as cards and images appear).
+    overscan: isListMode ? 6 : isLiveTv ? 4 : 3,
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();

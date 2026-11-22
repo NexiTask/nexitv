@@ -27,7 +27,12 @@
   width: 100%;
   aspect-ratio: 2 / 3;
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  /* Corners are rounded on each painted child (see --poster-inner-radius), not
+     by clipping the whole card with overflow: hidden. A rounded clip over a
+     subtree was the biggest scroll cost measured in WebKitGTK (about 30 ms a
+     frame against about 9 ms), and it also forces the clip onto the gradients,
+     badges and text inside. */
+  --poster-inner-radius: calc(var(--radius-lg) - 1px);
   background-color: var(--surface-control);
   border: 1px solid var(--border-grid);
   box-sizing: border-box;
@@ -38,6 +43,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: var(--poster-inner-radius);
 }
 
 .posterLive {
@@ -68,7 +74,7 @@
   padding: var(--space-3);
   background: linear-gradient(135deg, var(--surface-control-hover) 0%, var(--surface-control) 100%);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--poster-inner-radius);
   text-align: center;
   box-sizing: border-box;
 }
@@ -122,6 +128,7 @@
   flex-direction: column;
   justify-content: space-between;
   padding: var(--space-2);
+  border-radius: var(--poster-inner-radius);
   z-index: 2;
 }
 
@@ -186,6 +193,8 @@
   right: 0;
   height: 4px;
   background: rgba(var(--neutral-white-rgb), var(--alpha-20));
+  border-radius: 0 0 var(--poster-inner-radius) var(--poster-inner-radius);
+  overflow: hidden;
   z-index: 4;
 }
 
@@ -209,6 +218,7 @@
     rgba(var(--neutral-black-rgb), var(--alpha-45)) 28%,
     rgba(var(--neutral-black-rgb), var(--alpha-95))
   );
+  border-radius: 0 0 var(--poster-inner-radius) var(--poster-inner-radius);
   pointer-events: none;
   z-index: 3;
 }
@@ -368,6 +378,7 @@
 }
 
 .listView .posterWrapper {
+  --poster-inner-radius: calc(var(--radius-sm) - 1px);
   width: 36px;
   height: 54px;
   aspect-ratio: auto;

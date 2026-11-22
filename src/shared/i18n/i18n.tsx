@@ -237,7 +237,7 @@ export function createI18n(language: UiLanguage): I18nApi {
       const message = catalogFor(language)[localizedPlural] ? localizedPlural : defaultMessage;
       return t(message, { count, ...values });
     },
-    number: (value, options) => new Intl.NumberFormat(locale, options).format(value),
+    number: (value, options) => cachedNumberFormat(locale, options).format(value),
     date: (value, options) => new Intl.DateTimeFormat(locale, options).format(value),
     time: (value, options) =>
       new Intl.DateTimeFormat(locale, {
@@ -247,6 +247,19 @@ export function createI18n(language: UiLanguage): I18nApi {
       }).format(value),
     list: (values, options) => new Intl.ListFormat(locale, options).format(values),
   };
+}
+
+const NUMBER_FORMATS = new Map<string, Intl.NumberFormat>();
+
+/** Building an Intl.NumberFormat is slow; a card grid asks for the same few. */
+function cachedNumberFormat(locale: string, options?: Intl.NumberFormatOptions): Intl.NumberFormat {
+  const key = `${locale}|${options ? JSON.stringify(options) : ''}`;
+  let format = NUMBER_FORMATS.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat(locale, options);
+    NUMBER_FORMATS.set(key, format);
+  }
+  return format;
 }
 
 /** Reactive localization API for components. */

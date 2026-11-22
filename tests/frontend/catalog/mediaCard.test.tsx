@@ -182,6 +182,8 @@ describe('MediaCard quick remove', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
+    // The hover overlay is built on first hover.
+    fireEvent.pointerEnter(screen.getByRole('group'));
     fireEvent.click(screen.getByRole('button', { name: 'Remove from Continue Watching' }));
     expect(onRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 'movie-1' }));
     expect(onClick).not.toHaveBeenCalled();
