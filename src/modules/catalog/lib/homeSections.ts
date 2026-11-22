@@ -60,9 +60,13 @@ export function sanitizeHomeSections(value: unknown): HomeSectionPref[] {
     }
   }
 
-  for (const id of HOME_SECTION_IDS) {
-    if (!seen.has(id)) result.push({ id, enabled: true });
-  }
+  // A section the save predates goes right after the one that precedes it in
+  // the default layout (Watch Next lands under Continue Watching), else last.
+  HOME_SECTION_IDS.forEach((id, index) => {
+    if (seen.has(id)) return;
+    const before = result.findIndex((section) => section.id === HOME_SECTION_IDS[index - 1]);
+    result.splice(before >= 0 ? before + 1 : result.length, 0, { id, enabled: true });
+  });
 
   return result;
 }

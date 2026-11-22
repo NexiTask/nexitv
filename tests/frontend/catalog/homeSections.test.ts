@@ -83,3 +83,25 @@ describe('moveHomeSection', () => {
     expect(sections.map((section) => section.id)).toEqual(snapshot);
   });
 });
+
+describe('a layout saved before Watch Next existed', () => {
+  it('gets Watch Next right after Continue Watching', () => {
+    const saved = [
+      { id: 'upcoming', enabled: true },
+      { id: 'continueWatching', enabled: true },
+      { id: 'recentMovies', enabled: false },
+      { id: 'recentSeries', enabled: false },
+      { id: 'popularMovies', enabled: false },
+      { id: 'popularSeries', enabled: false },
+      { id: 'liveChannels', enabled: false },
+    ];
+    const result = sanitizeHomeSections(saved);
+    expect(result.map((section) => section.id).slice(0, 3)).toEqual([
+      'upcoming',
+      'continueWatching',
+      'watchNext',
+    ]);
+    expect(result.find((section) => section.id === 'watchNext')?.enabled).toBe(true);
+    expect(result.find((section) => section.id === 'recentMovies')?.enabled).toBe(false);
+  });
+});

@@ -756,7 +756,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'iptv-settings-storage',
-      version: 14,
+      version: 15,
       migrate: migrateSettingsState,
       partialize: ({ tmdbApiKey: _tmdbApiKey, ...persistedState }) => persistedState,
     },
