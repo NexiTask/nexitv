@@ -36,7 +36,7 @@ beforeEach(() => {
     profiles: [],
     runtimes: { [sourceId]: { credentials, status: 'ready', error: null, revision: 1 } },
   } as never);
-  useLibraryStore.setState({ history: [], watched: [], startedSeries: [] });
+  useLibraryStore.setState({ history: [], watched: [], startedSeries: [], syncedSeries: [] });
   xc.getSeriesInfo.mockResolvedValue({
     info: { name: 'Breaking Bad' },
     episodes: { '1': [episode(101, 1), episode(102, 2)], '2': [episode(201, 1)] },
@@ -75,5 +75,33 @@ describe('setSeriesWatched', () => {
   it('tells a series card from an episode', () => {
     expect(isSeriesCard(series)).toBe(true);
     expect(isSeriesCard({ ...series, seriesId: series.id })).toBe(false);
+  });
+});
+
+describe('migrateWatchedSeries', () => {
+  it('fills in the episodes of a series that was only flagged on its card', async () => {
+    const { migrateWatchedSeries } =
+      await import('@/modules/catalog/data/useSeriesWatchedMigration');
+    useLibraryStore.setState({ watched: [series.id], syncedSeries: [], startedSeries: [] });
+    expect(await migrateWatchedSeries()).toBe(1);
+    const state = useLibraryStore.getState();
+    expect(state.watched).toHaveLength(4);
+    expect(state.watched).toContain(xtreamItemId(sourceId, 'episode', '201'));
+    expect(state.startedSeries).toEqual([series.id]);
+    expect(state.syncedSeries).toEqual([series.id]);
+
+    // Done once: a second run neither fetches nor changes anything.
+    xc.getSeriesInfo.mockClear();
+    expect(await migrateWatchedSeries()).toBe(0);
+    expect(xc.getSeriesInfo).not.toHaveBeenCalled();
+  });
+
+  it('retries later when the episodes cannot be fetched', async () => {
+    const { migrateWatchedSeries } =
+      await import('@/modules/catalog/data/useSeriesWatchedMigration');
+    xc.getSeriesInfo.mockRejectedValue(new Error('offline'));
+    useLibraryStore.setState({ watched: [series.id], syncedSeries: [], startedSeries: [] });
+    expect(await migrateWatchedSeries()).toBe(0);
+    expect(useLibraryStore.getState().syncedSeries).toEqual([]);
   });
 });

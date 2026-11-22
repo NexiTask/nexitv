@@ -36,4 +36,5 @@ export async function setSeriesWatched(item: MediaItem, watched: boolean): Promi
   const library = useLibraryStore.getState();
   library.setWatched(ids, watched);
   library.setSeriesStarted(item.id, watched, item);
+  if (watched) library.markSeriesSynced(item.id);
 }

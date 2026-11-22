@@ -171,6 +171,12 @@ interface LibraryState {
    * filter reads this list instead.
    */
   startedSeries: string[];
+  /**
+   * Series marked watched as a whole whose episodes have all been marked too
+   * (see `setSeriesWatched`); older marks are filled in once at start.
+   */
+  syncedSeries: string[];
+  markSeriesSynced: (seriesId: string) => void;
   /** Records (or clears) that a series has watched episodes; `item` is what
    * a card needs to show it (kept the first time it is given). */
   setSeriesStarted: (seriesId: string, started: boolean, item?: MediaItem) => void;
@@ -191,7 +197,7 @@ interface LibraryState {
   toggleWatched: (id: string) => void;
   isWatched: (id: string) => boolean;
   /** Marks many items (a season's episodes) at once, with one notice. */
-  setWatched: (ids: readonly string[], watched: boolean) => void;
+  setWatched: (ids: readonly string[], watched: boolean, quiet?: boolean) => void;
   /** Points a series' Continue Watching entry at the episode to watch next,
    * or drops it when there is none (the show is finished). */
   advanceSeriesHistory: (
@@ -270,6 +276,9 @@ export function migrateLibraryState(persistedState: unknown): LibraryState {
     startedSeries: Array.isArray(state.startedSeries)
       ? state.startedSeries.filter((id): id is string => typeof id === 'string' && id.length > 0)
       : [],
+    syncedSeries: Array.isArray(state.syncedSeries)
+      ? state.syncedSeries.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      : [],
     trackedSeries:
       state.trackedSeries &&
       typeof state.trackedSeries === 'object' &&
@@ -297,7 +306,14 @@ export const useLibraryStore = create<LibraryState>()(
       watched: [],
       startedSeries: [],
       trackedSeries: {},
+      syncedSeries: [],
       recentChannels: [],
+
+      markSeriesSynced: (seriesId) => {
+        const current = get().syncedSeries || [];
+        if (!seriesId || current.includes(seriesId)) return;
+        set({ syncedSeries: [...current, seriesId] });
+      },
 
       setSeriesStarted: (seriesId, started, item) => {
         if (!seriesId) return;
@@ -393,7 +409,7 @@ export const useLibraryStore = create<LibraryState>()(
 
       isWatched: (id) => (get().watched || []).includes(id),
 
-      setWatched: (ids, watched) => {
+      setWatched: (ids, watched, quiet = false) => {
         const targets = new Set(ids);
         if (targets.size === 0) return;
         set((state) => {
@@ -404,13 +420,15 @@ export const useLibraryStore = create<LibraryState>()(
               : current.filter((id) => !targets.has(id)),
           };
         });
-        notify.info(
-          watched ? 'Marked as Watched' : 'Marked as Unwatched',
-          undefined,
-          undefined,
-          undefined,
-          'library',
-        );
+        if (!quiet) {
+          notify.info(
+            watched ? 'Marked as Watched' : 'Marked as Unwatched',
+            undefined,
+            undefined,
+            undefined,
+            'library',
+          );
+        }
         debugLog.info('library', `Set watched status`, { count: targets.size, watched });
       },
 
@@ -697,6 +715,7 @@ export const useLibraryStore = create<LibraryState>()(
           watched: [],
           startedSeries: [],
           trackedSeries: {},
+          syncedSeries: [],
           recentChannels: [],
         });
         notify.warning(
