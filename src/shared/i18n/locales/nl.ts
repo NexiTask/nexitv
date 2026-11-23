@@ -67,6 +67,7 @@ export const NL_MESSAGES: Record<string, string> = {
   'Loading…': 'Laden...',
   'Loading the provider catalog…': 'Catalogus van de aanbieder laden…',
   'Preparing the library index…': 'Bibliotheekindex voorbereiden…',
+  'Indexing titles…': 'Titels indexeren…',
   'Loading playlists…': 'Afspeellijsten laden…',
   'Loading the TV guide…': 'Tv-gids laden…',
   'Saving…': 'Opslaan…',

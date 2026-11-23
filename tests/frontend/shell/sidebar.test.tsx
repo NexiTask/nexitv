@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from '@/app/shell/Sidebar';
 import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
-import { trackDataActivity } from '@/shared/lib/dataActivity';
+import { trackDataActivity, type ReportDataProgress } from '@/shared/lib/dataActivity';
 
 describe('Sidebar', () => {
   const originalMatchMedia = window.matchMedia;
@@ -41,6 +41,7 @@ describe('Sidebar', () => {
     const status = screen.getByRole('status');
     let finishCatalog!: () => void;
     let failIndex!: (error: Error) => void;
+    let reportIndex!: ReportDataProgress;
 
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
@@ -66,9 +67,10 @@ describe('Sidebar', () => {
         );
         index = trackDataActivity(
           'index',
-          () =>
+          (reportProgress) =>
             new Promise<void>((_, reject) => {
               failIndex = reject;
+              reportIndex = reportProgress;
             }),
         );
       });
@@ -82,10 +84,15 @@ describe('Sidebar', () => {
       act(() => useSettingsStore.setState({ sidebarCollapsed: true }));
       expect(screen.getByTitle(activeLabel).textContent).toBe(activeLabel);
 
+      act(() => reportIndex(25));
+      expect(status.textContent).toBe('Loading the provider catalog… Indexing titles… 25%');
+
       await act(async () => {
         finishCatalog();
         await catalog;
       });
+      expect(status.textContent).toBe('Indexing titles… 25%');
+      act(() => reportIndex(null));
       expect(status.textContent).toBe('Preparing the library index…');
 
       await act(async () => {

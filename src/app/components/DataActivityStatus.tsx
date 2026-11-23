@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, CircleAlert, LoaderCircle } from 'lucide-react';
 import { useI18n } from '@/shared/i18n/i18n';
-import { useDataActivities } from '@/shared/lib/dataActivity';
+import { useDataActivities, type DataActivity } from '@/shared/lib/dataActivity';
 import styles from './DataActivityStatus.module.css';
 
 const ACTIVITIES = ['catalog', 'index', 'playlist', 'guide'] as const;
@@ -35,11 +35,13 @@ function ActivityRow({
 function ActivityLabels({
   active,
   compact,
+  progress,
 }: {
   active: (typeof ACTIVITIES)[number][];
   compact: boolean;
+  progress: ReadonlyMap<DataActivity, number>;
 }) {
-  const { t } = useI18n();
+  const { t, number } = useI18n();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -51,22 +53,33 @@ function ActivityLabels({
 
   const labels = {
     catalog: t('Loading the provider catalog…'),
-    index: t('Preparing the library index…'),
+    index: progress.has('index') ? t('Indexing titles…') : t('Preparing the library index…'),
     playlist: t('Loading playlists…'),
     guide: t('Loading the TV guide…'),
   };
-  const label = active.map((activity) => labels[activity]).join(' ');
+  const label = active
+    .map((activity) => {
+      const percent = progress.get(activity);
+      return percent === undefined
+        ? labels[activity]
+        : `${labels[activity]} ${number(percent / 100, { style: 'percent', maximumFractionDigits: 0 })}`;
+    })
+    .join(' ');
 
   return <ActivityRow label={label} compact={compact} />;
 }
 
 export function DataActivityStatus({ compact }: { compact: boolean }) {
-  const { t } = useI18n();
+  const { t, number } = useI18n();
   const counts = useDataActivities();
   const active = ACTIVITIES.filter((activity) => counts[activity] > 0);
+  const progress = new Map<DataActivity, number>();
+  for (const { activity, percent } of counts.progress.values()) {
+    if (counts[activity] === 1) progress.set(activity, percent);
+  }
   const refresh = counts.sourceRefresh?.phase;
   const refreshLabels = {
-    refreshing: t('Refreshing sources…'),
+    refreshing: `${t('Refreshing sources…')} ${number((counts.sourceRefresh?.percent ?? 0) / 100, { style: 'percent', maximumFractionDigits: 0 })}`,
     complete: t('Sources Refreshed'),
     incomplete: t('Refresh Incomplete'),
     failed: t('Refresh Failed'),
@@ -83,7 +96,9 @@ export function DataActivityStatus({ compact }: { compact: boolean }) {
           }
         />
       ) : (
-        active.length > 0 && <ActivityLabels active={active} compact={compact} />
+        active.length > 0 && (
+          <ActivityLabels active={active} compact={compact} progress={progress} />
+        )
       )}
     </div>
   );

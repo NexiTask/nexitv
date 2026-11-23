@@ -2,7 +2,7 @@ import { tauriApi, type CatalogPageKind } from '@/platform/tauri';
 import { perfLog } from '@/platform/perf';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 import { getErrorMessage } from '@/shared/lib/error';
-import { trackDataActivity } from '@/shared/lib/dataActivity';
+import { trackDataActivity, type ReportDataProgress } from '@/shared/lib/dataActivity';
 import {
   runCatalogFacetTask,
   type CatalogFacetTask,
@@ -82,26 +82,49 @@ export function onCatalogFacetsBuilt(listener: (kind: CatalogPageKind) => void):
   return () => listeners.delete(listener);
 }
 
-async function buildSource(kind: CatalogPageKind, source: FacetBuildSource): Promise<boolean> {
+async function buildSource(
+  kind: CatalogPageKind,
+  source: FacetBuildSource,
+  reportProgress?: ReportDataProgress,
+): Promise<boolean> {
   let stored = false;
   let attempts = 0;
+  let progressGeneration: number | undefined;
+  let total = 0;
+  let processed = 0;
   while (attempts < MAX_ATTEMPTS) {
     const payload = await tauriApi.catalogIndexFacetBatch(
       source.id,
       kind,
       source.queryScope,
       FACET_BATCH_ROWS,
+      progressGeneration,
     );
     const batch = await runTask({ op: 'facets', kind, sourceId: source.id, payload });
     if (batch.op !== 'facets' || !batch.ready || batch.facets.length === 0) break;
+    if (batch.remaining !== null) {
+      total = batch.remaining;
+      processed = 0;
+      reportProgress?.(total > 0 ? 0 : null);
+    }
     const saved = await tauriApi.catalogIndexStoreFacets(
       source.id,
       kind,
       batch.generation,
       batch.facets,
     );
-    if (saved) stored = true;
-    else attempts += 1;
+    if (saved) {
+      stored = true;
+      // Storing facets advances the generation once. A different generation in
+      // the next batch means the native side must count the remaining rows again.
+      progressGeneration = batch.generation + 1;
+      processed += batch.facets.length;
+      if (total > 0) reportProgress?.(Math.floor((Math.min(total, processed) / total) * 100));
+    } else {
+      attempts += 1;
+      progressGeneration = undefined;
+      reportProgress?.(null);
+    }
   }
   return stored;
 }
@@ -118,13 +141,20 @@ async function buildRanks(kind: CatalogPageKind): Promise<boolean> {
   return false;
 }
 
-async function build(kind: CatalogPageKind, sources: FacetBuildSource[]): Promise<void> {
+async function build(
+  kind: CatalogPageKind,
+  sources: FacetBuildSource[],
+  reportProgress: ReportDataProgress,
+): Promise<void> {
   const start = performance.now();
   let changed = false;
   try {
     for (const source of sources) {
-      if (await buildSource(kind, source)) changed = true;
+      if (await buildSource(kind, source, sources.length === 1 ? reportProgress : undefined)) {
+        changed = true;
+      }
     }
+    reportProgress(null);
     if (await buildRanks(kind)) changed = true;
   } catch (error: unknown) {
     debugLog.warn('api', 'Catalogue index facets were not built', {
@@ -150,7 +180,9 @@ export function buildCatalogFacets(
     rerun.set(kind, sources);
     return running;
   }
-  const run = trackDataActivity('index', () => build(kind, sources)).finally(() => {
+  const run = trackDataActivity('index', (reportProgress) =>
+    build(kind, sources, reportProgress),
+  ).finally(() => {
     runs.delete(kind);
     const next = rerun.get(kind);
     if (next) {

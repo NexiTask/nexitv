@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { buildCatalogFacets } from '@/modules/catalog/data/catalogFacetBuilder';
+import { tauriApi } from '@/platform/tauri';
+import { useDataActivities } from '@/shared/lib/dataActivity';
 import {
   catalogItemFacets,
   FACET_HAS_POSTER,
@@ -140,9 +143,14 @@ describe('catalogue index facets', () => {
       op: 'facets',
       kind: 'vod',
       sourceId: 's',
-      payload: encode({ ready: true, generation: 3, rows: [[0, { stream_id: 1, name: 'A' }]] }),
+      payload: encode({
+        ready: true,
+        generation: 3,
+        remaining: 4,
+        rows: [[0, { stream_id: 1, name: 'A' }]],
+      }),
     });
-    expect(facets).toMatchObject({ op: 'facets', ready: true, generation: 3 });
+    expect(facets).toMatchObject({ op: 'facets', ready: true, generation: 3, remaining: 4 });
     const ranks = runCatalogFacetTask({
       op: 'ranks',
       payload: encode({ needed: true, token: 't', titles: ['b', 'a'] }),
@@ -153,6 +161,49 @@ describe('catalogue index facets', () => {
       payload: encode({ needed: false, token: 't', titles: [] }),
     });
     expect(none).toMatchObject({ needed: false });
+  });
+
+  it('counts saved title facets and clears the percentage before name ranking', async () => {
+    let finishBatch!: (payload: ArrayBuffer) => void;
+    const batches = vi
+      .spyOn(tauriApi, 'catalogIndexFacetBatch')
+      .mockResolvedValueOnce(
+        encode({
+          ready: true,
+          generation: 3,
+          remaining: 4,
+          rows: [[0, { stream_id: 1, name: 'A' }]],
+        }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishBatch = resolve;
+          }),
+      );
+    const store = vi.spyOn(tauriApi, 'catalogIndexStoreFacets').mockResolvedValue(true);
+    let progressWhenRanking: number | undefined;
+    const ranks = vi.spyOn(tauriApi, 'catalogIndexTitles').mockImplementation(async () => {
+      progressWhenRanking = useDataActivities.getState().progress.size;
+      return encode({ needed: false, token: '', titles: [] });
+    });
+    const build = buildCatalogFacets('vod', [{ id: 's', queryScope: 'scope' }]);
+    try {
+      await vi.waitFor(() => expect(batches).toHaveBeenCalledTimes(2));
+      expect(batches).toHaveBeenLastCalledWith('s', 'vod', 'scope', 4000, 4);
+      expect([...useDataActivities.getState().progress.values()]).toEqual([
+        { activity: 'index', percent: 25 },
+      ]);
+      finishBatch(encode({ ready: true, generation: 4, rows: [] }));
+      await build;
+      expect(ranks).toHaveBeenCalledWith('vod');
+      expect(progressWhenRanking).toBe(0);
+      expect(useDataActivities.getState().progress.size).toBe(0);
+    } finally {
+      batches.mockRestore();
+      store.mockRestore();
+      ranks.mockRestore();
+    }
   });
 });
 

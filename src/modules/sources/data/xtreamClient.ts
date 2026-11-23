@@ -1,4 +1,5 @@
 import type { XtreamCredentials, XtreamServerInfo, XtreamUserInfo } from '../model/xtream';
+import type { ReportDataProgress } from '@/shared/lib/dataActivity';
 import {
   useSettingsStore,
   type LiveStreamFormat,
@@ -112,6 +113,44 @@ export async function testServerLatency(
   }
 }
 
+async function readCatalogJson<T>(
+  response: Response,
+  reportProgress: ReportDataProgress,
+): Promise<T> {
+  const length = response.headers.get('content-length');
+  const total = length && /^\d+$/.test(length) ? Number(length) : 0;
+  const encoding = response.headers.get('content-encoding')?.trim().toLowerCase();
+  // Fetch exposes decoded bytes. On a CORS response an absent encoding header
+  // can mean the server hid it, so the advertised byte count may be compressed.
+  const identity = encoding === 'identity' || (!encoding && response.type !== 'cors');
+  if (
+    !identity ||
+    response.status !== 200 ||
+    !Number.isSafeInteger(total) ||
+    total <= 0 ||
+    !response.body
+  ) {
+    return response.json();
+  }
+
+  let received = 0;
+  reportProgress(0);
+  const stream = response.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        received += chunk.byteLength;
+        reportProgress(received < total ? Math.floor((received / total) * 100) : null);
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+  try {
+    return await new Response(stream).json();
+  } finally {
+    reportProgress(null);
+  }
+}
+
 // Single URL fetcher
 async function fetchSingleXC<T>(
   baseUrl: string,
@@ -119,6 +158,7 @@ async function fetchSingleXC<T>(
   extraParams: Record<string, string> = {},
   signal?: AbortSignal,
   timeoutMs = PROVIDER_PRIMARY_TIMEOUT_MS,
+  reportProgress?: ReportDataProgress,
 ): Promise<T> {
   const settings = useSettingsStore.getState();
   const startTime = Date.now();
@@ -229,7 +269,9 @@ async function fetchSingleXC<T>(
 
   let data: T;
   try {
-    data = await response.json();
+    data = reportProgress
+      ? await readCatalogJson<T>(response, reportProgress)
+      : await response.json();
   } catch {
     if (settings.debugMode && settings.logApiRequests) {
       useDebugStore.getState().addNetworkLog({
@@ -275,6 +317,7 @@ async function fetchXtream<T>(
   extraParams: Record<string, string> = {},
   signal?: AbortSignal,
   timeouts: ProviderTimeouts = DEFAULT_TIMEOUTS,
+  reportProgress?: ReportDataProgress,
 ): Promise<T> {
   const urlsToTry = [creds.url, ...(creds.alternativeUrls || [])].filter(Boolean);
   const failoverStartedAt = Date.now();
@@ -288,7 +331,14 @@ async function fetchXtream<T>(
       remainingBudget,
     );
     try {
-      const data = await fetchSingleXC<T>(currentUrl, creds, extraParams, signal, timeoutMs);
+      const data = await fetchSingleXC<T>(
+        currentUrl,
+        creds,
+        extraParams,
+        signal,
+        timeoutMs,
+        reportProgress,
+      );
       if (currentUrl !== creds.url) {
         promoteXtreamServer(creds.sourceId, currentUrl);
         notify.info(
@@ -369,10 +419,11 @@ export async function getVodStreams(
   creds: XtreamCredentials,
   categoryId?: string,
   signal?: AbortSignal,
+  reportProgress?: ReportDataProgress,
 ): Promise<XtreamVodStream[]> {
   const params: Record<string, string> = { action: 'get_vod_streams' };
   if (categoryId) params.category_id = categoryId;
-  return fetchXtream<XtreamVodStream[]>(creds, params, signal, CATALOG_TIMEOUTS);
+  return fetchXtream<XtreamVodStream[]>(creds, params, signal, CATALOG_TIMEOUTS, reportProgress);
 }
 
 // 3b. Fetch VOD Info
@@ -453,10 +504,11 @@ export async function getSeries(
   creds: XtreamCredentials,
   categoryId?: string,
   signal?: AbortSignal,
+  reportProgress?: ReportDataProgress,
 ): Promise<XtreamSeries[]> {
   const params: Record<string, string> = { action: 'get_series' };
   if (categoryId) params.category_id = categoryId;
-  return fetchXtream<XtreamSeries[]>(creds, params, signal, CATALOG_TIMEOUTS);
+  return fetchXtream<XtreamSeries[]>(creds, params, signal, CATALOG_TIMEOUTS, reportProgress);
 }
 
 // 5b. Fetch Series Info (Seasons and Episodes)
@@ -557,10 +609,11 @@ export async function getLiveStreams(
   creds: XtreamCredentials,
   categoryId?: string,
   signal?: AbortSignal,
+  reportProgress?: ReportDataProgress,
 ): Promise<XtreamLiveStream[]> {
   const params: Record<string, string> = { action: 'get_live_streams' };
   if (categoryId) params.category_id = categoryId;
-  return fetchXtream<XtreamLiveStream[]>(creds, params, signal, CATALOG_TIMEOUTS);
+  return fetchXtream<XtreamLiveStream[]>(creds, params, signal, CATALOG_TIMEOUTS, reportProgress);
 }
 
 // 8. Fetch Short EPG

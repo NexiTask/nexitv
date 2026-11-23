@@ -2,7 +2,7 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn(), isTauri: () => false }));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }));
@@ -87,6 +87,8 @@ beforeEach(() => {
     initializationError: null,
   });
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('unified source settings', () => {
   it('associates every Xtream field label with its control', async () => {
@@ -185,13 +187,19 @@ describe('unified source settings', () => {
 
   it('refreshes every source from one button and keeps protected edits', async () => {
     const refreshSource = vi.fn().mockResolvedValue(undefined);
-    let finishConnectionCheck!: () => void;
-    const testSource = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          finishConnectionCheck = resolve;
-        }),
-    );
+    let finishLiveList!: (response: Response) => void;
+    const fetchCatalog = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishLiveList = resolve;
+          }),
+      )
+      .mockImplementation(
+        async () => new Response('[{"stream_id":5,"series_id":5,"name":"Title"}]'),
+      );
+    vi.stubGlobal('fetch', fetchCatalog);
     const editedProfile: M3uSourceProfile = {
       ...remoteProfile,
       id: 'm3u-87654321',
@@ -209,7 +217,7 @@ describe('unified source settings', () => {
     useSourceStore.setState({
       profiles: [remoteProfile, editedProfile],
       runtimes: { [remoteProfile.id]: readyRuntime, [editedProfile.id]: readyRuntime },
-      enabledSourceIds: [remoteProfile.id, editedProfile.id],
+      enabledSourceIds: [remoteProfile.id, editedProfile.id, xtreamProfile.id],
       refreshSource,
     });
     useAuthStore.setState({
@@ -227,7 +235,6 @@ describe('unified source settings', () => {
           revision: 1,
         },
       },
-      testSource,
     });
     render(
       <>
@@ -240,10 +247,12 @@ describe('unified source settings', () => {
 
     await waitFor(() => expect(refreshSource).toHaveBeenCalledWith(remoteProfile.id));
     expect(refreshSource).not.toHaveBeenCalledWith(editedProfile.id);
-    expect(testSource).toHaveBeenCalledWith(xtreamProfile.id);
-    expect(screen.getByRole('status').textContent).toBe('Refreshing sources…');
-    finishConnectionCheck();
+    expect(screen.getByRole('status').textContent).toBe('Refreshing sources… 40%');
+    finishLiveList(new Response('[{"stream_id":4,"name":"Channel"}]'));
     expect(await screen.findByText('Sources Refreshed')).toBeTruthy();
+    expect(fetchCatalog.mock.calls.map(([url]) => new URL(url).searchParams.get('action'))).toEqual(
+      ['get_live_streams', 'get_vod_streams', 'get_series'],
+    );
 
     // The store keeps notifications newest first.
     const messages = useNotificationStore.getState().notifications;

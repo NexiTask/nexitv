@@ -32,6 +32,7 @@ import type { RatingLookups } from '../lib/smartCatalogFilter';
 import { mapXtreamList } from './useCatalog';
 import { foldLiveChannels } from '../lib/streamFolding';
 import { buildCatalogFacets, onCatalogFacetsBuilt } from './catalogFacetBuilder';
+import { INDEX_ROWS_ROOT } from './useHomeRows';
 import type { RatingHeadSource } from './useTmdbRatingChecks';
 
 const STATUS_ROOT = 'catalog_index_page_status';
@@ -558,7 +559,7 @@ export function useCatalogFacetBuilds(delayMs = 3_000): void {
   );
 
   useEffect(() => {
-    if (!eligible) return;
+    if (!desktopApi.isDesktop()) return;
     const run = (kind: CatalogPageKind) => {
       void buildCatalogFacets(kind, buildSources).then(() =>
         // Warm the facet cache, so the first page visit only filters and sorts.
@@ -570,16 +571,22 @@ export function useCatalogFacetBuilds(delayMs = 3_000): void {
           .catch(() => undefined),
       );
     };
-    const timer = window.setTimeout(() => {
-      run('vod');
-      run('series');
-      run('live');
-    }, delayMs);
+    const timer = eligible
+      ? window.setTimeout(() => {
+          run('vod');
+          run('series');
+          run('live');
+        }, delayMs)
+      : undefined;
     let unlisten: (() => void) | undefined;
     let cancelled = false;
     void desktopApi
       .onCatalogIndexUpdated((kind) => {
-        if (kind === 'live' || kind === 'vod' || kind === 'series') run(kind);
+        if (kind !== 'live' && kind !== 'vod' && kind !== 'series') return;
+        for (const root of [STATUS_ROOT, PAGE_ROOT, STATS_ROOT, SEARCH_ROOT, INDEX_ROWS_ROOT]) {
+          void client.invalidateQueries({ queryKey: [root, kind], refetchType: 'none' });
+        }
+        if (eligible) run(kind);
       })
       .then((stop) => {
         if (cancelled) stop();

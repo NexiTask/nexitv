@@ -12,7 +12,7 @@ import {
 } from '@/modules/sources/public/data/xtreamClient';
 import { desktopApi } from '@/platform/desktop';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
-import { loadProviderList, rememberProviderList } from './catalogDiskCache';
+import { loadProviderList, rememberProviderList, storeProviderList } from './catalogDiskCache';
 import { CATALOG_FRESH_MS } from './catalogFreshness';
 import { perfAsync, perfSync } from '@/platform/perf';
 import { queryKeys } from '@/modules/sources/public/model/queryKeys';
@@ -127,14 +127,14 @@ function fetchXtreamList(
   source: EnabledXtreamSource,
   signal?: AbortSignal,
 ): Promise<unknown[]> {
-  return trackDataActivity('catalog', async () => {
+  return trackDataActivity('catalog', async (reportProgress) => {
     const credentials = source.credentials!;
     const response =
       type === 'live'
-        ? await getLiveStreams(credentials, undefined, signal)
+        ? await getLiveStreams(credentials, undefined, signal, reportProgress)
         : type === 'vod'
-          ? await getVodStreams(credentials, undefined, signal)
-          : await getSeries(credentials, undefined, signal);
+          ? await getVodStreams(credentials, undefined, signal, reportProgress)
+          : await getSeries(credentials, undefined, signal, reportProgress);
     return Array.isArray(response) ? response : [];
   });
 }
@@ -164,6 +164,79 @@ const BACKGROUND_REFRESH_DELAY_MS = 5_000;
 
 type CatalogType = 'live' | 'vod' | 'series';
 
+const catalogTypes = ['live', 'vod', 'series'] as const;
+const providerRefreshes = new Map<string, Promise<unknown[]>>();
+
+function fetchProviderRefresh(type: CatalogType, source: EnabledXtreamSource) {
+  const key = `${type}:${source.id}:${source.queryScope}`;
+  const inFlight = providerRefreshes.get(key);
+  if (inFlight) return inFlight;
+  const request = fetchXtreamList(type, source).finally(() => providerRefreshes.delete(key));
+  providerRefreshes.set(key, request);
+  return request;
+}
+
+export function providerCatalogCount(sources: EnabledSourcesSnapshot): number {
+  return sources.xtreamSources.length * catalogTypes.length;
+}
+
+/** Fetch each enabled provider list from the network, leaving failed lists in place. */
+export async function refreshProviderCatalogs(
+  sources: EnabledSourcesSnapshot,
+  onListSettled: () => void,
+  client: QueryClient = queryClient,
+): Promise<string[]> {
+  const failed = new Map<string, string>();
+  const targets = sources.xtreamSources;
+  for (const type of catalogTypes) {
+    const queryKey = queryKeys.catalog(type, sources.queryScope);
+    const refreshed = await Promise.allSettled(
+      targets.map(async (source) => {
+        try {
+          if (!source.credentials || !source.isAvailable) {
+            throw new Error('The saved credential is unavailable');
+          }
+          const list = await fetchProviderRefresh(type, source);
+          if (list.length === 0) {
+            const current = client.getQueryData<CatalogItem[]>(queryKey);
+            const saved = desktopApi.isDesktop()
+              ? await loadProviderList(source.id, type, source.queryScope)
+              : null;
+            if (saved?.list.length || current?.some((item) => item.sourceId === source.id)) {
+              throw new Error('The provider returned an empty catalogue');
+            }
+          }
+          const items = mapXtreamList(type, source, list);
+          await storeProviderList(source.id, type, source.queryScope, list);
+          return { sourceId: source.id, items };
+        } finally {
+          onListSettled();
+        }
+      }),
+    );
+    const lists = refreshed.flatMap((result, i) => {
+      if (result.status === 'fulfilled') return [result.value];
+      const source = targets[i]!;
+      failed.set(source.id, source.profile.name);
+      return [];
+    });
+    if (!lists.length) continue;
+    await client.cancelQueries({ queryKey, exact: true });
+    client.setQueryData<CatalogItem[]>(queryKey, (current) => {
+      const base =
+        current ?? (lists.length === targets.length ? playlistCatalog(type, sources) : undefined);
+      return (
+        base &&
+        lists.reduce(
+          (items, list) => replaceSourceItems(items, list.sourceId, list.items, sources),
+          base,
+        )
+      );
+    });
+  }
+  return [...failed.values()];
+}
+
 const backgroundRefreshes = new Set<string>();
 
 /**
@@ -186,7 +259,7 @@ function scheduleBackgroundRefresh(
       try {
         const list = await perfAsync(
           `bg:fetch_json:${type}`,
-          () => fetchXtreamList(type, source),
+          () => fetchProviderRefresh(type, source),
           (l) => `items=${l.length}`,
         );
         if (list.length === 0) throw new Error('The provider returned an empty catalogue');

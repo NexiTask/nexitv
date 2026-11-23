@@ -67,6 +67,7 @@ export const IT_MESSAGES: Record<string, string> = {
   'Loading…': 'Caricamento…',
   'Loading the provider catalog…': 'Caricamento del catalogo del fornitore…',
   'Preparing the library index…': 'Preparazione dell’indice della libreria…',
+  'Indexing titles…': 'Indicizzazione dei titoli…',
   'Loading playlists…': 'Caricamento delle playlist…',
   'Loading the TV guide…': 'Caricamento della guida TV…',
   'Saving…': 'Salvataggio…',

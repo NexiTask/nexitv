@@ -1309,6 +1309,7 @@ pub fn catalog_index_rating_head(
 struct FacetBatch {
     ready: bool,
     generation: i64,
+    remaining: Option<i64>,
     rows: Vec<(u32, Box<RawValue>)>,
 }
 
@@ -1320,12 +1321,14 @@ pub fn catalog_index_facet_batch(
     kind: String,
     scope: String,
     limit: u32,
+    progress_generation: Option<i64>,
 ) -> Result<tauri::ipc::Response, String> {
     validate_page_kind(&kind)?;
     validate_source_id(&source_id)?;
     let empty = |ready| FacetBatch {
         ready,
         generation: 0,
+        remaining: None,
         rows: Vec::new(),
     };
     let batch = if ensure_indexed(&app, &source_id, &kind, &scope)? {
@@ -1354,10 +1357,21 @@ pub fn catalog_index_facet_batch(
                 })
                 .collect::<rusqlite::Result<Vec<_>>>()?;
             drop(statement);
+            let remaining = if !rows.is_empty() && progress_generation != Some(generation) {
+                Some(transaction.query_row(
+                    "SELECT COUNT(*) FROM items WHERE source_id = ?1 AND kind = ?2
+                     AND f_rank IS NULL AND f_id IS NULL",
+                    params![source_id, kind],
+                    |row| row.get(0),
+                )?)
+            } else {
+                None
+            };
             transaction.finish()?;
             Ok(FacetBatch {
                 ready: true,
                 generation,
+                remaining,
                 rows,
             })
         })?

@@ -21,6 +21,11 @@ import {
 } from '@/modules/sources/public/store/useSourceStore';
 import { getUserFacingErrorMessage } from '@/shared/lib/error';
 import { beginSourceRefresh } from '@/shared/lib/dataActivity';
+import { useEnabledSources } from '@/modules/sources/public/hooks/useEnabledSources';
+import {
+  providerCatalogCount,
+  refreshProviderCatalogs,
+} from '@/modules/catalog/public/data/useCatalog';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import {
   SettingsButton,
@@ -80,6 +85,7 @@ export function SourcesSettingsSection({
   const setEditorRefreshPolicy = useSourceStore((state) => state.setEditorRefreshPolicy);
   const setEditorWriteBack = useSourceStore((state) => state.setEditorWriteBack);
   const [busy, setBusy] = useState<string | null>(null);
+  const sources = useEnabledSources();
   const [removeTarget, setRemoveTarget] = useState<RemoveTarget | null>(null);
 
   const runXtreamTest = async (profile: XtreamSourceProfile) => {
@@ -120,19 +126,22 @@ export function SourcesSettingsSection({
 
   const runRefreshAll = async () => {
     setBusy('refresh-all');
-    const finishRefresh = beginSourceRefresh();
-    let result: Parameters<typeof finishRefresh>[0] = 'failed';
+    const { finish, reportSettled } = beginSourceRefresh(
+      providerCatalogCount(sources) + m3uProfiles.length,
+    );
+    let result: Parameters<typeof finish>[0] = 'failed';
     try {
-      const [playlists, xtreamResults] = await Promise.all([
-        refreshAllM3u(),
-        Promise.allSettled(xtreamProfiles.map((profile) => testXtream(profile.id))),
+      const [playlists, xtreamFailures] = await Promise.all([
+        refreshAllM3u().then((report) => {
+          reportSettled(m3uProfiles.length);
+          return report;
+        }),
+        refreshProviderCatalogs(sources, reportSettled),
       ]);
-      const xtreamFailures = xtreamProfiles.filter(
-        (_, index) => xtreamResults[index]?.status === 'rejected',
-      );
-      const unreachable = [...playlists.failed, ...xtreamFailures.map((profile) => profile.name)];
-      const reloaded = playlists.refreshed.length + xtreamProfiles.length - xtreamFailures.length;
-      const total = m3uProfiles.length + xtreamProfiles.length;
+      const unreachable = [...playlists.failed, ...xtreamFailures];
+      const reloaded =
+        playlists.refreshed.length + sources.xtreamSources.length - xtreamFailures.length;
+      const total = m3uProfiles.length + sources.xtreamSources.length;
 
       result = unreachable.length ? 'incomplete' : 'complete';
       if (unreachable.length) {
@@ -159,7 +168,7 @@ export function SourcesSettingsSection({
         ),
       );
     } finally {
-      finishRefresh(result);
+      finish(result);
       setBusy(null);
     }
   };
@@ -206,7 +215,7 @@ export function SourcesSettingsSection({
             }
             description="Xtream accounts and M3U playlists live together in one source list."
           >
-            {sourceCount > 0 && (
+            {(m3uProfiles.length > 0 || sources.xtreamSources.length > 0) && (
               <SettingsButton
                 onClick={() => void runRefreshAll()}
                 disabled={refreshingAll}

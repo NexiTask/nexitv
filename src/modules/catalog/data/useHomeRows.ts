@@ -11,7 +11,7 @@ import { mapXtreamList, playlistCatalog, type CatalogItem } from './useCatalog';
 import { useHiddenCategoryState } from './useCategories';
 import { CATALOG_FRESH_MS } from './catalogFreshness';
 
-const INDEX_ROWS_ROOT = 'catalog_index_rows';
+export const INDEX_ROWS_ROOT = 'catalog_index_rows';
 
 export interface IndexPool {
   /**
