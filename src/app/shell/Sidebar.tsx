@@ -28,6 +28,7 @@ import {
 import { NavLink, useLocation } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import { isQueuedEpisode, useLibraryStore } from '@/modules/library/store/useLibraryStore';
+import { useWatchNext } from '@/modules/catalog/public/data/useWatchNext';
 import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { StateIcon } from '@/shared/ui/StateIcon';
@@ -53,6 +54,7 @@ export function Sidebar() {
   const resumeCount = useLibraryStore(
     (state) => state.history.filter((item) => !isQueuedEpisode(item)).length,
   );
+  const { items: watchNext } = useWatchNext();
   const favorites = useLibraryStore((state) => state.favorites);
   const collections = useLibraryStore((state) => state.collections);
   const downloads = useDownloadStore((state) => state.jobs);
@@ -104,7 +106,7 @@ export function Sidebar() {
       icons: { line: RiPlayList2Line, fill: RiPlayList2Fill },
       label: 'Watch Next',
       path: '/watch-next',
-      badge: 0,
+      badge: watchNext.length,
     },
     {
       icons: { line: RiHeartLine, fill: RiHeartFill },

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { resolveXtreamSourceId } from '@/modules/sources/public/store/useAuthStore';
+import { useAuthStore } from '@/modules/sources/public/store/useAuthStore';
 import { xtreamItemId } from '@/modules/sources/public/lib/sourceIdentity';
 import {
   isQueuedEpisode,
@@ -8,7 +8,7 @@ import {
   type TrackedSeries,
 } from '@/modules/library/public/store/useLibraryStore';
 import { pickWatchNext, regularEpisodeCount } from '../lib/watchNext';
-import { seriesInfoQuery, sourceCredentials } from './useDetails';
+import { seriesInfoQuery } from './useDetails';
 
 /** Started shows checked for a next episode at a time (one provider call each). */
 const MAX_CHECKED = 12;
@@ -25,12 +25,16 @@ export function useWatchNext() {
   const history = useLibraryStore((state) => state.history);
   const watched = useLibraryStore((state) => state.watched);
   const updateTrackedSeries = useLibraryStore((state) => state.updateTrackedSeries);
+  const legacySourceId = useAuthStore((state) => state.profiles[0]?.id);
+  const runtimes = useAuthStore((state) => state.runtimes);
+  const resolveSourceId = (sourceId?: string) =>
+    !sourceId || sourceId === 'xtream' ? legacySourceId : sourceId;
   const watchedSet = new Set(watched);
   const resuming = new Set(history.filter((item) => !isQueuedEpisode(item)).map((item) => item.id));
   const queued = history.filter((item) => {
     if (!isQueuedEpisode(item) || tracked[item.id]?.muted) return false;
     if (!item.episodeId) return true;
-    const sourceId = resolveXtreamSourceId(item.sourceId);
+    const sourceId = resolveSourceId(item.sourceId);
     const episodeId = sourceId ? xtreamItemId(sourceId, 'episode', item.episodeId) : item.episodeId;
     return !watchedSet.has(episodeId) && !watchedSet.has(item.episodeId);
   });
@@ -46,7 +50,8 @@ export function useWatchNext() {
 
   const results = useQueries({
     queries: candidates.map(([, entry]) => {
-      const credentials = sourceCredentials(entry.item.sourceId);
+      const sourceId = resolveSourceId(entry.item.sourceId);
+      const credentials = sourceId ? (runtimes[sourceId]?.credentials ?? null) : null;
       const providerSeriesId = entry.item.seriesSourceItemId || entry.item.sourceItemId;
       return {
         ...seriesInfoQuery(providerSeriesId ?? entry.item.id, entry.item.sourceId, credentials),
@@ -69,7 +74,7 @@ export function useWatchNext() {
       if (total <= entry.knownEpisodes) return;
       bookkeeping.push({ id, patch: { muted: false } });
     }
-    const sourceId = resolveXtreamSourceId(entry.item.sourceId);
+    const sourceId = resolveSourceId(entry.item.sourceId);
     const pick = pickWatchNext(episodes, (episode) =>
       watchedSet.has(sourceId ? xtreamItemId(sourceId, 'episode', episode.id) : String(episode.id)),
     );
