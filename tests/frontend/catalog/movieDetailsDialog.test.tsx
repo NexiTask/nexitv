@@ -265,7 +265,7 @@ describe('<MovieDetailsDialog />', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'The Dink' })).toBeTruthy();
   });
 
-  it('saves and favorites a movie independently', async () => {
+  it('moves a saved movie to Favorites and back to Saved', async () => {
     const user = userEvent.setup();
 
     vi.spyOn(useDetailsModule, 'useVodInfo').mockReturnValue({
@@ -287,11 +287,14 @@ describe('<MovieDetailsDialog />', () => {
 
     const favBtn = screen.getByRole('button', { name: /Add to favorites/i });
     await user.click(favBtn);
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
+    expect(useLibraryStore.getState().favorites).toMatchObject([{ id: 'movie-123' }]);
+
+    await user.click(screen.getByRole('button', { name: 'Move to Saved' }));
+    expect(useLibraryStore.getState().favorites).toEqual([]);
+    expect(useLibraryStore.getState().savedItems).toMatchObject([{ id: 'movie-123' }]);
     await user.click(screen.getByRole('button', { name: 'Remove from Library' }));
     expect(useLibraryStore.getState().savedItems).toEqual([]);
-
-    expect(useLibraryStore.getState().favorites).toHaveLength(1);
-    expect(useLibraryStore.getState().favorites[0]!.id).toBe('movie-123');
   });
 
   it('renders error state and retries fetch on Try Again click', async () => {

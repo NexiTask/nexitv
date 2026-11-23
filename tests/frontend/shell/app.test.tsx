@@ -116,10 +116,10 @@ describe('application shell', () => {
     await user.hover(card);
     await user.click(within(card).getByRole('button', { name: 'Remove from Favorites' }));
     expect(useLibraryStore.getState().favorites).toEqual([]);
+    expect(useLibraryStore.getState().savedItems).toEqual([movie]);
     expect(useLibraryStore.getState().collections[0]?.items).toEqual([movie]);
     await user.click(within(card).getByRole('button', { name: 'Add to Favorites' }));
-    await user.click(within(card).getByRole('button', { name: 'More options' }));
-    await user.click(screen.getByRole('button', { name: 'Add to Library' }));
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
     await user.click(screen.getByRole('button', { name: 'Delete Collection' }));
     const confirmation = within(screen.getByRole('alertdialog', { name: 'Delete Collection?' }));
     await user.click(confirmation.getByRole('button', { name: 'Delete Collection' }));
@@ -133,15 +133,22 @@ describe('application shell', () => {
     expect(activeSaved.getAttribute('aria-current')).toBe('page');
     expect(useLibraryStore.getState().favorites).toEqual([movie]);
     expect(screen.queryByRole('button', { name: 'Delete Collection' })).toBeNull();
-    const savedCard = screen.getByRole('group', { name: 'Open Favorite film' });
-    await user.hover(savedCard);
-    await user.click(within(savedCard).getByRole('button', { name: 'More options' }));
-    await user.click(screen.getByRole('button', { name: 'Remove from Library' }));
     expect(screen.getByRole('heading', { name: 'No saved items' })).toBeTruthy();
 
     await user.click(activeFavorites);
     expect(await screen.findByRole('heading', { name: 'Favorites', level: 1 })).toBeTruthy();
-    expect(screen.getByRole('group', { name: 'Open Favorite film' })).toBeTruthy();
+    const favoriteCard = screen.getByRole('group', { name: 'Open Favorite film' });
+    await user.hover(favoriteCard);
+    await user.click(within(favoriteCard).getByRole('button', { name: 'Remove from Favorites' }));
+    expect(screen.getByRole('heading', { name: 'Your Favorites Are Empty' })).toBeTruthy();
+
+    await user.click(activeSaved);
+    expect(await screen.findByRole('heading', { name: 'Saved', level: 1 })).toBeTruthy();
+    const savedCard = screen.getByRole('group', { name: 'Open Favorite film' });
+    await user.hover(savedCard);
+    await user.click(within(savedCard).getByRole('button', { name: 'Add to Favorites' }));
+    expect(screen.getByRole('heading', { name: 'No saved items' })).toBeTruthy();
+    expect(useLibraryStore.getState().favorites).toEqual([movie]);
   });
 
   it('opens Saved by default when Library has no last selected list', async () => {

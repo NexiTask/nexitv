@@ -17,7 +17,10 @@ export function SaveToLibraryButton({
     state.savedItems.some((entry) => entry.id === item.id),
   );
   const toggleSavedItem = useLibraryStore((state) => state.toggleSavedItem);
-  const label = t(isSaved ? 'Remove from Library' : 'Add to Library');
+  const isFavorite = useLibraryStore((state) => state.isFavorite(item.id));
+  const label = t(
+    isFavorite ? 'Move to Saved' : isSaved ? 'Remove from Library' : 'Add to Library',
+  );
 
   return (
     <button

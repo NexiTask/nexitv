@@ -37,7 +37,7 @@ beforeEach(() => {
 });
 
 describe('library store', () => {
-  it('persists saved items without stream transport and leaves other lists independent', async () => {
+  it('persists saved items without stream transport and preserves custom lists when moving them', async () => {
     const item = {
       ...movie,
       sourceId: 'm3u-source',
@@ -60,21 +60,26 @@ describe('library store', () => {
     await useLibraryStore.persist.rehydrate();
     expect(useLibraryStore.getState().savedItems).toEqual([safeItem]);
 
-    library.addFavorite(movie);
     const list = library.createCollection('Weekend');
     library.addToCollection(list, movie);
-    library.toggleSavedItem(item);
+    library.addFavorite(safeItem);
     expect(useLibraryStore.getState()).toMatchObject({
       savedItems: [],
-      favorites: [movie],
+      favorites: [safeItem],
       collections: [{ id: list, items: [movie] }],
     });
-    library.toggleSavedItem(item);
+    library.removeFavorite(item.id);
+    library.removeFavorite(item.id);
+    expect(useLibraryStore.getState()).toMatchObject({
+      savedItems: [safeItem],
+      favorites: [],
+      collections: [{ id: list, items: [movie] }],
+    });
     library.clearAllData();
     expect(useLibraryStore.getState().savedItems).toEqual([]);
   });
 
-  it('keeps old favorites and ignores malformed saved entries during hydration', async () => {
+  it('keeps old favorites and discards overlapping or malformed saved entries during hydration', async () => {
     localStorage.setItem(
       'iptv-library-storage',
       JSON.stringify({ version: 3, state: { favorites: [movie] } }),
@@ -83,15 +88,20 @@ describe('library store', () => {
     expect(useLibraryStore.getState().favorites).toEqual([movie]);
     expect(useLibraryStore.getState().savedItems).toEqual([]);
 
+    const savedOnly = { ...movie, id: 'saved-only' };
     localStorage.setItem(
       'iptv-library-storage',
       JSON.stringify({
         version: 4,
-        state: { savedItems: [null, 3, { id: 'no-title' }, movie, movie] },
+        state: {
+          favorites: [movie],
+          savedItems: [null, 3, { id: 'no-title' }, movie, savedOnly, savedOnly],
+        },
       }),
     );
     await useLibraryStore.persist.rehydrate();
-    expect(useLibraryStore.getState().savedItems).toEqual([movie]);
+    expect(useLibraryStore.getState().favorites).toEqual([movie]);
+    expect(useLibraryStore.getState().savedItems).toEqual([savedOnly]);
   });
   it('deduplicates favorites and toggles watched state', () => {
     const store = useLibraryStore.getState();

@@ -186,6 +186,8 @@ export const NL_MESSAGES: Record<string, string> = {
   'No Downloads Yet': 'Nog geen downloads',
   'No Watch History': 'Geen kijkgeschiedenis',
   Saved: 'Opgeslagen',
+  'Move to Saved': 'Verplaatsen naar Opgeslagen',
+  'Moved to Saved': 'Verplaatst naar Opgeslagen',
   'Add to Library': 'Toevoegen aan bibliotheek',
   'Remove from Library': 'Verwijderen uit bibliotheek',
   'Added to Library': 'Toegevoegd aan bibliotheek',

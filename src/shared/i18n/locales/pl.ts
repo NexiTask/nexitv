@@ -187,6 +187,8 @@ export const PL_MESSAGES: Record<string, string> = {
   'No Downloads Yet': 'Nie ma jeszcze pobrań',
   'No Watch History': 'Brak historii oglądania',
   Saved: 'Zapisane',
+  'Move to Saved': 'Przenieś do zapisanych',
+  'Moved to Saved': 'Przeniesiono do zapisanych',
   'Add to Library': 'Dodaj do biblioteki',
   'Remove from Library': 'Usuń z biblioteki',
   'Added to Library': 'Dodano do biblioteki',

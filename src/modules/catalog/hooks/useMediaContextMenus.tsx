@@ -151,7 +151,13 @@ export function useMediaContextMenus() {
         const isSaved = state.savedItems.some((entry) => entry.id === item.id);
         items.push({
           id: 'save-library',
-          label: t(isSaved ? 'Remove from Library' : 'Add to Library'),
+          label: t(
+            state.isFavorite(item.id)
+              ? 'Move to Saved'
+              : isSaved
+                ? 'Remove from Library'
+                : 'Add to Library',
+          ),
           icon: <Bookmark size={16} fill={isSaved ? 'currentColor' : 'none'} />,
           action: () => state.toggleSavedItem(item),
         });

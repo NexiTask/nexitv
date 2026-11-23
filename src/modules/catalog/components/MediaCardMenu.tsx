@@ -51,9 +51,8 @@ export function MediaCardMenu({
   const isSaved = useLibraryStore((state) =>
     state.savedItems.some((entry) => entry.id === item.id),
   );
-  const isFavorite =
-    useLibraryStore((state) => state.favorites.some((entry) => entry.id === item.id)) ||
-    Boolean(item.isFavorite);
+  const inFavorites = useLibraryStore((state) => state.isFavorite(item.id));
+  const isFavorite = inFavorites || Boolean(item.isFavorite);
   const isWatched =
     useLibraryStore((state) => state.watched.includes(item.id)) || Boolean(item.isWatched);
   const inHistory = useLibraryStore((state) =>
@@ -176,7 +175,15 @@ export function MediaCardMenu({
               }
             >
               <Bookmark size={14} fill={isSaved ? 'currentColor' : 'none'} />
-              <span>{t(isSaved ? 'Remove from Library' : 'Add to Library')}</span>
+              <span>
+                {t(
+                  inFavorites
+                    ? 'Move to Saved'
+                    : isSaved
+                      ? 'Remove from Library'
+                      : 'Add to Library',
+                )}
+              </span>
             </button>
             <button
               type="button"

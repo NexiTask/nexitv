@@ -275,9 +275,10 @@ function sanitizedLibraryData(
   };
 }
 
-function normalizeSavedItems(value: unknown): MediaItem[] {
+function normalizeSavedItems(value: unknown, favorites: MediaItem[]): MediaItem[] {
   if (!Array.isArray(value)) return [];
   const items = new Map<string, MediaItem>();
+  const favoriteIds = new Set(favorites.map((item) => item?.id));
   for (const item of value) {
     if (
       item &&
@@ -285,7 +286,8 @@ function normalizeSavedItems(value: unknown): MediaItem[] {
       item.id.length > 0 &&
       typeof item.title === 'string' &&
       typeof item.posterUrl === 'string' &&
-      !items.has(item.id)
+      !items.has(item.id) &&
+      !favoriteIds.has(item.id)
     ) {
       items.set(item.id, withoutPlaybackTransport(item));
     }
@@ -300,10 +302,11 @@ export function migrateLibraryState(persistedState: unknown): LibraryState {
   const nextState = { ...state };
   delete nextState.downloads;
 
+  const favorites = Array.isArray(state.favorites) ? state.favorites : [];
   const normalized = {
     ...nextState,
-    savedItems: normalizeSavedItems(state.savedItems),
-    favorites: Array.isArray(state.favorites) ? state.favorites : [],
+    savedItems: normalizeSavedItems(state.savedItems, favorites),
+    favorites,
     collections: Array.isArray(state.collections) ? state.collections : [],
     history: Array.isArray(state.history) ? state.history : [],
     watched: Array.isArray(state.watched) ? state.watched : [],
@@ -414,7 +417,11 @@ export const useLibraryStore = create<LibraryState>()(
       },
 
       toggleSavedItem: (item) => {
-        const { savedItems } = get();
+        const { savedItems, favorites, removeFavorite } = get();
+        if (favorites.some((entry) => entry.id === item.id)) {
+          removeFavorite(item.id);
+          return;
+        }
         const isSaved = savedItems.some((entry) => entry.id === item.id);
         set({
           savedItems: isSaved
@@ -433,7 +440,10 @@ export const useLibraryStore = create<LibraryState>()(
       addFavorite: (item) => {
         const exists = get().favorites.some((f) => f.id === item.id);
         if (!exists) {
-          set((state) => ({ favorites: [...state.favorites, item] }));
+          set((state) => ({
+            favorites: [...state.favorites, item],
+            savedItems: state.savedItems.filter((entry) => entry.id !== item.id),
+          }));
           notify.success(
             'Added to Favorites',
             getDisplayTitle(item.title, item.type),
@@ -449,16 +459,23 @@ export const useLibraryStore = create<LibraryState>()(
       },
 
       removeFavorite: (id) => {
-        const item = get().favorites.find((f) => f.id === id);
-        set((state) => ({ favorites: state.favorites.filter((f) => f.id !== id) }));
+        const { favorites, savedItems } = get();
+        const item = favorites.find((entry) => entry.id === id);
+        if (!item) return;
+        set({
+          favorites: favorites.filter((entry) => entry.id !== id),
+          savedItems: savedItems.some((entry) => entry.id === id)
+            ? savedItems
+            : [...savedItems, item],
+        });
         notify.info(
-          'Removed from Favorites',
-          item ? getDisplayTitle(item.title, item.type) : 'Item removed',
+          'Moved to Saved',
+          getDisplayTitle(item.title, item.type),
           undefined,
           undefined,
           'library',
         );
-        debugLog.info('library', `Removed favorite`, { id });
+        debugLog.info('library', 'Moved favorite to Saved', { id });
       },
 
       isFavorite: (id) => get().favorites.some((f) => f.id === id),
@@ -797,10 +814,16 @@ export const useLibraryStore = create<LibraryState>()(
     }),
     {
       name: 'iptv-library-storage',
-      version: 4,
+      version: 5,
       merge: (persisted, current) => {
         const state = persisted as Partial<LibraryState> | undefined;
-        return { ...current, ...state, savedItems: normalizeSavedItems(state?.savedItems) };
+        const favorites = Array.isArray(state?.favorites) ? state.favorites : current.favorites;
+        return {
+          ...current,
+          ...state,
+          favorites,
+          savedItems: normalizeSavedItems(state?.savedItems, favorites),
+        };
       },
       migrate: migrateLibraryState,
       storage: createDebouncedStorage<LibraryState>(),

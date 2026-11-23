@@ -192,6 +192,8 @@ export const DE_MESSAGES: Record<string, string> = {
   'No Downloads Yet': 'Noch keine Downloads',
   'No Watch History': 'Kein Wiedergabeverlauf',
   Saved: 'Gespeichert',
+  'Move to Saved': 'Nach Gespeichert verschieben',
+  'Moved to Saved': 'Nach Gespeichert verschoben',
   'Add to Library': 'Zur Bibliothek hinzufügen',
   'Remove from Library': 'Aus der Bibliothek entfernen',
   'Added to Library': 'Zur Bibliothek hinzugefügt',
