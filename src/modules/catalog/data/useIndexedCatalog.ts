@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { desktopApi } from '@/platform/desktop';
+import { trackDataActivity } from '@/shared/lib/dataActivity';
 import {
   tauriApi,
   type CatalogKeyRow,
@@ -31,6 +32,7 @@ import type { RatingLookups } from '../lib/smartCatalogFilter';
 import { mapXtreamList } from './useCatalog';
 import { foldLiveChannels } from '../lib/streamFolding';
 import { buildCatalogFacets, onCatalogFacetsBuilt } from './catalogFacetBuilder';
+import { INDEX_ROWS_ROOT } from './useHomeRows';
 import type { RatingHeadSource } from './useTmdbRatingChecks';
 
 const STATUS_ROOT = 'catalog_index_page_status';
@@ -56,6 +58,13 @@ function pageSources(sources: EnabledSourcesSnapshot): CatalogPageSource[] {
     sourceId: source.id,
     scope: source.queryScope,
   }));
+}
+
+function prepareCatalogPage(kind: CatalogPageKind, sources: CatalogPageSource[]) {
+  return trackDataActivity('index', () => tauriApi.catalogIndexPageStatus(kind, sources), {
+    phase: 'check-index',
+    kind,
+  });
 }
 
 /** Whether these sources could be served from the index at all. */
@@ -129,7 +138,7 @@ export function useCatalogPageMode(type: 'live' | 'vod' | 'series'): {
 
   const status = useQuery({
     queryKey: [STATUS_ROOT, kind, sources.queryScope],
-    queryFn: () => tauriApi.catalogIndexPageStatus(kind!, pageSources(sources)),
+    queryFn: () => prepareCatalogPage(kind!, pageSources(sources)),
     enabled: candidate && decided === null && !sources.isLoading,
     // Index and facet changes invalidate it (useIndexInvalidation).
     staleTime: Infinity,
@@ -553,29 +562,34 @@ export function useCatalogFacetBuilds(delayMs = 3_000): void {
   );
 
   useEffect(() => {
-    if (!eligible) return;
+    if (!desktopApi.isDesktop()) return;
     const run = (kind: CatalogPageKind) => {
       void buildCatalogFacets(kind, buildSources).then(() =>
         // Warm the facet cache, so the first page visit only filters and sorts.
-        tauriApi
-          .catalogIndexPageStatus(
-            kind,
-            buildSources.map(({ id, queryScope: scope }) => ({ sourceId: id, scope })),
-          )
+        prepareCatalogPage(
+          kind,
+          buildSources.map(({ id, queryScope: scope }) => ({ sourceId: id, scope })),
+        )
           .then((status) => client.setQueryData([STATUS_ROOT, kind, queryScope], status))
           .catch(() => undefined),
       );
     };
-    const timer = window.setTimeout(() => {
-      run('vod');
-      run('series');
-      run('live');
-    }, delayMs);
+    const timer = eligible
+      ? window.setTimeout(() => {
+          run('vod');
+          run('series');
+          run('live');
+        }, delayMs)
+      : undefined;
     let unlisten: (() => void) | undefined;
     let cancelled = false;
     void desktopApi
       .onCatalogIndexUpdated((kind) => {
-        if (kind === 'live' || kind === 'vod' || kind === 'series') run(kind);
+        if (kind !== 'live' && kind !== 'vod' && kind !== 'series') return;
+        for (const root of [STATUS_ROOT, PAGE_ROOT, STATS_ROOT, SEARCH_ROOT, INDEX_ROWS_ROOT]) {
+          void client.invalidateQueries({ queryKey: [root, kind], refetchType: 'none' });
+        }
+        if (eligible) run(kind);
       })
       .then((stop) => {
         if (cancelled) stop();

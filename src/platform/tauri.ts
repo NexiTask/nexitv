@@ -1,8 +1,15 @@
 import { invoke } from '@tauri-apps/api/core';
 
+export interface ImdbRefreshEvent {
+  stage: string;
+  dataset?: 'ratings' | 'titles' | null;
+  percent?: number | null;
+}
+
 /** The IMDb pipeline's state (metadata/imdb.rs). Unix seconds where set. */
 export interface ImdbRefreshStatus {
   running: boolean;
+  importProgress: ImdbRefreshEvent | null;
   /** The automatic refresh (weekly dumps, daily backfill) is on. */
   enabled: boolean;
   lastRefresh: number | null;
@@ -477,8 +484,20 @@ export const tauriApi = {
     ),
 
   /** Rows still waiting for facets, as JSON bytes for the facet worker. */
-  catalogIndexFacetBatch: (sourceId: string, kind: CatalogPageKind, scope: string, limit: number) =>
-    invoke<ArrayBuffer>('catalog_index_facet_batch', { sourceId, kind, scope, limit }),
+  catalogIndexFacetBatch: (
+    sourceId: string,
+    kind: CatalogPageKind,
+    scope: string,
+    limit: number,
+    progressGeneration?: number,
+  ) =>
+    invoke<ArrayBuffer>('catalog_index_facet_batch', {
+      sourceId,
+      kind,
+      scope,
+      limit,
+      progressGeneration,
+    }),
 
   /** Store worker-derived facet rows; false when the list changed meanwhile. */
   catalogIndexStoreFacets: (

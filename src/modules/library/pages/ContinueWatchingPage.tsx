@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { VirtualizedGrid } from '@/modules/catalog/public/components/VirtualizedGrid';
-import { useLibraryStore } from '../store/useLibraryStore';
+import { isQueuedEpisode, useLibraryStore } from '../store/useLibraryStore';
 import { historyCardSubtitle } from '@/shared/lib/time';
 import { CatalogViewToggle } from '@/modules/catalog/public/components/CatalogViewToggle';
 import { History, Trash2 } from 'lucide-react';
@@ -26,7 +26,9 @@ export function ContinueWatchingPage() {
     useMediaDetailState({ enableSourceOnOpen: true });
 
   // Sort by most recently watched
-  const sortedHistory = [...history].sort((a, b) => b.lastWatchedAt - a.lastWatchedAt);
+  const sortedHistory = history
+    .filter((item) => !isQueuedEpisode(item))
+    .sort((a, b) => b.lastWatchedAt - a.lastWatchedAt);
 
   return (
     <>

@@ -16,7 +16,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
+import { isQueuedEpisode, useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import { notify } from '@/shared/notifications/useNotificationStore';
 import type { MediaItem } from '../model/media';
 import styles from './MediaCard.module.css';
@@ -52,7 +52,9 @@ export function MediaCardMenu({
     Boolean(item.isFavorite);
   const isWatched =
     useLibraryStore((state) => state.watched.includes(item.id)) || Boolean(item.isWatched);
-  const inHistory = useLibraryStore((state) => state.history.some((entry) => entry.id === item.id));
+  const inHistory = useLibraryStore((state) =>
+    state.history.some((entry) => entry.id === item.id && !isQueuedEpisode(entry)),
+  );
   const collections = useLibraryStore((state) => state.collections);
 
   const close = () => {

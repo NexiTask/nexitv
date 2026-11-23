@@ -40,6 +40,8 @@ vi.mock('@/modules/search/pages/SearchPage', () => ({
 }));
 
 import App from '@/app/App';
+import { preloadRouteModule } from '@/app/router/routeModules';
+import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
 import { useAuthStore } from '@/modules/sources/store/useAuthStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { useSourceStore } from '@/modules/sources/store/useSourceStore';
@@ -54,6 +56,7 @@ beforeEach(() => {
     value: vi.fn(),
   });
   window.history.replaceState({}, '', '/');
+  useLibraryStore.setState({ history: [], trackedSeries: {}, watched: [] });
   useSettingsStore.getState().resetSettings();
   useSettingsStore.setState({ onboardingDismissed: true });
   useAuthStore.setState({
@@ -70,6 +73,30 @@ beforeEach(() => {
 });
 
 describe('application shell', () => {
+  it('opens the Watch Next page and counts queued episodes separately from resume entries', async () => {
+    await preloadRouteModule('/watch-next');
+    const queued = {
+      id: 'queued',
+      title: 'Queued show',
+      type: 'series' as const,
+      posterUrl: '',
+      lastWatchedAt: 2,
+      seasonNum: 2,
+      episodeNum: 8,
+      progressPercentage: 0,
+    };
+    useLibraryStore.setState({
+      history: [queued, { ...queued, id: 'resuming', progressPercentage: 20 }],
+    });
+    window.history.replaceState({}, '', '/watch-next');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Watch Next' })).toBeTruthy();
+    expect(screen.getByText('1 episode')).toBeTruthy();
+    act(() => useLibraryStore.getState().dismissWatchNext(queued.id));
+    expect(screen.getByRole('heading', { name: 'No Next Episodes' })).toBeTruthy();
+  });
+
   it('restores M3U and Xtream sources in parallel', async () => {
     let resolveSources!: () => void;
     let resolveAuth!: () => void;

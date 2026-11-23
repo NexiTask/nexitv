@@ -14,6 +14,8 @@ import {
   RiHome5Line,
   RiMovie2Fill,
   RiMovie2Line,
+  RiPlayList2Fill,
+  RiPlayList2Line,
   RiSearchFill,
   RiSearchLine,
   RiSettings3Fill,
@@ -25,12 +27,14 @@ import {
 } from '@/shared/ui/icons';
 import { NavLink, useLocation } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
+import { isQueuedEpisode, useLibraryStore } from '@/modules/library/store/useLibraryStore';
+import { useWatchNext } from '@/modules/catalog/public/data/useWatchNext';
 import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { StateIcon } from '@/shared/ui/StateIcon';
 import { useEnabledSources } from '@/modules/sources/hooks/useEnabledSources';
 import { prefetchNavigationData } from '../bootstrap/prefetch';
+import { DataActivityStatus } from '../components/DataActivityStatus';
 import styles from './Sidebar.module.css';
 import { useI18n } from '@/shared/i18n/i18n';
 import { useMediaQuery } from '@/modules/catalog/hooks/useMediaQuery';
@@ -47,7 +51,10 @@ export function Sidebar() {
   const updateSetting = useSettingsStore((state) => state.updateSetting);
   const setIsCollapsed = (collapsed: boolean) => updateSetting('sidebarCollapsed', collapsed);
 
-  const history = useLibraryStore((state) => state.history);
+  const resumeCount = useLibraryStore(
+    (state) => state.history.filter((item) => !isQueuedEpisode(item)).length,
+  );
+  const { items: watchNext } = useWatchNext();
   const favorites = useLibraryStore((state) => state.favorites);
   const collections = useLibraryStore((state) => state.collections);
   const downloads = useDownloadStore((state) => state.jobs);
@@ -79,6 +86,18 @@ export function Sidebar() {
   ];
 
   const libraryItems = [
+    {
+      icons: { line: RiHistoryLine, fill: RiHistoryFill },
+      label: 'Continue Watching',
+      path: '/continue',
+      badge: resumeCount,
+    },
+    {
+      icons: { line: RiPlayList2Line, fill: RiPlayList2Fill },
+      label: 'Watch Next',
+      path: '/watch-next',
+      badge: watchNext.length,
+    },
     ...(upcomingEnabled
       ? [
           {
@@ -89,12 +108,6 @@ export function Sidebar() {
           },
         ]
       : []),
-    {
-      icons: { line: RiHistoryLine, fill: RiHistoryFill },
-      label: 'Continue Watching',
-      path: '/continue',
-      badge: history.length,
-    },
     {
       icons: { line: RiHeartLine, fill: RiHeartFill },
       label: 'Favorites',
@@ -168,8 +181,6 @@ export function Sidebar() {
 
         <div className={styles.divider} />
 
-        {/* LIBRARY */}
-        <div className={styles.groupLabel}>{t('Library')}</div>
         <nav className={styles.navGroup} aria-label={t('Library')}>
           {libraryItems.map((item) => (
             <NavLink
@@ -215,14 +226,14 @@ export function Sidebar() {
             </NavLink>
           ))}
         </nav>
+      </div>
 
-        <div className={styles.spacer} />
-
-        {/* BOTTOM SETTINGS & COLLAPSE */}
-        <div
-          className={styles.bottomBar}
-          data-seasonal-decor={isCollapsed ? undefined : 'sidebar-footer'}
-        >
+      <div
+        className={styles.footer}
+        data-seasonal-decor={isCollapsed ? undefined : 'sidebar-footer'}
+      >
+        <DataActivityStatus compact={isCollapsed} />
+        <div className={styles.bottomBar}>
           <NavLink
             to="/settings"
             title={isCollapsed ? t('Settings') : undefined}

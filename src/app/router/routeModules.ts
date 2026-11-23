@@ -8,6 +8,7 @@ const loaders = {
   '/series': () => import('@/modules/catalog/pages/SeriesPage'),
   '/search': () => import('@/modules/search/pages/SearchPage'),
   '/continue': () => import('@/modules/library/pages/ContinueWatchingPage'),
+  '/watch-next': () => import('@/modules/library/pages/WatchNextPage'),
   '/favorites': () => import('@/modules/library/pages/FavoritesPage'),
   '/collections': () => import('@/modules/library/pages/CollectionsPage'),
   '/downloads': () => import('@/modules/downloads/pages/DownloadsPage'),
@@ -47,6 +48,9 @@ export const CollectionsPage = lazy(() =>
 );
 export const ContinueWatchingPage = lazy(() =>
   loaders['/continue']().then((module) => ({ default: module.ContinueWatchingPage })),
+);
+export const WatchNextPage = lazy(() =>
+  loaders['/watch-next']().then((module) => ({ default: module.WatchNextPage })),
 );
 export const DownloadsPage = lazy(() =>
   loaders['/downloads']().then((module) => ({ default: module.DownloadsPage })),

@@ -1,14 +1,31 @@
 // @vitest-environment happy-dom
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { LiveTvViewToggle } from '@/modules/catalog/components/LiveTvViewToggle';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from '@/app/shell/Sidebar';
 import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
+import {
+  trackDataActivity,
+  type ReportDataProgress,
+  type ReportActivityDetail,
+} from '@/shared/lib/dataActivity';
 
-describe('Sidebar library counts', () => {
+function renderSidebar(path = '/') {
+  const client = new QueryClient();
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[path]}>
+        <Sidebar />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+describe('Sidebar', () => {
   const originalMatchMedia = window.matchMedia;
 
   beforeEach(() => {
@@ -25,31 +42,154 @@ describe('Sidebar library counts', () => {
       ],
       favorites: [],
       collections: [],
+      trackedSeries: {},
+      watched: [],
     });
+  });
+
+  it('shows ongoing data tasks above Settings and clears them as they finish', async () => {
+    useSettingsStore.setState({ sidebarCollapsed: false });
+    renderSidebar();
+
+    const settings = screen.getByRole('link', { name: 'Settings' });
+    const status = screen.getByRole('status');
+    let finishCatalog!: () => void;
+    let failIndex!: (error: Error) => void;
+    let reportIndex!: ReportDataProgress;
+    let reportIndexDetail!: ReportActivityDetail;
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      act(() => {
+        void trackDataActivity(
+          'guide',
+          () => new Promise<void>((resolve) => window.setTimeout(resolve, 100)),
+        );
+      });
+      await act(() => vi.advanceTimersByTimeAsync(100));
+      act(() => vi.advanceTimersByTime(400));
+      expect(status.textContent).toBe('');
+
+      let catalog!: Promise<void>;
+      let index!: Promise<void>;
+      act(() => {
+        catalog = trackDataActivity(
+          'catalog',
+          () =>
+            new Promise<void>((resolve) => {
+              finishCatalog = resolve;
+            }),
+        );
+        index = trackDataActivity(
+          'index',
+          (reportProgress, reportDetail) =>
+            new Promise<void>((_, reject) => {
+              failIndex = reject;
+              reportIndex = reportProgress;
+              reportIndexDetail = reportDetail;
+            }),
+        );
+      });
+      expect(status.textContent).toBe('');
+
+      act(() => vi.advanceTimersByTime(400));
+      expect(screen.getByText('Loading the provider catalog…')).toBeTruthy();
+      expect(screen.getByText('Preparing the library index…')).toBeTruthy();
+      expect(screen.queryByRole('progressbar')).toBeNull();
+      expect(status.nextElementSibling?.contains(settings)).toBe(true);
+
+      act(() => useSettingsStore.setState({ sidebarCollapsed: true }));
+      expect(screen.getByTitle('Loading the provider catalog…')).toBeTruthy();
+
+      act(() => {
+        reportIndex(25);
+        reportIndexDetail({ phase: 'index-titles', kind: 'vod', completed: 1000, total: 4000 });
+      });
+      const progress = screen.getByRole('progressbar', { name: 'Indexing titles…' });
+      expect(progress.getAttribute('aria-valuenow')).toBe('25');
+      expect(
+        screen
+          .getByTitle('Indexing titles… · 25% · Movies · 1,000 of 4,000 titles indexed')
+          .contains(progress),
+      ).toBe(true);
+      expect(screen.getByText('25%')).toBeTruthy();
+
+      await act(async () => {
+        finishCatalog();
+        await catalog;
+      });
+      expect(screen.queryByText('Loading the provider catalog…')).toBeNull();
+      expect(screen.getByRole('progressbar', { name: 'Indexing titles…' })).toBe(progress);
+      act(() => {
+        reportIndex(null);
+        reportIndexDetail({ phase: 'sort-titles', kind: 'vod' });
+      });
+      expect(screen.getByText('Preparing the library index…')).toBeTruthy();
+      expect(screen.getByText('Movies · Sorting titles by name')).toBeTruthy();
+      expect(screen.queryByRole('progressbar')).toBeNull();
+
+      await act(async () => {
+        const error = new Error('Index unavailable');
+        failIndex(error);
+        await expect(index).rejects.toBe(error);
+      });
+      expect(status.textContent).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows a collapsed library count while announcing its full label', () => {
     useSettingsStore.setState({ sidebarCollapsed: true, showCollapsedSidebarBadges: true });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
     const link = screen.getByRole('link', { name: 'Continue Watching, 1 item' });
     expect(link.getAttribute('title')).toBe('Continue Watching (1)');
     expect(link.querySelector('[class*="collapsedBadge"]')?.textContent).toBe('1');
   });
 
+  it('counts the Watch Next queue separately and updates after dismissal', () => {
+    useSettingsStore.setState({ sidebarCollapsed: false });
+    const episode = {
+      id: 'queued-show',
+      title: 'Queued show',
+      type: 'series' as const,
+      posterUrl: '',
+      episodeId: 'next-episode',
+      seasonNum: 2,
+      episodeNum: 8,
+      progressPercentage: 0,
+      lastWatchedAt: 2,
+    };
+    useLibraryStore.setState(({ history }) => ({
+      history: [episode, { ...episode, id: 'paused-show', currentTime: 120 }, ...history],
+    }));
+    renderSidebar('/watch-next');
+
+    const watchNext = screen.getByRole('link', { name: 'Watch Next' });
+    expect(watchNext.getAttribute('href')).toBe('/watch-next');
+    expect(watchNext.getAttribute('aria-current')).toBe('page');
+    expect(watchNext.querySelector('[class*="badge"]')?.textContent).toBe('1');
+    const resume = screen.getByRole('link', { name: 'Continue Watching' });
+    expect(resume.getAttribute('href')).toBe('/continue');
+    expect(resume.querySelector('[class*="badge"]')?.textContent).toBe('2');
+
+    act(() =>
+      useSettingsStore.setState({ sidebarCollapsed: true, showCollapsedSidebarBadges: true }),
+    );
+    expect(screen.getByRole('link', { name: 'Watch Next, 1 item' })).toBe(watchNext);
+    expect(watchNext.querySelector('[class*="collapsedBadge"]')?.textContent).toBe('1');
+
+    act(() => useLibraryStore.getState().dismissWatchNext(episode.id));
+    expect(screen.getByRole('link', { name: 'Watch Next' })).toBe(watchNext);
+    expect(watchNext.querySelector('[class*="collapsedBadge"]')).toBeNull();
+  });
+
   it('can hide collapsed library counts without changing their accessible labels', () => {
     useSettingsStore.setState({ sidebarCollapsed: true, showCollapsedSidebarBadges: false });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
     const link = screen.getByRole('link', { name: 'Continue Watching, 1 item' });
     expect(link.getAttribute('title')).toBe('Continue Watching (1)');
@@ -59,11 +199,7 @@ describe('Sidebar library counts', () => {
   it('shows the restrained inline count when the sidebar is expanded', () => {
     useSettingsStore.setState({ sidebarCollapsed: false });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
     expect(screen.getByRole('link', { name: /Continue Watching/ }).textContent).toContain('1');
     // Seasonal decorations only rest on the full-width footer.
@@ -73,11 +209,7 @@ describe('Sidebar library counts', () => {
   it('keeps collapsed navigation links accessible after their labels leave the rail', () => {
     useSettingsStore.setState({ sidebarCollapsed: true });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
     expect(screen.getByRole('link', { name: 'Home' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Settings' })).toBeTruthy();
@@ -86,11 +218,7 @@ describe('Sidebar library counts', () => {
   it('uses one explicit sidebar toggle and keeps the wordmark decorative', () => {
     useSettingsStore.setState({ sidebarCollapsed: false });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
     expect(screen.getByRole('complementary', { name: 'Primary navigation' })).toBeTruthy();
     expect(screen.getAllByRole('button', { name: 'Collapse sidebar' })).toHaveLength(1);
@@ -124,14 +252,24 @@ describe('Sidebar library counts', () => {
     return mediaQuery;
   }
 
+  it('identifies the Library navigation without a visible heading and lists playback first', () => {
+    useSettingsStore.setState({ upcomingEnabled: true, sidebarCollapsed: false });
+
+    renderSidebar();
+
+    expect(screen.queryByText('Library')).toBeNull();
+    const library = within(screen.getByRole('navigation', { name: 'Library' }));
+    expect(library.getAllByRole('link').slice(0, 3)).toEqual([
+      library.getByRole('link', { name: 'Continue Watching' }),
+      library.getByRole('link', { name: 'Watch Next' }),
+      library.getByRole('link', { name: 'Coming Up' }),
+    ]);
+  });
+
   it('hides the Coming Up workspace when its master preference is disabled', () => {
     useSettingsStore.setState({ upcomingEnabled: false, sidebarCollapsed: false });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
     expect(screen.queryByRole('link', { name: 'Coming Up' })).toBeNull();
   });
@@ -140,11 +278,7 @@ describe('Sidebar library counts', () => {
     setCompactViewport(true);
     useSettingsStore.setState({ sidebarCollapsed: false });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
     expect(document.querySelector('aside')?.className).toContain('collapsed');
     expect(document.querySelector('[data-seasonal-decor]')).toBeNull();
@@ -167,11 +301,7 @@ describe('Live TV holds the guide', () => {
 
   it('has no separate TV Guide entry and stays highlighted on the guide', () => {
     useSettingsStore.setState({ liveTvView: 'guide' });
-    render(
-      <MemoryRouter initialEntries={['/epg']}>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar('/epg');
     expect(screen.queryByRole('link', { name: 'TV Guide' })).toBeNull();
     const live = screen.getByRole('link', { name: 'Live TV' });
     expect(live.getAttribute('href')).toBe('/epg');

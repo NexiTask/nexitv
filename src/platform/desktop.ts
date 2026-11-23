@@ -8,6 +8,7 @@ import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check, type DownloadEvent } from '@tauri-apps/plugin-updater';
 import type { DownloadStatusEvent } from './contracts';
+import type { ImdbRefreshEvent } from './tauri';
 
 interface DesktopFileFilter {
   name: string;
@@ -90,12 +91,12 @@ export const desktopApi = {
   onPointerMoved: (handler: () => void) => listen('pointer-moved', handler),
   onCatalogIndexUpdated: (handler: (kind: string) => void) =>
     listen<string>('catalog-index-updated', ({ payload }) => handler(payload)),
-  /** The IMDb pipeline's stage events: checking/downloading/parsing while a
+  /** The IMDb pipeline's stage events: checking/downloading/parsing/matching while a
    * refresh runs, done when new matches land (also after a quiet daily
    * backfill), failed when an announced refresh stopped early. */
-  onImdbRefreshed: (handler: (stage: string) => void) =>
-    listen<{ stage: string }>('imdb://refresh', ({ payload }) => {
-      handler(payload.stage);
+  onImdbRefreshed: (handler: (stage: string, event: ImdbRefreshEvent) => void) =>
+    listen<ImdbRefreshEvent>('imdb://refresh', ({ payload }) => {
+      handler(payload.stage, payload);
     }),
 
   /** The whole interface's zoom (1 = 100%), the webview's own scaling. */

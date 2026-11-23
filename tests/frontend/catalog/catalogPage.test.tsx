@@ -13,7 +13,8 @@ import * as enabledSourcesHook from '@/modules/sources/hooks/useEnabledSources';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import type { MediaItem } from '@/modules/catalog/model/media';
 import { desktopApi } from '@/platform/desktop';
-import { decodeCatalogPage, tauriApi } from '@/platform/tauri';
+import { decodeCatalogPage, tauriApi, type CatalogPageStatus } from '@/platform/tauri';
+import { useDataActivities } from '@/shared/lib/dataActivity';
 
 const tmdb = vi.hoisted(() => ({
   searchTmdbTitles: vi.fn(),
@@ -714,11 +715,12 @@ describe('CatalogPage served from the catalogue index', () => {
 
   it('shows the index page without loading the full catalogue', async () => {
     const catalog = vi.spyOn(catalogApi, 'useCatalogByType');
-    vi.spyOn(tauriApi, 'catalogIndexPageStatus').mockResolvedValue({
-      state: 'ready',
-      pending: 0,
-      total: 2,
-    });
+    let finishIndex!: (status: CatalogPageStatus) => void;
+    vi.spyOn(tauriApi, 'catalogIndexPageStatus').mockReturnValue(
+      new Promise<CatalogPageStatus>((resolve) => {
+        finishIndex = resolve;
+      }),
+    );
     const page = vi.spyOn(tauriApi, 'catalogIndexPage').mockImplementation(async () =>
       decodeCatalogPage(
         encodePage(
@@ -749,7 +751,10 @@ describe('CatalogPage served from the catalogue index', () => {
 
     renderPage();
 
+    expect(useDataActivities.getState().index).toBe(1);
+    finishIndex({ state: 'ready', pending: 0, total: 2 });
     expect(await screen.findByText('Second Film')).toBeTruthy();
+    expect(useDataActivities.getState().index).toBe(0);
     const grid = screen.getByTestId('virtualized-grid');
     expect(
       within(grid)

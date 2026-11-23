@@ -146,9 +146,15 @@ describe('typed Tauri IPC wrapper', () => {
     ],
     [
       'catalogIndexFacetBatch',
-      ['xtream-one', 'vod', 'sources-abc', 4000],
+      ['xtream-one', 'vod', 'sources-abc', 4000, 7],
       'catalog_index_facet_batch',
-      { sourceId: 'xtream-one', kind: 'vod', scope: 'sources-abc', limit: 4000 },
+      {
+        sourceId: 'xtream-one',
+        kind: 'vod',
+        scope: 'sources-abc',
+        limit: 4000,
+        progressGeneration: 7,
+      },
     ],
     [
       'catalogIndexStoreFacets',

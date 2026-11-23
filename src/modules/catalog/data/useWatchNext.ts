@@ -1,14 +1,14 @@
 import { useEffect } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { resolveXtreamSourceId } from '@/modules/sources/public/store/useAuthStore';
+import { useAuthStore } from '@/modules/sources/public/store/useAuthStore';
 import { xtreamItemId } from '@/modules/sources/public/lib/sourceIdentity';
 import {
+  isQueuedEpisode,
   useLibraryStore,
-  type HistoryItem,
   type TrackedSeries,
 } from '@/modules/library/public/store/useLibraryStore';
 import { pickWatchNext, regularEpisodeCount } from '../lib/watchNext';
-import { seriesInfoQuery, sourceCredentials } from './useDetails';
+import { seriesInfoQuery } from './useDetails';
 
 /** Started shows checked for a next episode at a time (one provider call each). */
 const MAX_CHECKED = 12;
@@ -20,23 +20,38 @@ type Bookkeeping = { id: string; patch: Partial<Omit<TrackedSeries, 'item'>> };
  * Continue Watching) that have an episode to watch, most recently watched
  * first. A dismissed show stays away until the provider lists more episodes.
  */
-export function useWatchNext(): HistoryItem[] {
+export function useWatchNext() {
   const tracked = useLibraryStore((state) => state.trackedSeries);
   const history = useLibraryStore((state) => state.history);
   const watched = useLibraryStore((state) => state.watched);
   const updateTrackedSeries = useLibraryStore((state) => state.updateTrackedSeries);
+  const legacySourceId = useAuthStore((state) => state.profiles[0]?.id);
+  const runtimes = useAuthStore((state) => state.runtimes);
+  const resolveSourceId = (sourceId?: string) =>
+    !sourceId || sourceId === 'xtream' ? legacySourceId : sourceId;
+  const watchedSet = new Set(watched);
+  const resuming = new Set(history.filter((item) => !isQueuedEpisode(item)).map((item) => item.id));
+  const queued = history.filter((item) => {
+    if (!isQueuedEpisode(item) || tracked[item.id]?.muted) return false;
+    if (!item.episodeId) return true;
+    const sourceId = resolveSourceId(item.sourceId);
+    const episodeId = sourceId ? xtreamItemId(sourceId, 'episode', item.episodeId) : item.episodeId;
+    return !watchedSet.has(episodeId) && !watchedSet.has(item.episodeId);
+  });
+  const queuedIds = new Set(queued.map((item) => item.id));
 
-  const candidates = Object.entries(tracked ?? {})
+  const candidates = Object.entries(tracked)
     .filter(
       ([id, entry]) =>
-        !entry.item.sourceId?.startsWith('m3u-') && !history.some((item) => item.id === id),
+        !entry.item.sourceId?.startsWith('m3u-') && !resuming.has(id) && !queuedIds.has(id),
     )
     .sort(([, left], [, right]) => right.lastWatchedAt - left.lastWatchedAt)
     .slice(0, MAX_CHECKED);
 
   const results = useQueries({
     queries: candidates.map(([, entry]) => {
-      const credentials = sourceCredentials(entry.item.sourceId);
+      const sourceId = resolveSourceId(entry.item.sourceId);
+      const credentials = sourceId ? (runtimes[sourceId]?.credentials ?? null) : null;
       const providerSeriesId = entry.item.seriesSourceItemId || entry.item.sourceItemId;
       return {
         ...seriesInfoQuery(providerSeriesId ?? entry.item.id, entry.item.sourceId, credentials),
@@ -45,8 +60,7 @@ export function useWatchNext(): HistoryItem[] {
     }),
   });
 
-  const watchedSet = new Set(watched);
-  const items: HistoryItem[] = [];
+  const items = [...queued];
   const bookkeeping: Bookkeeping[] = [];
   candidates.forEach(([id, entry], index) => {
     const episodes = results[index]?.data?.episodes;
@@ -60,7 +74,7 @@ export function useWatchNext(): HistoryItem[] {
       if (total <= entry.knownEpisodes) return;
       bookkeeping.push({ id, patch: { muted: false } });
     }
-    const sourceId = resolveXtreamSourceId(entry.item.sourceId);
+    const sourceId = resolveSourceId(entry.item.sourceId);
     const pick = pickWatchNext(episodes, (episode) =>
       watchedSet.has(sourceId ? xtreamItemId(sourceId, 'episode', episode.id) : String(episode.id)),
     );
@@ -90,5 +104,12 @@ export function useWatchNext(): HistoryItem[] {
     }
   }, [pending, updateTrackedSeries]);
 
-  return items;
+  return {
+    items: items.sort((left, right) => right.lastWatchedAt - left.lastWatchedAt),
+    isLoading: results.some((result) => result.isLoading),
+    error: results.find((result) => result.isError)?.error ?? null,
+    retry: () => {
+      for (const result of results) if (result.isError) void result.refetch();
+    },
+  };
 }

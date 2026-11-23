@@ -130,6 +130,18 @@ describe('quick play from a card', () => {
     );
   });
 
+  it('plays the episode shown on a Watch Next card from the beginning', async () => {
+    await quickPlay(client(), {
+      ...series,
+      progressPercentage: 0,
+      seasonNum: 2,
+      episodeNum: 1,
+    });
+    expect(playStream).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceItemId: '201', seasonNum: '2', startPosition: 0 }),
+    );
+  });
+
   it('hands M3U titles and provider failures back to the details sheet', async () => {
     expect(await quickPlay(client(), { ...movie, sourceId: 'm3u-1' })).toBe(false);
     xc.getVodInfo.mockRejectedValueOnce(new Error('timeout'));

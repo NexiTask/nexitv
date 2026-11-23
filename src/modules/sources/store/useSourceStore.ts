@@ -18,6 +18,7 @@ import { deleteM3uDraft } from '@/modules/m3u-editor/public/services/m3uDraftRep
 import { clearM3uVersions } from '@/modules/m3u-editor/public/services/m3uVersionHistory';
 import { parseM3uAsync } from '@/modules/m3u-editor/public/services/m3uParser';
 import { getErrorMessage } from '@/shared/lib/error';
+import { trackDataActivity } from '@/shared/lib/dataActivity';
 import {
   createProfile,
   ENABLED_SOURCE_IDS_STORAGE_KEY,
@@ -89,11 +90,16 @@ function parseDocument(
   document: M3uDocument,
   headers?: Record<string, string>,
 ): Promise<M3uPlaylist> {
-  return parseM3uAsync(document.content, {
-    sourceId: id,
-    baseUrl: document.baseUrl || undefined,
-    headers,
-  });
+  return trackDataActivity(
+    'playlist',
+    () =>
+      parseM3uAsync(document.content, {
+        sourceId: id,
+        baseUrl: document.baseUrl || undefined,
+        headers,
+      }),
+    { phase: 'parse-playlist' },
+  );
 }
 
 function errorMessage(error: unknown): string {

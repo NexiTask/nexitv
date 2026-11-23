@@ -20,6 +20,7 @@ import {
   SeriesPage,
   SettingsPage,
   UpcomingPage,
+  WatchNextPage,
 } from './routeModules';
 
 export function NotFoundPage() {
@@ -59,6 +60,7 @@ export function AppRoutes() {
           <Route path="/series" element={<SeriesPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/continue" element={<ContinueWatchingPage />} />
+          <Route path="/watch-next" element={<WatchNextPage />} />
           <Route path="/favorites" element={<FavoritesPage />} />
           <Route path="/collections" element={<CollectionsPage />} />
           <Route path="/downloads" element={<DownloadsPage />} />
