@@ -5,7 +5,6 @@ import { xtreamItemId } from '@/modules/sources/public/lib/sourceIdentity';
 import {
   isQueuedEpisode,
   useLibraryStore,
-  type HistoryItem,
   type TrackedSeries,
 } from '@/modules/library/public/store/useLibraryStore';
 import { pickWatchNext, regularEpisodeCount } from '../lib/watchNext';
@@ -21,7 +20,7 @@ type Bookkeeping = { id: string; patch: Partial<Omit<TrackedSeries, 'item'>> };
  * Continue Watching) that have an episode to watch, most recently watched
  * first. A dismissed show stays away until the provider lists more episodes.
  */
-export function useWatchNext(): HistoryItem[] {
+export function useWatchNext() {
   const tracked = useLibraryStore((state) => state.trackedSeries);
   const history = useLibraryStore((state) => state.history);
   const watched = useLibraryStore((state) => state.watched);
@@ -100,5 +99,12 @@ export function useWatchNext(): HistoryItem[] {
     }
   }, [pending, updateTrackedSeries]);
 
-  return items.sort((left, right) => right.lastWatchedAt - left.lastWatchedAt);
+  return {
+    items: items.sort((left, right) => right.lastWatchedAt - left.lastWatchedAt),
+    isLoading: results.some((result) => result.isLoading),
+    error: results.find((result) => result.isError)?.error ?? null,
+    retry: () => {
+      for (const result of results) if (result.isError) void result.refetch();
+    },
+  };
 }

@@ -511,6 +511,12 @@ export const NL_MESSAGES: Record<string, string> = {
   'No collections yet': 'Nog geen collecties',
   'Remove from Continue Watching': 'Verwijderen uit Verder kijken',
   'Watch Next': 'Hierna kijken',
+  'Could Not Load Next Episodes': 'Volgende afleveringen konden niet worden geladen',
+  'Check your source connection and try again.':
+    'Controleer de verbinding met je bron en probeer het opnieuw.',
+  'No Next Episodes': 'Geen volgende afleveringen',
+  'Next episodes from series you’ve started will appear here.':
+    'Hier verschijnen de volgende afleveringen van series waaraan je bent begonnen.',
   'Remove from Watch Next': 'Verwijderen uit Hierna kijken',
   Overview: 'Overzicht',
   'No overview available.': 'Geen overzicht beschikbaar.',

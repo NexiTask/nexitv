@@ -59,7 +59,7 @@ export function HomePage() {
   const { selectedMovie, selectedSeries, handleCloseMovie, handleCloseSeries, handleItemClick } =
     useMediaDetailState();
 
-  const watchNext = useWatchNext();
+  const { items: watchNext } = useWatchNext();
   const dismissWatchNextById = useLibraryStore((state) => state.dismissWatchNext);
   const watchNextItems = useMemo(
     () =>
@@ -223,6 +223,7 @@ export function HomePage() {
             title="Watch Next"
             items={watchNextItems}
             onItemClick={handleItemClick}
+            onSeeAll={() => navigate('/watch-next')}
             onRemoveItem={dismissWatchNext}
             removeLabel="Remove from Watch Next"
           />

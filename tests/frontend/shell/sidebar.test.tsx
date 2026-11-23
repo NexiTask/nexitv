@@ -143,6 +143,21 @@ describe('Sidebar', () => {
     expect(link.querySelector('[class*="collapsedBadge"]')?.textContent).toBe('1');
   });
 
+  it('offers Watch Next as a separate library destination', () => {
+    useSettingsStore.setState({ sidebarCollapsed: false });
+    render(
+      <MemoryRouter initialEntries={['/watch-next']}>
+        <Sidebar />
+      </MemoryRouter>,
+    );
+    const watchNext = screen.getByRole('link', { name: 'Watch Next' });
+    expect(watchNext.getAttribute('href')).toBe('/watch-next');
+    expect(watchNext.getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: 'Continue Watching' }).getAttribute('href')).toBe(
+      '/continue',
+    );
+  });
+
   it('can hide collapsed library counts without changing their accessible labels', () => {
     useSettingsStore.setState({ sidebarCollapsed: true, showCollapsedSidebarBadges: false });
 

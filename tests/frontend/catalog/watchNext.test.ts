@@ -92,13 +92,13 @@ describe('saved next episodes', () => {
       createElement(QueryClientProvider, { client }, children);
     const { result } = renderHook(useWatchNext, { wrapper });
 
-    expect(result.current).toEqual([queued]);
+    expect(result.current.items).toEqual([queued]);
     expect(useLibraryStore.getState().history.filter((item) => !isQueuedEpisode(item))).toEqual([
       resumed,
     ]);
 
     act(() => useLibraryStore.getState().dismissWatchNext(queued.id));
-    expect(result.current).toEqual([]);
+    expect(result.current.items).toEqual([]);
     expect(useLibraryStore.getState().history).toEqual([queued, resumed]);
   });
 });

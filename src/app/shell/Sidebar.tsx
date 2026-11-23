@@ -14,6 +14,8 @@ import {
   RiHome5Line,
   RiMovie2Fill,
   RiMovie2Line,
+  RiPlayList2Fill,
+  RiPlayList2Line,
   RiSearchFill,
   RiSearchLine,
   RiSettings3Fill,
@@ -97,6 +99,12 @@ export function Sidebar() {
       label: 'Continue Watching',
       path: '/continue',
       badge: resumeCount,
+    },
+    {
+      icons: { line: RiPlayList2Line, fill: RiPlayList2Fill },
+      label: 'Watch Next',
+      path: '/watch-next',
+      badge: 0,
     },
     {
       icons: { line: RiHeartLine, fill: RiHeartFill },

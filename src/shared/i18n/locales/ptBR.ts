@@ -512,6 +512,12 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   'No collections yet': 'Ainda não há coleções',
   'Remove from Continue Watching': 'Remover de continuar assistindo',
   'Watch Next': 'Assistir em seguida',
+  'Could Not Load Next Episodes': 'Não foi possível carregar os próximos episódios',
+  'Check your source connection and try again.':
+    'Verifique a conexão com a fonte e tente novamente.',
+  'No Next Episodes': 'Nenhum próximo episódio',
+  'Next episodes from series you’ve started will appear here.':
+    'Os próximos episódios das séries que você começou aparecerão aqui.',
   'Remove from Watch Next': 'Remover de Assistir em seguida',
   Overview: 'Visão geral',
   'No overview available.': 'Nenhuma visão geral disponível.',
