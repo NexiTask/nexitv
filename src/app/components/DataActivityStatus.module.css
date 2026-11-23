@@ -33,6 +33,18 @@
   overflow-wrap: anywhere;
 }
 
+.detail {
+  display: -webkit-box;
+  margin-top: var(--space-0-75);
+  color: var(--text-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-normal);
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .value {
   flex: none;
   min-inline-size: 5ch;
@@ -92,7 +104,8 @@
   display: contents;
 }
 
-.compact .heading {
+.compact .heading,
+.compact .detail {
   position: absolute;
   width: var(--space-px);
   height: var(--space-px);

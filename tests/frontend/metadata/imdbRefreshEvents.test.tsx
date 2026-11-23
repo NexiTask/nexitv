@@ -43,6 +43,7 @@ describe('IMDb import activity', () => {
 
     send('checking');
     expect(screen.getByText('Importing IMDb data…')).toBeTruthy();
+    expect(screen.getByText('Checking the library for titles to match')).toBeTruthy();
     send('downloading', { dataset: 'ratings', percent: 33 });
     expect(
       screen
@@ -54,6 +55,7 @@ describe('IMDb import activity', () => {
     expect(screen.queryByRole('progressbar')).toBeNull();
     send('parsing');
     expect(screen.getByText('Importing IMDb data…')).toBeTruthy();
+    expect(screen.getByText('Reading downloaded IMDb files')).toBeTruthy();
     send('matching');
     expect(screen.getByText('Matching IMDb ratings…')).toBeTruthy();
     expect(notifications.notify.info).not.toHaveBeenCalled();

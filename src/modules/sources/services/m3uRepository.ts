@@ -46,13 +46,17 @@ export function fetchRemoteM3u(
   secret: M3uConnectionSecret,
   sourceId?: string,
 ): Promise<M3uDocument> {
-  return trackDataActivity('playlist', () =>
-    tauriApi.m3uFetch({ url: secret.location, headers: secret.headers, cacheKey: sourceId }),
+  return trackDataActivity(
+    'playlist',
+    () => tauriApi.m3uFetch({ url: secret.location, headers: secret.headers, cacheKey: sourceId }),
+    { phase: 'download-playlist' },
   );
 }
 
 export function readLocalM3u(path: string): Promise<M3uDocument> {
-  return trackDataActivity('playlist', () => tauriApi.m3uReadFile(path));
+  return trackDataActivity('playlist', () => tauriApi.m3uReadFile(path), {
+    phase: 'read-playlist',
+  });
 }
 
 export async function writeLocalM3u(path: string, content: string): Promise<void> {
@@ -64,7 +68,9 @@ export async function storeM3uCache(sourceId: string, document: M3uDocument): Pr
 }
 
 export function loadM3uCache(sourceId: string): Promise<M3uDocument | null> {
-  return trackDataActivity('playlist', () => tauriApi.m3uCacheLoad(sourceId));
+  return trackDataActivity('playlist', () => tauriApi.m3uCacheLoad(sourceId), {
+    phase: 'restore-playlist',
+  });
 }
 
 export async function deleteM3uCache(sourceId: string): Promise<void> {

@@ -61,7 +61,10 @@ function pageSources(sources: EnabledSourcesSnapshot): CatalogPageSource[] {
 }
 
 function prepareCatalogPage(kind: CatalogPageKind, sources: CatalogPageSource[]) {
-  return trackDataActivity('index', () => tauriApi.catalogIndexPageStatus(kind, sources));
+  return trackDataActivity('index', () => tauriApi.catalogIndexPageStatus(kind, sources), {
+    phase: 'check-index',
+    kind,
+  });
 }
 
 /** Whether these sources could be served from the index at all. */

@@ -248,6 +248,8 @@ describe('unified source settings', () => {
     await waitFor(() => expect(refreshSource).toHaveBeenCalledWith(remoteProfile.id));
     expect(refreshSource).not.toHaveBeenCalledWith(editedProfile.id);
     expect(screen.getByText('40%')).toBeTruthy();
+    expect(screen.getByText('Live TV · 2 of 5 refresh tasks finished')).toBeTruthy();
+    expect(await screen.findByText('Live TV · Downloading the latest catalog')).toBeTruthy();
     expect(
       screen
         .getByRole('progressbar', { name: 'Refreshing sources…' })
@@ -255,6 +257,7 @@ describe('unified source settings', () => {
     ).toBe('40');
     finishLiveList(new Response('[{"stream_id":4,"name":"Channel"}]'));
     expect(await screen.findByText('Sources Refreshed')).toBeTruthy();
+    expect(screen.getByText('Updated 2 · Failed 0 · Kept edits on 1')).toBeTruthy();
     expect(screen.queryByRole('progressbar')).toBeNull();
     expect(fetchCatalog.mock.calls.map(([url]) => new URL(url).searchParams.get('action'))).toEqual(
       ['get_live_streams', 'get_vod_streams', 'get_series'],

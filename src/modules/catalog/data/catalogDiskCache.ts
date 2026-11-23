@@ -56,7 +56,10 @@ export async function storeProviderList(
       (s) => `chars=${s.length}`,
     );
     await perfAsync(`store:ipc:${kind}`, () =>
-      trackDataActivity('index', () => tauriApi.catalogCacheStore(sourceId, kind, scope, content)),
+      trackDataActivity('index', () => tauriApi.catalogCacheStore(sourceId, kind, scope, content), {
+        phase: 'save-index',
+        kind,
+      }),
     );
   })();
   activeStores.set(key, store);

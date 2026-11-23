@@ -16,7 +16,7 @@ function showImport({ stage, dataset, percent }: ImdbRefreshEvent) {
     stage === 'matching'
   ) {
     useDataActivities.setState({
-      imdbImport: { phase: stage === 'matching' ? 'matching' : 'importing' },
+      imdbImport: { phase: stage === 'matching' || stage === 'checking' ? stage : 'importing' },
     });
   }
 }

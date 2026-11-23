@@ -127,16 +127,20 @@ function fetchXtreamList(
   source: EnabledXtreamSource,
   signal?: AbortSignal,
 ): Promise<unknown[]> {
-  return trackDataActivity('catalog', async (reportProgress) => {
-    const credentials = source.credentials!;
-    const response =
-      type === 'live'
-        ? await getLiveStreams(credentials, undefined, signal, reportProgress)
-        : type === 'vod'
-          ? await getVodStreams(credentials, undefined, signal, reportProgress)
-          : await getSeries(credentials, undefined, signal, reportProgress);
-    return Array.isArray(response) ? response : [];
-  });
+  return trackDataActivity(
+    'catalog',
+    async (reportProgress) => {
+      const credentials = source.credentials!;
+      const response =
+        type === 'live'
+          ? await getLiveStreams(credentials, undefined, signal, reportProgress)
+          : type === 'vod'
+            ? await getVodStreams(credentials, undefined, signal, reportProgress)
+            : await getSeries(credentials, undefined, signal, reportProgress);
+      return Array.isArray(response) ? response : [];
+    },
+    { phase: 'fetch-catalog', kind: type },
+  );
 }
 
 /**
@@ -183,12 +187,14 @@ export function providerCatalogCount(sources: EnabledSourcesSnapshot): number {
 /** Fetch each enabled provider list from the network, leaving failed lists in place. */
 export async function refreshProviderCatalogs(
   sources: EnabledSourcesSnapshot,
-  onListSettled: () => void,
+  progress: { onListSettled: () => void; onCatalogStarted?: (kind: CatalogType) => void },
   client: QueryClient = queryClient,
 ): Promise<string[]> {
   const failed = new Map<string, string>();
   const targets = sources.xtreamSources;
+  if (targets.length === 0) return [];
   for (const type of catalogTypes) {
+    progress.onCatalogStarted?.(type);
     const queryKey = queryKeys.catalog(type, sources.queryScope);
     const refreshed = await Promise.allSettled(
       targets.map(async (source) => {
@@ -210,7 +216,7 @@ export async function refreshProviderCatalogs(
           await storeProviderList(source.id, type, source.queryScope, list);
           return { sourceId: source.id, items };
         } finally {
-          onListSettled();
+          progress.onListSettled();
         }
       }),
     );

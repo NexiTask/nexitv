@@ -126,23 +126,28 @@ export function SourcesSettingsSection({
 
   const runRefreshAll = async () => {
     setBusy('refresh-all');
-    const { finish, reportSettled } = beginSourceRefresh(
+    const { finish, reportSettled, setCatalogKind } = beginSourceRefresh(
       providerCatalogCount(sources) + m3uProfiles.length,
     );
     let result: Parameters<typeof finish>[0] = 'failed';
+    let summary: Parameters<typeof finish>[1];
     try {
       const [playlists, xtreamFailures] = await Promise.all([
         refreshAllM3u().then((report) => {
           reportSettled(m3uProfiles.length);
           return report;
         }),
-        refreshProviderCatalogs(sources, reportSettled),
+        refreshProviderCatalogs(sources, {
+          onListSettled: reportSettled,
+          onCatalogStarted: setCatalogKind,
+        }).finally(() => setCatalogKind()),
       ]);
       const unreachable = [...playlists.failed, ...xtreamFailures];
       const reloaded =
         playlists.refreshed.length + sources.xtreamSources.length - xtreamFailures.length;
       const total = m3uProfiles.length + sources.xtreamSources.length;
 
+      summary = { updated: reloaded, failed: unreachable.length, kept: playlists.skipped.length };
       result = unreachable.length ? 'incomplete' : 'complete';
       if (unreachable.length) {
         notify.error(
@@ -168,7 +173,7 @@ export function SourcesSettingsSection({
         ),
       );
     } finally {
-      finish(result);
+      finish(result, summary);
       setBusy(null);
     }
   };

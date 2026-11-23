@@ -90,12 +90,15 @@ function parseDocument(
   document: M3uDocument,
   headers?: Record<string, string>,
 ): Promise<M3uPlaylist> {
-  return trackDataActivity('playlist', () =>
-    parseM3uAsync(document.content, {
-      sourceId: id,
-      baseUrl: document.baseUrl || undefined,
-      headers,
-    }),
+  return trackDataActivity(
+    'playlist',
+    () =>
+      parseM3uAsync(document.content, {
+        sourceId: id,
+        baseUrl: document.baseUrl || undefined,
+        headers,
+      }),
+    { phase: 'parse-playlist' },
   );
 }
 

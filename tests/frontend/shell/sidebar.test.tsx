@@ -7,7 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from '@/app/shell/Sidebar';
 import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
-import { trackDataActivity, type ReportDataProgress } from '@/shared/lib/dataActivity';
+import {
+  trackDataActivity,
+  type ReportDataProgress,
+  type ReportActivityDetail,
+} from '@/shared/lib/dataActivity';
 
 describe('Sidebar', () => {
   const originalMatchMedia = window.matchMedia;
@@ -42,6 +46,7 @@ describe('Sidebar', () => {
     let finishCatalog!: () => void;
     let failIndex!: (error: Error) => void;
     let reportIndex!: ReportDataProgress;
+    let reportIndexDetail!: ReportActivityDetail;
 
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
@@ -67,10 +72,11 @@ describe('Sidebar', () => {
         );
         index = trackDataActivity(
           'index',
-          (reportProgress) =>
+          (reportProgress, reportDetail) =>
             new Promise<void>((_, reject) => {
               failIndex = reject;
               reportIndex = reportProgress;
+              reportIndexDetail = reportDetail;
             }),
         );
       });
@@ -85,10 +91,17 @@ describe('Sidebar', () => {
       act(() => useSettingsStore.setState({ sidebarCollapsed: true }));
       expect(screen.getByTitle('Loading the provider catalog…')).toBeTruthy();
 
-      act(() => reportIndex(25));
+      act(() => {
+        reportIndex(25);
+        reportIndexDetail({ phase: 'index-titles', kind: 'vod', completed: 1000, total: 4000 });
+      });
       const progress = screen.getByRole('progressbar', { name: 'Indexing titles…' });
       expect(progress.getAttribute('aria-valuenow')).toBe('25');
-      expect(screen.getByTitle('Indexing titles… 25%').contains(progress)).toBe(true);
+      expect(
+        screen
+          .getByTitle('Indexing titles… · 25% · Movies · 1,000 of 4,000 titles indexed')
+          .contains(progress),
+      ).toBe(true);
       expect(screen.getByText('25%')).toBeTruthy();
 
       await act(async () => {
@@ -97,8 +110,12 @@ describe('Sidebar', () => {
       });
       expect(screen.queryByText('Loading the provider catalog…')).toBeNull();
       expect(screen.getByRole('progressbar', { name: 'Indexing titles…' })).toBe(progress);
-      act(() => reportIndex(null));
-      expect(status.textContent).toBe('Preparing the library index…');
+      act(() => {
+        reportIndex(null);
+        reportIndexDetail({ phase: 'sort-titles', kind: 'vod' });
+      });
+      expect(screen.getByText('Preparing the library index…')).toBeTruthy();
+      expect(screen.getByText('Movies · Sorting titles by name')).toBeTruthy();
       expect(screen.queryByRole('progressbar')).toBeNull();
 
       await act(async () => {

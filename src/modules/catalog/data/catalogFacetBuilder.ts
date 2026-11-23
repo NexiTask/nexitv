@@ -2,7 +2,11 @@ import { tauriApi, type CatalogPageKind } from '@/platform/tauri';
 import { perfLog } from '@/platform/perf';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 import { getErrorMessage } from '@/shared/lib/error';
-import { trackDataActivity, type ReportDataProgress } from '@/shared/lib/dataActivity';
+import {
+  trackDataActivity,
+  type ReportDataProgress,
+  type ReportActivityDetail,
+} from '@/shared/lib/dataActivity';
 import {
   runCatalogFacetTask,
   type CatalogFacetTask,
@@ -86,6 +90,7 @@ async function buildSource(
   kind: CatalogPageKind,
   source: FacetBuildSource,
   reportProgress?: ReportDataProgress,
+  reportDetail?: ReportActivityDetail,
 ): Promise<boolean> {
   let stored = false;
   let attempts = 0;
@@ -106,6 +111,7 @@ async function buildSource(
       total = batch.remaining;
       processed = 0;
       reportProgress?.(total > 0 ? 0 : null);
+      if (total > 0) reportDetail?.({ phase: 'index-titles', kind, completed: 0, total });
     }
     const saved = await tauriApi.catalogIndexStoreFacets(
       source.id,
@@ -119,11 +125,16 @@ async function buildSource(
       // the next batch means the native side must count the remaining rows again.
       progressGeneration = batch.generation + 1;
       processed += batch.facets.length;
-      if (total > 0) reportProgress?.(Math.floor((Math.min(total, processed) / total) * 100));
+      if (total > 0) {
+        const completed = Math.min(total, processed);
+        reportProgress?.(Math.floor((completed / total) * 100));
+        reportDetail?.({ phase: 'index-titles', kind, completed, total });
+      }
     } else {
       attempts += 1;
       progressGeneration = undefined;
       reportProgress?.(null);
+      reportDetail?.({ phase: 'index-titles', kind });
     }
   }
   return stored;
@@ -145,16 +156,26 @@ async function build(
   kind: CatalogPageKind,
   sources: FacetBuildSource[],
   reportProgress: ReportDataProgress,
+  reportDetail: ReportActivityDetail,
 ): Promise<void> {
   const start = performance.now();
   let changed = false;
   try {
     for (const source of sources) {
-      if (await buildSource(kind, source, sources.length === 1 ? reportProgress : undefined)) {
+      const singleSource = sources.length === 1;
+      if (
+        await buildSource(
+          kind,
+          source,
+          singleSource ? reportProgress : undefined,
+          singleSource ? reportDetail : undefined,
+        )
+      ) {
         changed = true;
       }
     }
     reportProgress(null);
+    reportDetail({ phase: 'sort-titles', kind });
     if (await buildRanks(kind)) changed = true;
   } catch (error: unknown) {
     debugLog.warn('api', 'Catalogue index facets were not built', {
@@ -180,8 +201,10 @@ export function buildCatalogFacets(
     rerun.set(kind, sources);
     return running;
   }
-  const run = trackDataActivity('index', (reportProgress) =>
-    build(kind, sources, reportProgress),
+  const run = trackDataActivity(
+    'index',
+    (reportProgress, reportDetail) => build(kind, sources, reportProgress, reportDetail),
+    { phase: 'index-titles', kind },
   ).finally(() => {
     runs.delete(kind);
     const next = rerun.get(kind);

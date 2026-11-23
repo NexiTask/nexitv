@@ -349,11 +349,17 @@ describe('source-scoped catalog and category queries', () => {
       xc.getVodStreams.mockRejectedValue(new Error('Movies temporarily unavailable'));
       xc.getSeries.mockResolvedValue(series);
       const settled = vi.fn();
+      const started = vi.fn();
 
-      await expect(refreshProviderCatalogs(sources(), settled, client)).resolves.toEqual([
-        'Provider',
-      ]);
+      await expect(
+        refreshProviderCatalogs(
+          sources(),
+          { onListSettled: settled, onCatalogStarted: started },
+          client,
+        ),
+      ).resolves.toEqual(['Provider']);
       expect(settled).toHaveBeenCalledTimes(3);
+      expect(started.mock.calls).toEqual([['live'], ['vod'], ['series']]);
       expect(disk.loadProviderList).not.toHaveBeenCalled();
       expect(disk.storeProviderList.mock.calls).toEqual([
         ['xtream-one', 'live', 'xtream-scope', live],
