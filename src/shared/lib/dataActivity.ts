@@ -4,10 +4,12 @@ export type DataActivity = 'catalog' | 'index' | 'playlist' | 'guide';
 
 type SourceRefreshResult = 'complete' | 'incomplete' | 'failed';
 type SourceRefresh = { phase: 'refreshing' | SourceRefreshResult; percent?: number };
+type ImdbImport = { phase: 'importing' | 'ratings' | 'titles' | 'matching'; percent?: number };
 export type ReportDataProgress = (percent: number | null) => void;
 type Progress = { activity: DataActivity; percent: number };
 type DataActivities = Record<DataActivity, number> & {
   sourceRefresh: SourceRefresh | null;
+  imdbImport: ImdbImport | null;
   progress: ReadonlyMap<symbol, Progress>;
 };
 
@@ -19,6 +21,7 @@ export const useDataActivities = create<DataActivities>(() => ({
   playlist: 0,
   guide: 0,
   sourceRefresh: null,
+  imdbImport: null,
   progress: new Map(),
 }));
 

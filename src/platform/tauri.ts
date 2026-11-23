@@ -1,8 +1,15 @@
 import { invoke } from '@tauri-apps/api/core';
 
+export interface ImdbRefreshEvent {
+  stage: string;
+  dataset?: 'ratings' | 'titles' | null;
+  percent?: number | null;
+}
+
 /** The IMDb pipeline's state (metadata/imdb.rs). Unix seconds where set. */
 export interface ImdbRefreshStatus {
   running: boolean;
+  importProgress: ImdbRefreshEvent | null;
   /** The automatic refresh (weekly dumps, daily backfill) is on. */
   enabled: boolean;
   lastRefresh: number | null;

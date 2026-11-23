@@ -64,6 +64,14 @@ fn facets_timed_out() -> String {
 }
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
+static IMPORT_PROGRESS: Mutex<Option<ImportProgress>> = Mutex::new(None);
+
+#[derive(Clone, Copy, Serialize)]
+pub struct ImportProgress {
+    stage: &'static str,
+    dataset: Option<&'static str>,
+    percent: Option<u64>,
+}
 
 fn database_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let directory = app
@@ -320,11 +328,7 @@ async fn run_refresh(app: tauri::AppHandle, manual: bool) -> Result<usize, Strin
         return Err("An IMDb refresh is already running".to_string());
     }
     let outcome = refresh_locked(&app, manual).await;
-    RUNNING.store(false, Ordering::SeqCst);
-    if outcome.is_err() {
-        // Followers that announced the run must hear that it ended.
-        emit(&app, "failed", None);
-    }
+    finish_run(&app, outcome.is_ok(), false);
     outcome
 }
 
@@ -340,7 +344,7 @@ async fn refresh_locked(app: &tauri::AppHandle, manual: bool) -> Result<usize, S
         }
     }
     // Only a run that will actually work is announced.
-    emit(&app, "checking", None);
+    emit_import(&app, "checking", None, None);
     // A pass started mid-build (a schema bump, a fresh list) waits for the
     // facet worker, or the dumps would be filtered to part of the catalogue.
     let waited = Instant::now();
@@ -356,9 +360,21 @@ async fn refresh_locked(app: &tauri::AppHandle, manual: bool) -> Result<usize, S
     }
 
     let cache = cache_directory(&app)?;
-    download_dump(&app, RATINGS_URL, &cache.join("title.ratings.tsv.gz.new")).await?;
-    download_dump(&app, BASICS_URL, &cache.join("title.basics.tsv.gz.new")).await?;
-    emit(&app, "parsing", None);
+    download_dump(
+        &app,
+        RATINGS_URL,
+        &cache.join("title.ratings.tsv.gz.new"),
+        "ratings",
+    )
+    .await?;
+    download_dump(
+        &app,
+        BASICS_URL,
+        &cache.join("title.basics.tsv.gz.new"),
+        "titles",
+    )
+    .await?;
+    emit_import(&app, "parsing", None, None);
     let parse_cache = cache.clone();
     let parse_database = database_path(&app)?;
     let titles = tauri::async_runtime::spawn_blocking(move || {
@@ -367,6 +383,7 @@ async fn refresh_locked(app: &tauri::AppHandle, manual: bool) -> Result<usize, S
     .await
     .map_err(|error| format!("IMDb parse failed: {error}"))??;
 
+    emit_import(&app, "matching", None, None);
     let matched = backfill(&app)?;
     with_connection(&app, |connection| {
         meta_set(connection, "last_refresh", now_secs());
@@ -387,7 +404,6 @@ async fn refresh_locked(app: &tauri::AppHandle, manual: bool) -> Result<usize, S
         Some(start.elapsed().as_millis()),
         &format!("titles={titles} matched={matched}"),
     );
-    emit(&app, "done", Some(titles as u64));
     Ok(matched)
 }
 
@@ -395,7 +411,9 @@ async fn download_dump(
     app: &tauri::AppHandle,
     url: &str,
     dest: &std::path::Path,
+    dataset: &'static str,
 ) -> Result<(), String> {
+    emit_import(app, "downloading", Some(dataset), None);
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(1800))
         .build()
@@ -409,6 +427,7 @@ async fn download_dump(
     let mut file = std::fs::File::create(dest)
         .map_err(|error| format!("Could not write the IMDb dump: {error}"))?;
     let mut received = 0u64;
+    let total = response.content_length();
     let mut last_emit: Option<Instant> = None;
     while let Some(chunk) = response
         .chunk()
@@ -422,10 +441,20 @@ async fn download_dump(
         // events a second are all the webview needs.
         if last_emit.map_or(true, |at| at.elapsed() >= DOWNLOAD_EMIT_EVERY) {
             last_emit = Some(Instant::now());
-            emit(app, "downloading", Some(received));
+            emit_import(
+                app,
+                "downloading",
+                Some(dataset),
+                download_percent(received, total),
+            );
         }
     }
-    emit(app, "downloading", Some(received));
+    emit_import(
+        app,
+        "downloading",
+        Some(dataset),
+        download_percent(received, total),
+    );
     Ok(())
 }
 
@@ -437,7 +466,7 @@ fn run_rematch(app: &tauri::AppHandle) -> Result<usize, String> {
         return Err("An IMDb refresh is already running".to_string());
     }
     let outcome = rematch_locked(app);
-    RUNNING.store(false, Ordering::SeqCst);
+    finish_run(app, outcome.is_ok(), true);
     outcome
 }
 
@@ -781,9 +810,6 @@ fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
         Ok(())
     })?;
     catalog_index::invalidate_imdb_facets();
-    // Index-backed pages reload with the new matches (a full refresh emits
-    // its own 'done' after this one; an extra invalidation is harmless).
-    emit(app, "done", None);
     crate::perf::log(
         "imdb:backfill",
         Some(start.elapsed().as_millis()),
@@ -878,17 +904,53 @@ fn resync_matched(app: &tauri::AppHandle) -> Result<usize, String> {
     Ok(changed)
 }
 
-fn emit(app: &tauri::AppHandle, stage: &str, progress: Option<u64>) {
-    let _ = app.emit(
-        "imdb://refresh",
-        serde_json::json!({ "stage": stage, "progress": progress }),
-    );
+fn download_percent(received: u64, total: Option<u64>) -> Option<u64> {
+    let total = total.filter(|total| *total > 0 && received <= *total)?;
+    Some((u128::from(received) * 100 / u128::from(total)) as u64)
+}
+
+fn emit_import(
+    app: &tauri::AppHandle,
+    stage: &'static str,
+    dataset: Option<&'static str>,
+    percent: Option<u64>,
+) {
+    let progress = ImportProgress {
+        stage,
+        dataset,
+        percent,
+    };
+    let mut current = IMPORT_PROGRESS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    *current = Some(progress);
+    let _ = app.emit("imdb://refresh", progress);
+}
+
+fn finish_run(app: &tauri::AppHandle, succeeded: bool, rematch: bool) {
+    let mut current = IMPORT_PROGRESS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    let imported = current.take().is_some();
+    RUNNING.store(false, Ordering::SeqCst);
+    if imported || (rematch && succeeded) {
+        let stage = if succeeded { "done" } else { "failed" };
+        let _ = app.emit(
+            "imdb://refresh",
+            ImportProgress {
+                stage,
+                dataset: None,
+                percent: None,
+            },
+        );
+    }
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RefreshStatus {
     pub running: bool,
+    pub import_progress: Option<ImportProgress>,
     pub enabled: bool,
     pub last_refresh: Option<u64>,
     pub titles: Option<u64>,
@@ -922,8 +984,12 @@ fn status(app: &tauri::AppHandle) -> Result<RefreshStatus, String> {
         ))
     })?;
     let (matched, total) = (matched as u64, total as u64);
+    let import_progress = *IMPORT_PROGRESS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
     Ok(RefreshStatus {
         running: RUNNING.load(Ordering::SeqCst),
+        import_progress,
         enabled,
         last_refresh,
         titles,
@@ -1003,6 +1069,15 @@ pub(crate) fn schedule(app: tauri::AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn download_percent_requires_a_reliable_total() {
+        assert_eq!(download_percent(1, Some(3)), Some(33));
+        assert_eq!(download_percent(u64::MAX, Some(u64::MAX)), Some(100));
+        assert_eq!(download_percent(1, None), None);
+        assert_eq!(download_percent(0, Some(0)), None);
+        assert_eq!(download_percent(4, Some(3)), None);
+    }
 
     #[test]
     fn the_rematch_waits_a_day_unless_the_lists_changed() {

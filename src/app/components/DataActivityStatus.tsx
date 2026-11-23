@@ -92,6 +92,13 @@ export function DataActivityStatus({ compact }: { compact: boolean }) {
     if (counts[activity] === 1) progress.set(activity, percent);
   }
   const refresh = counts.sourceRefresh?.phase;
+  const imdbImport = counts.imdbImport;
+  const imdbLabels = {
+    importing: t('Importing IMDb data…'),
+    ratings: t('Downloading IMDb ratings…'),
+    titles: t('Downloading IMDb titles…'),
+    matching: t('Matching IMDb ratings…'),
+  };
   const refreshLabels = {
     refreshing: t('Refreshing sources…'),
     complete: t('Sources Refreshed'),
@@ -114,6 +121,13 @@ export function DataActivityStatus({ compact }: { compact: boolean }) {
         active.length > 0 && (
           <ActivityLabels active={active} compact={compact} progress={progress} />
         )
+      )}
+      {imdbImport && (
+        <ActivityRow
+          label={imdbLabels[imdbImport.phase]}
+          compact={compact}
+          percent={imdbImport.percent}
+        />
       )}
     </div>
   );
