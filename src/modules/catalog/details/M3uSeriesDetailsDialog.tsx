@@ -360,7 +360,7 @@ export function M3uSeriesDetailsDialog({
                 availableEpisodeKeys={availableEpisodeKeys}
                 onViewSchedule={() => {
                   onClose();
-                  navigate('/upcoming');
+                  navigate('/library/upcoming');
                 }}
               />
             </div>

@@ -7,6 +7,8 @@ export const DE_MESSAGES: Record<string, string> = {
   // Global navigation and common actions
   Home: 'Start',
   Browse: 'Entdecken',
+  'Show Coming Up in Library and announced episodes in the details of favorite series.':
+    'Zeigt „Demnächst“ in der Bibliothek und angekündigte Folgen in den Details zu Lieblingsserien an.',
   Library: 'Bibliothek',
   'Live TV': 'Live-TV',
   'TV Guide': 'TV-Programm',

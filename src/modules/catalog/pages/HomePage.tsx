@@ -196,7 +196,7 @@ export function HomePage() {
           <UpcomingReleaseCard
             key={id}
             onOpen={handleItemClick}
-            onViewAll={() => navigate('/upcoming')}
+            onViewAll={() => navigate('/library/upcoming')}
             showEmpty
           />
         );

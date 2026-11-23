@@ -26,7 +26,7 @@ export function ComingUpSettingsSection() {
       >
         <SettingsRow
           title="Enable Coming Up"
-          description="Show the Coming Up workspace and append announced episodes to the details of favorite series."
+          description="Show Coming Up in Library and announced episodes in the details of favorite series."
         >
           <SettingsToggle
             label="Enable Coming Up"

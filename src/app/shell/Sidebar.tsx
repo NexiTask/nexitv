@@ -1,7 +1,5 @@
 import { LibraryBig, PanelLeftClose, PanelLeft } from 'lucide-react';
 import {
-  RiCalendarScheduleFill,
-  RiCalendarScheduleLine,
   RiDownload2Fill,
   RiDownload2Line,
   RiHome5Fill,
@@ -37,7 +35,6 @@ export function Sidebar() {
   const isCompactViewport = useMediaQuery(COMPACT_NAVIGATION_QUERY);
   const isCollapsed = storedCollapsed || isCompactViewport;
   const showCollapsedSidebarBadges = useSettingsStore((state) => state.showCollapsedSidebarBadges);
-  const upcomingEnabled = useSettingsStore((state) => state.upcomingEnabled);
   const updateSetting = useSettingsStore((state) => state.updateSetting);
   const setIsCollapsed = (collapsed: boolean) => updateSetting('sidebarCollapsed', collapsed);
 
@@ -76,16 +73,6 @@ export function Sidebar() {
       path: '/library',
       badge: 0,
     },
-    ...(upcomingEnabled
-      ? [
-          {
-            icons: { line: RiCalendarScheduleLine, fill: RiCalendarScheduleFill },
-            label: 'Coming Up',
-            path: '/upcoming',
-            badge: 0,
-          },
-        ]
-      : []),
     {
       icons: { line: RiDownload2Line, fill: RiDownload2Fill },
       label: 'Downloads',

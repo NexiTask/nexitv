@@ -5,6 +5,8 @@
 export const IT_MESSAGES: Record<string, string> = {
   Home: 'Pagina iniziale',
   Browse: 'Sfoglia',
+  'Show Coming Up in Library and announced episodes in the details of favorite series.':
+    'Mostra le prossime uscite nella raccolta e gli episodi annunciati nei dettagli delle serie preferite.',
   Library: 'Biblioteca',
   'Live TV': 'TV in diretta',
   'TV Guide': 'Guida televisiva',

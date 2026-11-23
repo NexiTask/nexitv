@@ -33,6 +33,9 @@ vi.mock('@/modules/playback/hooks/usePlayerContextMenus', () => ({
 vi.mock('@/modules/downloads/hooks/useDownloadEvents', () => ({
   useDownloadEvents: vi.fn(),
 }));
+vi.mock('@/modules/guide/data/useUpcomingReleases', () => ({
+  useUpcomingReleases: () => ({ data: [], dataUpdatedAt: 0, isLoading: false, refetch: vi.fn() }),
+}));
 vi.mock('@/modules/catalog/pages/HomePage', () => ({
   HomePage: () => <div>Mock home</div>,
 }));
@@ -240,6 +243,50 @@ describe('application shell', () => {
 
     expect(await screen.findByRole('heading', { name: 'Continue Watching' })).toBeTruthy();
     expect(window.location.pathname).toBe('/library/continue');
+  });
+
+  it('opens the Coming Up calendar in Library and hides its link when disabled', async () => {
+    await preloadRouteModule('/library/upcoming');
+    window.history.replaceState({}, '', '/upcoming');
+    useLibraryStore.setState({
+      favorites: [{ id: 'show', title: 'Example Show', posterUrl: '', type: 'series' }],
+    });
+    useSettingsStore.setState({
+      upcomingEnabled: true,
+      upcomingCalendarEnabled: true,
+      tmdbEnabled: true,
+      tmdbApiKey: 'fixture',
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Coming Up', level: 1 })).toBeTruthy();
+    expect(window.location.pathname).toBe('/library/upcoming');
+    const library = within(screen.getByRole('complementary', { name: 'Library' }));
+    expect(library.getAllByRole('link').map((link) => link.getAttribute('aria-label'))).toEqual([
+      'Continue Watching',
+      'Watch Next',
+      'Coming Up',
+      'Saved',
+      'Favorites',
+    ]);
+    expect(library.getByRole('link', { name: 'Coming Up' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+
+    await user.click(screen.getByRole('radio', { name: 'Calendar' }));
+    expect(screen.getByRole('region', { name: 'Release calendar' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Next month' }));
+
+    act(() => useSettingsStore.setState({ upcomingCalendarEnabled: false }));
+    expect(screen.queryByRole('radio', { name: 'Calendar' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Release calendar' })).toBeNull();
+
+    act(() => useSettingsStore.setState({ upcomingEnabled: false }));
+    expect(library.queryByRole('link', { name: 'Coming Up' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Coming Up is disabled' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Open Settings' }));
+    await waitFor(() => expect(window.location.search).toBe('?section=coming-up'));
   });
 
   it('restores M3U and Xtream sources in parallel', async () => {

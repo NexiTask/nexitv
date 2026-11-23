@@ -9,7 +9,6 @@ const loaders = {
   '/search': () => import('@/modules/search/pages/SearchPage'),
   '/library': () => import('@/modules/library/pages/LibraryPage'),
   '/downloads': () => import('@/modules/downloads/pages/DownloadsPage'),
-  '/upcoming': () => import('@/modules/guide/pages/UpcomingPage'),
   '/settings': () => import('@/modules/settings/pages/SettingsPage'),
   '/m3u-editor': () => import('@/modules/m3u-editor/pages/M3uEditorPage'),
 } as const;
@@ -46,9 +45,6 @@ export const LibraryPage = lazy(() =>
 );
 export const DownloadsPage = lazy(() =>
   loaders['/downloads']().then((module) => ({ default: module.DownloadsPage })),
-);
-export const UpcomingPage = lazy(() =>
-  loaders['/upcoming']().then((module) => ({ default: module.UpcomingPage })),
 );
 export const SettingsPage = lazy(() =>
   loaders['/settings']().then((module) => ({ default: module.SettingsPage })),

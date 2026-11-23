@@ -17,7 +17,6 @@ import {
   SearchPage,
   SeriesPage,
   SettingsPage,
-  UpcomingPage,
 } from './routeModules';
 
 export function NotFoundPage() {
@@ -62,7 +61,7 @@ export function AppRoutes() {
           <Route path="/favorites" element={<Navigate to="/library/favorites" replace />} />
           <Route path="/collections" element={<Navigate to="/library" replace />} />
           <Route path="/downloads" element={<DownloadsPage />} />
-          <Route path="/upcoming" element={<UpcomingPage />} />
+          <Route path="/upcoming" element={<Navigate to="/library/upcoming" replace />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/m3u-editor/:sourceId?" element={<M3uEditorPage />} />
           <Route path="*" element={<NotFoundPage />} />

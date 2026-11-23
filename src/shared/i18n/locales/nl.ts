@@ -5,6 +5,8 @@
 export const NL_MESSAGES: Record<string, string> = {
   Home: 'Start',
   Browse: 'Blader',
+  'Show Coming Up in Library and announced episodes in the details of favorite series.':
+    'Toont aankomende releases in de bibliotheek en aangekondigde afleveringen bij favoriete series.',
   Library: 'Bibliotheek',
   'Live TV': 'Live-tv',
   'TV Guide': 'TV-gids',

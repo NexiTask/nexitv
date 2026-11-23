@@ -5,6 +5,7 @@ import { isQueuedEpisode, useLibraryStore } from '../store/useLibraryStore';
 import { CatalogViewToggle } from '@/modules/catalog/public/components/CatalogViewToggle';
 import {
   Bookmark,
+  CalendarClock,
   Heart,
   FolderHeart,
   History,
@@ -26,6 +27,7 @@ import { Button, IconButton } from '@/shared/ui/Button';
 import { DialogShell } from '@/shared/ui/DialogShell';
 import { MediaDetailsDialogs } from '@/modules/catalog/public/details/MediaDetailsDialogs';
 import { useMediaDetailState } from '@/modules/catalog/public/hooks/useMediaDetailsState';
+import { UpcomingSchedule } from '@/modules/guide/public/components/UpcomingSchedule';
 import { useWatchNext } from '@/modules/catalog/public/data/useWatchNext';
 import { ContinueWatchingList } from './ContinueWatchingList';
 import { WatchNextList } from './WatchNextList';
@@ -44,6 +46,7 @@ export function LibraryPage() {
   const createCollection = useLibraryStore((state) => state.createCollection);
   const renameCollection = useLibraryStore((state) => state.renameCollection);
   const deleteCollection = useLibraryStore((state) => state.deleteCollection);
+  const upcomingEnabled = useSettingsStore((state) => state.upcomingEnabled);
   const sidebarWidth = useSettingsStore((state) => state.sidebarWidth);
   const lastCollectionId = useSettingsStore((state) => state.lastCollectionId);
   const updateSetting = useSettingsStore((state) => state.updateSetting);
@@ -59,6 +62,11 @@ export function LibraryPage() {
       name: 'Watch Next',
       icon: ListVideo,
       items: watchNext.items,
+    },
+    {
+      id: 'upcoming',
+      name: 'Coming Up',
+      icon: CalendarClock,
     },
     {
       id: 'saved',
@@ -77,12 +85,16 @@ export function LibraryPage() {
       emptyDescription: 'Use the heart on a movie, series, or live channel to add it to Favorites.',
     },
   ];
+  const visibleBuiltInLists = builtInLists.filter(
+    (list) => upcomingEnabled || list.id !== 'upcoming',
+  );
   const builtInList = builtInLists.find((list) => list.id === listId);
   const activeCollection = builtInList
     ? undefined
     : collections.find((collection) => collection.id === listId);
   const selectedList = builtInList ?? activeCollection;
-  const selectedCollectionId = selectedList?.id;
+  const selectedCollectionId =
+    listId === 'upcoming' && !upcomingEnabled ? undefined : selectedList?.id;
 
   useEffect(() => {
     if (selectedCollectionId !== undefined && selectedCollectionId !== lastCollectionId) {
@@ -91,7 +103,7 @@ export function LibraryPage() {
   }, [selectedCollectionId, lastCollectionId, updateSetting]);
 
   const { selectedMovie, selectedSeries, handleCloseMovie, handleCloseSeries, handleItemClick } =
-    useMediaDetailState({ enableSourceOnOpen: true });
+    useMediaDetailState({ enableSourceOnOpen: listId !== 'upcoming' });
 
   // Modal states for Create, Rename, Delete
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -105,12 +117,12 @@ export function LibraryPage() {
   if (!selectedList) {
     const lastList =
       listId === undefined &&
-      (builtInLists.some((list) => list.id === lastCollectionId) ||
+      (visibleBuiltInLists.some((list) => list.id === lastCollectionId) ||
         collections.some((collection) => collection.id === lastCollectionId));
     return <Navigate to={`/library/${lastList ? lastCollectionId : 'saved'}`} replace />;
   }
 
-  const { items } = selectedList;
+  const { items = [] } = selectedList;
 
   const openCreateModal = () => {
     setNewCollectionName('');
@@ -172,7 +184,7 @@ export function LibraryPage() {
             </Button>
           }
         >
-          {builtInLists.map(({ id, name, icon: Icon, items }) => (
+          {visibleBuiltInLists.map(({ id, name, icon: Icon, items }) => (
             <NavLink
               key={id}
               to={`/library/${id}`}
@@ -182,9 +194,11 @@ export function LibraryPage() {
             >
               <Icon size={16} className={styles.listIcon} aria-hidden="true" />
               <span className={styles.collectionName}>{t(name)}</span>
-              <span className={styles.collectionCount} aria-hidden="true">
-                {number(items.length)}
-              </span>
+              {items && (
+                <span className={styles.collectionCount} aria-hidden="true">
+                  {number(items.length)}
+                </span>
+              )}
             </NavLink>
           ))}
           {collections.map((collection) => (
@@ -208,6 +222,8 @@ export function LibraryPage() {
             <ContinueWatchingList items={resumeItems} onItemClick={handleItemClick} />
           ) : listId === 'watch-next' ? (
             <WatchNextList queue={watchNext} onItemClick={handleItemClick} />
+          ) : listId === 'upcoming' ? (
+            <UpcomingSchedule onOpen={handleItemClick} />
           ) : (
             <>
               <CatalogPageHeader

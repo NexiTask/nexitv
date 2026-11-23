@@ -835,7 +835,7 @@ function XtreamSeriesDetailsDialog({
                     availableEpisodeKeys={availableEpisodeKeys}
                     onViewSchedule={() => {
                       onClose();
-                      navigate('/upcoming');
+                      navigate('/library/upcoming');
                     }}
                   />
                 </div>

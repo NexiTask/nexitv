@@ -212,22 +212,13 @@ describe('Sidebar', () => {
     const library = within(screen.getByRole('navigation', { name: 'Library' }));
     expect(library.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
       '/library',
-      '/upcoming',
       '/downloads',
     ]);
     const link = library.getByRole('link', { name: 'Library' });
     expect(link.getAttribute('href')).toBe('/library');
     expect(link.getAttribute('aria-current')).toBe('page');
     expect(library.queryByRole('link', { name: 'Favorites' })).toBeNull();
-    expect(library.queryByRole('link', { name: 'Collections' })).toBeNull();
-  });
-
-  it('hides the Coming Up workspace when its master preference is disabled', () => {
-    useSettingsStore.setState({ upcomingEnabled: false, sidebarCollapsed: false });
-
-    renderSidebar();
-
-    expect(screen.queryByRole('link', { name: 'Coming Up' })).toBeNull();
+    expect(library.queryByRole('link', { name: 'Coming Up' })).toBeNull();
   });
 
   it('uses the compact rail without changing the saved normal-width preference', () => {

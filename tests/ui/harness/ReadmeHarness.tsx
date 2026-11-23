@@ -32,7 +32,6 @@ import { MoviesPage } from '@/modules/catalog/pages/MoviesPage';
 import { SearchPage } from '@/modules/search/pages/SearchPage';
 import { SeriesPage } from '@/modules/catalog/pages/SeriesPage';
 import { SettingsPage } from '@/modules/settings/pages/SettingsPage';
-import { UpcomingPage } from '@/modules/guide/pages/UpcomingPage';
 import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import {
   useAuthStore,
@@ -1235,7 +1234,12 @@ function Surface({ surface }: { surface: ReadmeSurface | ReadmeFeatureSurface })
   if (surface === 'hero' || surface === 'light-theme') return <HomePage />;
   if (surface === 'movies') return <MoviesPage />;
   if (surface === 'series') return <SeriesPage />;
-  if (surface === 'continue-watching' || surface === 'favorites' || surface === 'collections') {
+  if (
+    surface === 'continue-watching' ||
+    surface === 'favorites' ||
+    surface === 'collections' ||
+    surface === 'upcoming'
+  ) {
     return (
       <Routes>
         <Route path="/library/:listId" element={<LibraryPage />} />
@@ -1245,7 +1249,6 @@ function Surface({ surface }: { surface: ReadmeSurface | ReadmeFeatureSurface })
   if (surface === 'not-found') return <NotFoundPage />;
   if (surface === 'live-tv') return <LiveTvPage />;
   if (surface === 'live-epg') return <EpgPage />;
-  if (surface === 'upcoming') return <UpcomingPage />;
   if (surface === 'search') return <SearchPage />;
   if (surface === 'downloads')
     return (
@@ -1402,7 +1405,7 @@ const ROUTES: Record<ReadmeSurface, string> = {
   'player-series': '/series',
   'library-details': '/movies',
   'series-details': '/series',
-  upcoming: '/upcoming',
+  upcoming: '/library/upcoming',
   search: '/search?q=dune',
   'm3u-editor': `/m3u-editor/${SOURCE_ID}`,
   'm3u-raw-editor': `/m3u-editor/${SOURCE_ID}`,
