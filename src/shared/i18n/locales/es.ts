@@ -844,6 +844,7 @@ export const ES_MESSAGES: Record<string, string> = {
     'No se pudo acceder a ninguna de las direcciones del servidor con estos detalles de cuenta.',
   'Playlist Refreshed': 'Lista de reproducción actualizada',
   'Refresh Failed': 'Error al actualizar',
+  'Refreshing sources…': 'Actualizando fuentes…',
   'Sources Refreshed': 'Fuentes actualizadas',
   'Refresh Incomplete': 'Actualización incompleta',
   'Edited Playlists Kept': 'Listas editadas conservadas',

@@ -10,9 +10,11 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }));
 import { M3uSourceForm } from '@/modules/sources/components/M3uSourceForm';
 import { AccountConnectionForm } from '@/modules/sources/components/AccountConnectionForm';
 import { SourcesSettingsSection } from '@/modules/settings/components/SourcesSettingsSection';
+import { DataActivityStatus } from '@/app/components/DataActivityStatus';
 import { useAuthStore, type XtreamSourceProfile } from '@/modules/sources/store/useAuthStore';
 import { useSourceStore, type M3uSourceProfile } from '@/modules/sources/store/useSourceStore';
 import { useNotificationStore } from '@/shared/notifications/useNotificationStore';
+import { useDataActivities } from '@/shared/lib/dataActivity';
 
 const remoteProfile: M3uSourceProfile = {
   id: 'm3u-12345678',
@@ -70,6 +72,7 @@ beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
   useNotificationStore.setState({ notifications: [] });
+  useDataActivities.setState({ sourceRefresh: null });
   useAuthStore.setState({
     profiles: [],
     runtimes: {},
@@ -182,7 +185,13 @@ describe('unified source settings', () => {
 
   it('refreshes every source from one button and keeps protected edits', async () => {
     const refreshSource = vi.fn().mockResolvedValue(undefined);
-    const testSource = vi.fn().mockResolvedValue(undefined);
+    let finishConnectionCheck!: () => void;
+    const testSource = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishConnectionCheck = resolve;
+        }),
+    );
     const editedProfile: M3uSourceProfile = {
       ...remoteProfile,
       id: 'm3u-87654321',
@@ -220,13 +229,21 @@ describe('unified source settings', () => {
       },
       testSource,
     });
-    render(<SourcesSettingsSection {...emptyProps} />);
+    render(
+      <>
+        <DataActivityStatus compact={false} />
+        <SourcesSettingsSection {...emptyProps} />
+      </>,
+    );
 
     await userEvent.click(screen.getByRole('button', { name: 'Refresh All' }));
 
     await waitFor(() => expect(refreshSource).toHaveBeenCalledWith(remoteProfile.id));
     expect(refreshSource).not.toHaveBeenCalledWith(editedProfile.id);
     expect(testSource).toHaveBeenCalledWith(xtreamProfile.id);
+    expect(screen.getByRole('status').textContent).toBe('Refreshing sources…');
+    finishConnectionCheck();
+    expect(await screen.findByText('Sources Refreshed')).toBeTruthy();
 
     // The store keeps notifications newest first.
     const messages = useNotificationStore.getState().notifications;
@@ -265,6 +282,7 @@ describe('unified source settings', () => {
     expect(message?.type).toBe('error');
     expect(message?.title).toBe('Refresh Incomplete');
     expect(message?.message).toBe('0 of 1 sources reloaded. Could not reach: Living Room');
+    expect(useDataActivities.getState().sourceRefresh?.phase).toBe('incomplete');
   });
 
   it('offers no refresh entry point until a source exists', () => {

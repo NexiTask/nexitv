@@ -866,6 +866,7 @@ export const DE_MESSAGES: Record<string, string> = {
     'Keine der Serveradressen konnte mit diesen Kontodaten erreicht werden.',
   'Playlist Refreshed': 'Wiedergabeliste aktualisiert',
   'Refresh Failed': 'Aktualisierung fehlgeschlagen',
+  'Refreshing sources…': 'Quellen werden aktualisiert…',
   'Sources Refreshed': 'Quellen aktualisiert',
   'Refresh Incomplete': 'Aktualisierung unvollständig',
   'Edited Playlists Kept': 'Bearbeitete Wiedergabelisten behalten',

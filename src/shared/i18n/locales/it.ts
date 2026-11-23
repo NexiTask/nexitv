@@ -841,6 +841,7 @@ export const IT_MESSAGES: Record<string, string> = {
     "Non è stato possibile raggiungere nessuno degli indirizzi del server con questi dettagli dell'account.",
   'Playlist Refreshed': 'Playlist aggiornata',
   'Refresh Failed': 'Aggiornamento non riuscito',
+  'Refreshing sources…': 'Aggiornamento delle fonti…',
   'Sources Refreshed': 'Fonti aggiornate',
   'Refresh Incomplete': 'Aggiornamento incompleto',
   'Edited Playlists Kept': 'Playlist modificate mantenute',

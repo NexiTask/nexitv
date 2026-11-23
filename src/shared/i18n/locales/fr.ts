@@ -850,6 +850,7 @@ export const FR_MESSAGES: Record<string, string> = {
     "Aucune des adresses de serveur n'a pu être atteinte avec ces détails de compte.",
   'Playlist Refreshed': 'Liste de lecture actualisée',
   'Refresh Failed': "Échec de l'actualisation",
+  'Refreshing sources…': 'Actualisation des sources…',
   'Sources Refreshed': 'Sources actualisées',
   'Refresh Incomplete': 'Actualisation incomplète',
   'Edited Playlists Kept': 'Playlists modifiées conservées',

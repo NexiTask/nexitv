@@ -20,6 +20,7 @@ import {
   type M3uSourceProfile,
 } from '@/modules/sources/public/store/useSourceStore';
 import { getUserFacingErrorMessage } from '@/shared/lib/error';
+import { beginSourceRefresh } from '@/shared/lib/dataActivity';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import {
   SettingsButton,
@@ -119,6 +120,8 @@ export function SourcesSettingsSection({
 
   const runRefreshAll = async () => {
     setBusy('refresh-all');
+    const finishRefresh = beginSourceRefresh();
+    let result: Parameters<typeof finishRefresh>[0] = 'failed';
     try {
       const [playlists, xtreamResults] = await Promise.all([
         refreshAllM3u(),
@@ -131,6 +134,7 @@ export function SourcesSettingsSection({
       const reloaded = playlists.refreshed.length + xtreamProfiles.length - xtreamFailures.length;
       const total = m3uProfiles.length + xtreamProfiles.length;
 
+      result = unreachable.length ? 'incomplete' : 'complete';
       if (unreachable.length) {
         notify.error(
           'Refresh Incomplete',
@@ -155,6 +159,7 @@ export function SourcesSettingsSection({
         ),
       );
     } finally {
+      finishRefresh(result);
       setBusy(null);
     }
   };

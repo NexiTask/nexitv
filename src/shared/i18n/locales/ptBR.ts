@@ -843,6 +843,7 @@ export const PT_BR_MESSAGES: Record<string, string> = {
     'Nenhum dos endereços do servidor pôde ser alcançado com esses detalhes da conta.',
   'Playlist Refreshed': 'Lista de reprodução atualizada',
   'Refresh Failed': 'Falha na atualização',
+  'Refreshing sources…': 'Atualizando fontes…',
   'Sources Refreshed': 'Fontes atualizadas',
   'Refresh Incomplete': 'Atualização incompleta',
   'Edited Playlists Kept': 'Playlists editadas mantidas',

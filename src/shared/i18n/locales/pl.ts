@@ -838,6 +838,7 @@ export const PL_MESSAGES: Record<string, string> = {
     'Za pomocą tych danych konta nie można było uzyskać dostępu do żadnego z adresów serwerów.',
   'Playlist Refreshed': 'Playlista odświeżona',
   'Refresh Failed': 'Odświeżanie nie powiodło się',
+  'Refreshing sources…': 'Odświeżanie źródeł…',
   'Sources Refreshed': 'Źródła odświeżone',
   'Refresh Incomplete': 'Odświeżanie niepełne',
   'Edited Playlists Kept': 'Zachowano edytowane playlisty',

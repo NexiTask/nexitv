@@ -846,6 +846,7 @@ export const NL_MESSAGES: Record<string, string> = {
     'Met deze accountgegevens kon geen van de serveradressen worden bereikt.',
   'Playlist Refreshed': 'Afspeellijst vernieuwd',
   'Refresh Failed': 'Vernieuwen mislukt',
+  'Refreshing sources…': 'Bronnen vernieuwen…',
   'Sources Refreshed': 'Bronnen ververst',
   'Refresh Incomplete': 'Verversen onvolledig',
   'Edited Playlists Kept': 'Bewerkte afspeellijsten behouden',
