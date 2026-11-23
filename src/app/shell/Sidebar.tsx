@@ -181,8 +181,6 @@ export function Sidebar() {
 
         <div className={styles.divider} />
 
-        {/* LIBRARY */}
-        <div className={styles.groupLabel}>{t('Library')}</div>
         <nav className={styles.navGroup} aria-label={t('Library')}>
           {libraryItems.map((item) => (
             <NavLink

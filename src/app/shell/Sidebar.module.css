@@ -311,25 +311,3 @@
   background-color: var(--border-subtle);
   margin: var(--space-3) 0 var(--space-2);
 }
-
-.groupLabel {
-  width: 100%;
-  max-width: 100%;
-  flex-shrink: 0;
-  height: calc(var(--font-size-caption) + var(--space-3));
-  overflow: hidden;
-  white-space: nowrap;
-  font-size: var(--font-size-caption);
-  line-height: 1;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  padding: 0 var(--space-3) var(--space-2);
-}
-
-.sidebar.collapsed .groupLabel {
-  height: 0;
-  max-width: 0;
-  padding: 0;
-}

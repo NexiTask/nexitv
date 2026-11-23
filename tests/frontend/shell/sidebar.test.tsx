@@ -252,11 +252,12 @@ describe('Sidebar', () => {
     return mediaQuery;
   }
 
-  it('puts Continue Watching and Watch Next first in the Library', () => {
+  it('identifies the Library navigation without a visible heading and lists playback first', () => {
     useSettingsStore.setState({ upcomingEnabled: true, sidebarCollapsed: false });
 
     renderSidebar();
 
+    expect(screen.queryByText('Library')).toBeNull();
     const library = within(screen.getByRole('navigation', { name: 'Library' }));
     expect(library.getAllByRole('link').slice(0, 3)).toEqual([
       library.getByRole('link', { name: 'Continue Watching' }),
