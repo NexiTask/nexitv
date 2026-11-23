@@ -167,6 +167,7 @@ describe('clearAllAppData', () => {
     });
     localStorage.setItem(`movena-m3u-editor-draft-v1:${m3uId}`, 'private playlist');
     localStorage.setItem('movena-m3u-editor-filters-v1', 'private filter');
+    localStorage.setItem('nexitv-watch-next-episodes-v1', 'private series');
     queryClient.setQueryData(['catalog', 'private-source'], [{ id: 'movie-1' }]);
 
     await clearAllAppData();

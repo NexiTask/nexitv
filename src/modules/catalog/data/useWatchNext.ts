@@ -9,6 +9,7 @@ import {
 } from '@/modules/library/public/store/useLibraryStore';
 import { pickWatchNext, regularEpisodeCount } from '../lib/watchNext';
 import { seriesInfoQuery } from './useDetails';
+import { readWatchNextEpisodes } from './watchNextCache';
 
 /** Started shows checked for a next episode at a time (one provider call each). */
 const MAX_CHECKED = 12;
@@ -48,22 +49,28 @@ export function useWatchNext() {
     .sort(([, left], [, right]) => right.lastWatchedAt - left.lastWatchedAt)
     .slice(0, MAX_CHECKED);
 
-  const results = useQueries({
-    queries: candidates.map(([, entry]) => {
-      const sourceId = resolveSourceId(entry.item.sourceId);
-      const credentials = sourceId ? (runtimes[sourceId]?.credentials ?? null) : null;
-      const providerSeriesId = entry.item.seriesSourceItemId || entry.item.sourceItemId;
-      return {
-        ...seriesInfoQuery(providerSeriesId ?? entry.item.id, entry.item.sourceId, credentials),
-        enabled: Boolean(credentials),
-      };
-    }),
+  const queries = candidates.map(([, entry]) => {
+    const sourceId = resolveSourceId(entry.item.sourceId);
+    const credentials = sourceId ? (runtimes[sourceId]?.credentials ?? null) : null;
+    const providerSeriesId = entry.item.seriesSourceItemId || entry.item.sourceItemId;
+    return {
+      ...seriesInfoQuery(providerSeriesId ?? entry.item.id, entry.item.sourceId, credentials),
+      enabled: Boolean(credentials),
+    };
   });
+  const results = useQueries({ queries });
 
   const items = [...queued];
   const bookkeeping: Bookkeeping[] = [];
+  let savedEpisodes: ReturnType<typeof readWatchNextEpisodes> | undefined;
   candidates.forEach(([id, entry], index) => {
-    const episodes = results[index]?.data?.episodes;
+    const query = queries[index];
+    let episodes = results[index]?.data?.episodes;
+    // Keep dismissal counts tied to the provider response, even on a cold start.
+    if (!episodes && !entry.muted && query?.enabled) {
+      savedEpisodes ??= readWatchNextEpisodes();
+      episodes = savedEpisodes.get(JSON.stringify(query.queryKey));
+    }
     if (!episodes) return;
     const total = regularEpisodeCount(episodes);
     if (entry.muted) {

@@ -31,6 +31,7 @@ const PERSISTED_STORAGE_KEYS = [
   'movena-downloads-v1',
   'iptv-search-storage',
   'movena-stream-verification',
+  'nexitv-watch-next-episodes-v1',
   'movena-playback-recovery-v1',
   'movena-m3u-editor-filters-v1',
   TRANSFORM_PRESET_KEY,

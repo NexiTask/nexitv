@@ -1,8 +1,11 @@
 import type { XtreamEpisode } from '@/modules/sources/public/data/xtreamClient';
 
+export type WatchNextEpisode = Pick<XtreamEpisode, 'id' | 'episode_num' | 'title'>;
+export type WatchNextEpisodes = Record<string, WatchNextEpisode[]>;
+
 export interface WatchNextPick {
   season: string;
-  episode: XtreamEpisode;
+  episode: WatchNextEpisode;
   /** Every regular episode the show lists, for spotting new ones. */
   total: number;
 }
@@ -15,8 +18,8 @@ export interface WatchNextPick {
  * has been watched yet or the viewer is caught up.
  */
 export function pickWatchNext(
-  episodes: Record<string, XtreamEpisode[]>,
-  isWatched: (episode: XtreamEpisode) => boolean,
+  episodes: WatchNextEpisodes,
+  isWatched: (episode: WatchNextEpisode) => boolean,
 ): WatchNextPick | null {
   const ordered = Object.keys(episodes)
     .filter((season) => Number(season) > 0)
@@ -36,7 +39,7 @@ export function pickWatchNext(
 }
 
 /** How many regular episodes a show lists. */
-export function regularEpisodeCount(episodes: Record<string, XtreamEpisode[]>): number {
+export function regularEpisodeCount(episodes: WatchNextEpisodes): number {
   return Object.entries(episodes)
     .filter(([season]) => Number(season) > 0)
     .reduce((count, [, list]) => count + list.length, 0);

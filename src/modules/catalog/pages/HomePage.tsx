@@ -215,9 +215,7 @@ export function HomePage() {
           />
         );
       case 'watchNext':
-        return loading ? (
-          <CarouselSkeleton key={id} title="Watch Next" />
-        ) : (
+        return (
           <HorizontalCarousel
             key={id}
             title="Watch Next"
