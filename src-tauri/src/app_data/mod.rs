@@ -37,6 +37,7 @@ pub(crate) fn app_data_clear(
         }
     }
     crate::credentials::xtream::credential_delete()?;
+    crate::chatgpt::clear_local_accounts(&app)?;
 
     let app_data = app
         .path()

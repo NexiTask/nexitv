@@ -1,5 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 
+interface ChatGptConnectionStatus {
+  activeClient: string | null;
+  accounts: { clientId: string; label: string; planPermission: boolean }[];
+}
+
 export interface ImdbRefreshEvent {
   stage: string;
   dataset?: 'ratings' | 'titles' | null;
@@ -279,6 +284,15 @@ export type MpvPropertyUpdate =
  * Strongly-typed wrapper for all Tauri IPC commands in NexiTV.
  */
 export const tauriApi = {
+  chatGptStatus: () => invoke<ChatGptConnectionStatus>('chatgpt_status'),
+  chatGptConnect: (clientId: string | null) =>
+    invoke<{ status: ChatGptConnectionStatus; firstPlanPermission: boolean }>('chatgpt_connect', {
+      clientId,
+    }),
+  chatGptCancel: () => invoke<void>('chatgpt_cancel'),
+  chatGptDisconnect: () =>
+    invoke<{ status: ChatGptConnectionStatus; revocationConfirmed: boolean }>('chatgpt_disconnect'),
+
   /** Spawn or re-initialize native mpv player instance */
   mpvStart: (options: MpvStartOptions) => invoke<void>('mpv_start', { options }),
 

@@ -1,4 +1,5 @@
 mod app_data;
+mod chatgpt;
 mod credentials;
 mod downloads;
 mod metadata;
@@ -33,7 +34,12 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol(posters::SCHEME, posters::handle)
         .manage(player::NativePlayerManager::default())
         .manage(downloads::DownloadManager::default())
+        .manage(chatgpt::Connection::default())
         .invoke_handler(tauri::generate_handler![
+            chatgpt::chatgpt_status,
+            chatgpt::chatgpt_connect,
+            chatgpt::chatgpt_cancel,
+            chatgpt::chatgpt_disconnect,
             perf::perf_log,
             platform::commands::player_set_fullscreen,
             platform::commands::player_set_cursor_hidden,
