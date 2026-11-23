@@ -51,6 +51,7 @@ import {
 } from '@/modules/playback/public/lib/playback';
 import { xtreamItemId } from '@/modules/sources/public/lib/sourceIdentity';
 import { M3uSeriesDetailsDialog } from './M3uSeriesDetailsDialog';
+import { SaveToLibraryButton } from './SaveToLibraryButton';
 import { useI18n } from '@/shared/i18n/i18n';
 import { useNavigate } from 'react-router-dom';
 import { SeriesUpcomingEpisodes } from '@/modules/guide/public/components/SeriesUpcomingEpisodes';
@@ -136,18 +137,18 @@ function XtreamSeriesDetailsDialog({
   });
   const enriched = tmdb.details;
 
+  const libraryItem: MediaItem = {
+    id: seriesId,
+    title: seriesTitle,
+    posterUrl: seriesPoster,
+    type: 'series',
+    sourceItemId: providerSeriesId,
+    sourceId: Object.values(data?.episodes ?? {})[0]?.[0]?.source_id || sourceId,
+    description: data?.info?.plot,
+  };
   const toggleFavorite = () => {
     if (isFav) removeFavorite(seriesId);
-    else
-      addFavorite({
-        id: seriesId,
-        title: seriesTitle,
-        posterUrl: seriesPoster,
-        type: 'series',
-        sourceItemId: providerSeriesId,
-        sourceId: Object.values(data?.episodes ?? {})[0]?.[0]?.source_id || sourceId,
-        description: data?.info?.plot,
-      });
+    else addFavorite(libraryItem);
   };
 
   const [isRetryingDetails, setIsRetryingDetails] = useState(false);
@@ -618,6 +619,11 @@ function XtreamSeriesDetailsDialog({
                       <span>{t('Start Watching')}</span>
                     </button>
                   ) : null}
+                  <SaveToLibraryButton
+                    item={libraryItem}
+                    className={heroStyles.iconBtn}
+                    activeClassName={heroStyles.iconBtnActive}
+                  />
                   <button
                     type="button"
                     className={`${heroStyles.iconBtn} ${isFav ? heroStyles.iconBtnActive : ''}`}
@@ -756,6 +762,7 @@ function XtreamSeriesDetailsDialog({
                         onClick={() => handlePlayEpisode(episode)}
                         onContextMenu={(e) =>
                           handleMediaCardContextMenu(e, episodeItem, {
+                            isEpisode: true,
                             onPlay: () => handlePlayEpisode(episode),
                           })
                         }

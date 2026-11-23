@@ -186,6 +186,15 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   'No channels found.': 'Nenhum canal encontrado.',
   'No Downloads Yet': 'Ainda não há downloads',
   'No Watch History': 'Sem histórico de exibição',
+  Saved: 'Salvos',
+  'Add to Library': 'Adicionar à biblioteca',
+  'Remove from Library': 'Remover da biblioteca',
+  'Added to Library': 'Adicionado à biblioteca',
+  'Removed from Library': 'Removido da biblioteca',
+  'No saved items': 'Nenhum item salvo',
+  'Use Add to Library to save an item here.':
+    'Use “Adicionar à biblioteca” para salvar um item aqui.',
+  'Library data cleared.': 'Dados da biblioteca apagados.',
   'Your Favorites Are Empty': 'Seus favoritos estão vazios',
   'Use the heart on a movie, series, or live channel to add it to Favorites.':
     'Clique no coração de um filme, série ou canal ao vivo para adicioná-lo aos favoritos.',

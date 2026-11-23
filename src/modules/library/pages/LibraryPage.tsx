@@ -3,7 +3,7 @@ import { Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { VirtualizedGrid } from '@/modules/catalog/public/components/VirtualizedGrid';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { CatalogViewToggle } from '@/modules/catalog/public/components/CatalogViewToggle';
-import { Heart, FolderHeart, Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Bookmark, Heart, FolderHeart, Plus, Edit2, Trash2, X } from 'lucide-react';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { HeaderSearch } from '@/modules/search/public/components/HeaderSearch';
 import appStyles from '@/app/shell/AppLayout.module.css';
@@ -22,6 +22,7 @@ export function LibraryPage() {
   const { t, tn, number } = useI18n();
   const { listId } = useParams<'listId'>();
   const navigate = useNavigate();
+  const savedItems = useLibraryStore((state) => state.savedItems);
   const favorites = useLibraryStore((state) => state.favorites);
   const collections = useLibraryStore((state) => state.collections);
   const createCollection = useLibraryStore((state) => state.createCollection);
@@ -30,11 +31,31 @@ export function LibraryPage() {
   const sidebarWidth = useSettingsStore((state) => state.sidebarWidth);
   const lastCollectionId = useSettingsStore((state) => state.lastCollectionId);
   const updateSetting = useSettingsStore((state) => state.updateSetting);
-  const activeCollection = collections.find((collection) => collection.id === listId);
-  const showingFavorites = listId === 'favorites';
-  const items = activeCollection?.items ?? favorites;
+  const builtInLists = [
+    {
+      id: 'saved',
+      name: 'Saved',
+      icon: Bookmark,
+      items: savedItems,
+      emptyTitle: 'No saved items',
+      emptyDescription: 'Use Add to Library to save an item here.',
+    },
+    {
+      id: 'favorites',
+      name: 'Favorites',
+      icon: Heart,
+      items: favorites,
+      emptyTitle: 'Your Favorites Are Empty',
+      emptyDescription: 'Use the heart on a movie, series, or live channel to add it to Favorites.',
+    },
+  ];
+  const builtInList = builtInLists.find((list) => list.id === listId);
+  const activeCollection = builtInList
+    ? undefined
+    : collections.find((collection) => collection.id === listId);
+  const selectedList = builtInList ?? activeCollection;
+  const selectedCollectionId = selectedList?.id;
 
-  const selectedCollectionId = showingFavorites ? null : activeCollection?.id;
   useEffect(() => {
     if (selectedCollectionId !== undefined && selectedCollectionId !== lastCollectionId) {
       updateSetting('lastCollectionId', selectedCollectionId);
@@ -53,11 +74,15 @@ export function LibraryPage() {
   const closeCreateModal = useCallback(() => setIsCreateOpen(false), []);
   const closeRenameModal = useCallback(() => setIsRenameOpen(false), []);
 
-  if (!showingFavorites && !activeCollection) {
-    const lastCollection =
-      listId === undefined && collections.find((collection) => collection.id === lastCollectionId);
-    return <Navigate to={`/library/${lastCollection ? lastCollection.id : 'favorites'}`} replace />;
+  if (!selectedList) {
+    const lastList =
+      listId === undefined &&
+      (builtInLists.some((list) => list.id === lastCollectionId) ||
+        collections.some((collection) => collection.id === lastCollectionId));
+    return <Navigate to={`/library/${lastList ? lastCollectionId : 'saved'}`} replace />;
   }
+
+  const { items } = selectedList;
 
   const openCreateModal = () => {
     setNewCollectionName('');
@@ -96,7 +121,7 @@ export function LibraryPage() {
     if (!activeCollection) return;
     deleteCollection(activeCollection.id);
     setIsDeleteOpen(false);
-    void navigate('/library/favorites', { replace: true });
+    void navigate('/library/saved', { replace: true });
   };
 
   return (
@@ -119,18 +144,21 @@ export function LibraryPage() {
             </Button>
           }
         >
-          <NavLink
-            to="/library/favorites"
-            end
-            className={styles.collectionRow ?? ''}
-            aria-label={t('Favorites')}
-          >
-            <Heart size={16} className={styles.favoritesIcon} aria-hidden="true" />
-            <span className={styles.collectionName}>{t('Favorites')}</span>
-            <span className={styles.collectionCount} aria-hidden="true">
-              {number(favorites.length)}
-            </span>
-          </NavLink>
+          {builtInLists.map(({ id, name, icon: Icon, items }) => (
+            <NavLink
+              key={id}
+              to={`/library/${id}`}
+              end
+              className={styles.collectionRow ?? ''}
+              aria-label={t(name)}
+            >
+              <Icon size={16} className={styles.listIcon} aria-hidden="true" />
+              <span className={styles.collectionName}>{t(name)}</span>
+              <span className={styles.collectionCount} aria-hidden="true">
+                {number(items.length)}
+              </span>
+            </NavLink>
+          ))}
           {collections.map((collection) => (
             <NavLink
               key={collection.id}
@@ -149,7 +177,7 @@ export function LibraryPage() {
 
         <div className={appStyles.catalogMain}>
           <CatalogPageHeader
-            title={activeCollection?.name ?? 'Favorites'}
+            title={selectedList.name}
             meta={tn('{count} item', '{count} items', items.length, {
               count: number(items.length),
             })}
@@ -195,15 +223,14 @@ export function LibraryPage() {
             </div>
           ) : (
             <EmptyState
-              icon={activeCollection ? FolderHeart : Heart}
-              title={activeCollection ? 'Collection Empty' : 'Your Favorites Are Empty'}
+              icon={builtInList?.icon ?? FolderHeart}
+              title={builtInList?.emptyTitle ?? 'Collection Empty'}
               description={
-                activeCollection
-                  ? t(
-                      '"{name}" has no items yet. Add movies or series from their detail modals or context menus.',
-                      { name: activeCollection.name },
-                    )
-                  : 'Use the heart on a movie, series, or live channel to add it to Favorites.'
+                builtInList?.emptyDescription ??
+                t(
+                  '"{name}" has no items yet. Add movies or series from their detail modals or context menus.',
+                  { name: selectedList.name },
+                )
               }
             />
           )}

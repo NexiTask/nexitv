@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import {
   Play,
   Heart,
+  Bookmark,
   CheckCircle,
   Circle,
   Trash2,
@@ -78,6 +79,7 @@ export function useMediaContextMenus() {
         onPlay?: ((item: MediaItem) => void) | undefined;
         onViewDetails?: ((item: MediaItem) => void) | undefined;
         currentCollectionId?: string | undefined;
+        isEpisode?: boolean | undefined;
       },
     ) => {
       e.preventDefault();
@@ -142,6 +144,16 @@ export function useMediaContextMenus() {
           action: () => {
             void downloadMediaItem(item);
           },
+        });
+      }
+
+      if (!options?.isEpisode) {
+        const isSaved = state.savedItems.some((entry) => entry.id === item.id);
+        items.push({
+          id: 'save-library',
+          label: t(isSaved ? 'Remove from Library' : 'Add to Library'),
+          icon: <Bookmark size={16} fill={isSaved ? 'currentColor' : 'none'} />,
+          action: () => state.toggleSavedItem(item),
         });
       }
 

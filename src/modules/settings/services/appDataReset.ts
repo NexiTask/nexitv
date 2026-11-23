@@ -78,7 +78,13 @@ export async function clearAllAppData(): Promise<void> {
     isInitializing: false,
     initializationError: null,
   });
-  useLibraryStore.setState({ favorites: [], collections: [], history: [], watched: [] });
+  useLibraryStore.setState({
+    savedItems: [],
+    favorites: [],
+    collections: [],
+    history: [],
+    watched: [],
+  });
   useDownloadStore.setState({ jobs: [] });
   useSearchStore.setState({ recentSearches: [] });
   useStreamVerificationStore.setState({ verifiedStreams: {} });

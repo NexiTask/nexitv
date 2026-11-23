@@ -185,6 +185,15 @@ export const NL_MESSAGES: Record<string, string> = {
   'No channels found.': 'Geen kanalen gevonden.',
   'No Downloads Yet': 'Nog geen downloads',
   'No Watch History': 'Geen kijkgeschiedenis',
+  Saved: 'Opgeslagen',
+  'Add to Library': 'Toevoegen aan bibliotheek',
+  'Remove from Library': 'Verwijderen uit bibliotheek',
+  'Added to Library': 'Toegevoegd aan bibliotheek',
+  'Removed from Library': 'Verwijderd uit bibliotheek',
+  'No saved items': 'Geen opgeslagen items',
+  'Use Add to Library to save an item here.':
+    'Kies ‘Toevoegen aan bibliotheek’ om een item hier op te slaan.',
+  'Library data cleared.': 'Bibliotheekgegevens gewist.',
   'Your Favorites Are Empty': 'Je favorieten zijn leeg',
   'Use the heart on a movie, series, or live channel to add it to Favorites.':
     'Klik op het hartje bij een film, serie of livezender om deze aan je favorieten toe te voegen.',

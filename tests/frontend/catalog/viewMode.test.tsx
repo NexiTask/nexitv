@@ -22,6 +22,7 @@ describe('grid/list view per section', () => {
   it('names a section by its first path segment', () => {
     expect(viewSection('/library/abc')).toBe('collections');
     expect(viewSection('/library/favorites')).toBe('favorites');
+    expect(viewSection('/library/saved')).toBe('saved');
     expect(viewSection('/')).toBe('home');
   });
 

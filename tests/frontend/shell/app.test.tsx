@@ -58,6 +58,7 @@ beforeEach(() => {
   });
   window.history.replaceState({}, '', '/');
   useLibraryStore.setState({
+    savedItems: [],
     favorites: [],
     collections: [],
     history: [],
@@ -102,7 +103,8 @@ describe('application shell', () => {
     const library = within(screen.getByRole('complementary', { name: 'Library' }));
     const favorites = library.getByRole('link', { name: 'Favorites' });
     const weekend = library.getByRole('link', { name: 'Weekend' });
-    expect(library.getAllByRole('link')).toEqual([favorites, weekend]);
+    const saved = library.getByRole('link', { name: 'Saved' });
+    expect(library.getAllByRole('link')).toEqual([saved, favorites, weekend]);
     expect(favorites.getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('group', { name: 'Open Favorite film' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Rename Collection' })).toBeNull();
@@ -116,21 +118,40 @@ describe('application shell', () => {
     expect(useLibraryStore.getState().favorites).toEqual([]);
     expect(useLibraryStore.getState().collections[0]?.items).toEqual([movie]);
     await user.click(within(card).getByRole('button', { name: 'Add to Favorites' }));
+    await user.click(within(card).getByRole('button', { name: 'More options' }));
+    await user.click(screen.getByRole('button', { name: 'Add to Library' }));
     await user.click(screen.getByRole('button', { name: 'Delete Collection' }));
     const confirmation = within(screen.getByRole('alertdialog', { name: 'Delete Collection?' }));
     await user.click(confirmation.getByRole('button', { name: 'Delete Collection' }));
 
-    expect(await screen.findByRole('heading', { name: 'Favorites', level: 1 })).toBeTruthy();
-    expect(window.location.pathname).toBe('/library/favorites');
+    expect(await screen.findByRole('heading', { name: 'Saved', level: 1 })).toBeTruthy();
+    expect(window.location.pathname).toBe('/library/saved');
     const activeLibrary = within(screen.getByRole('complementary', { name: 'Library' }));
+    const activeSaved = activeLibrary.getByRole('link', { name: 'Saved' });
     const activeFavorites = activeLibrary.getByRole('link', { name: 'Favorites' });
-    expect(activeLibrary.getAllByRole('link')).toEqual([activeFavorites]);
+    expect(activeLibrary.getAllByRole('link')).toEqual([activeSaved, activeFavorites]);
+    expect(activeSaved.getAttribute('aria-current')).toBe('page');
     expect(useLibraryStore.getState().favorites).toEqual([movie]);
-    const favoriteCard = screen.getByRole('group', { name: 'Open Favorite film' });
-    await user.hover(favoriteCard);
-    await user.click(within(favoriteCard).getByRole('button', { name: 'Remove from Favorites' }));
-    expect(screen.getByRole('heading', { name: 'Your Favorites Are Empty' })).toBeTruthy();
-    expect(activeFavorites.getAttribute('aria-current')).toBe('page');
+    expect(screen.queryByRole('button', { name: 'Delete Collection' })).toBeNull();
+    const savedCard = screen.getByRole('group', { name: 'Open Favorite film' });
+    await user.hover(savedCard);
+    await user.click(within(savedCard).getByRole('button', { name: 'More options' }));
+    await user.click(screen.getByRole('button', { name: 'Remove from Library' }));
+    expect(screen.getByRole('heading', { name: 'No saved items' })).toBeTruthy();
+
+    await user.click(activeFavorites);
+    expect(await screen.findByRole('heading', { name: 'Favorites', level: 1 })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Open Favorite film' })).toBeTruthy();
+  });
+
+  it('opens Saved by default when Library has no last selected list', async () => {
+    await preloadRouteModule('/library');
+    window.history.replaceState({}, '', '/library');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Saved', level: 1 })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'No saved items' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/library/saved');
   });
 
   it('opens the saved custom list from the old Collections route and selects a new list by ID', async () => {

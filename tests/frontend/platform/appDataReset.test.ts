@@ -55,7 +55,13 @@ beforeEach(() => {
     isInitializing: false,
     initializationError: null,
   });
-  useLibraryStore.setState({ favorites: [], collections: [], history: [], watched: [] });
+  useLibraryStore.setState({
+    savedItems: [],
+    favorites: [],
+    collections: [],
+    history: [],
+    watched: [],
+  });
   useDownloadStore.setState({ jobs: [] });
   useSearchStore.setState({ recentSearches: [] });
 });
@@ -138,6 +144,9 @@ describe('clearAllAppData', () => {
         },
       ],
     });
+    useLibraryStore
+      .getState()
+      .toggleSavedItem({ id: 'saved', title: 'Saved movie', type: 'vod', posterUrl: '' });
     useLibraryStore.setState({
       history: [
         {
@@ -176,6 +185,7 @@ describe('clearAllAppData', () => {
     expect(useSourceStore.getState().profiles).toEqual([]);
     expect(useAuthStore.getState().profiles).toEqual([]);
     expect(useLibraryStore.getState().history).toEqual([]);
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
     expect(useDownloadStore.getState().jobs).toEqual([]);
     expect(useSearchStore.getState().recentSearches).toEqual([]);
     expect(useStreamVerificationStore.getState().verifiedStreams).toEqual({});

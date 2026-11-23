@@ -7,7 +7,10 @@ type ViewMode = 'grid' | 'list';
 /** Library lists retain the view settings from their previous pages. */
 export function viewSection(pathname: string): string {
   const [section, listId] = pathname.split('/').filter(Boolean);
-  if (section === 'library') return listId === 'favorites' ? 'favorites' : 'collections';
+  if (section === 'library') {
+    if (listId === 'favorites' || listId === 'saved') return listId;
+    return 'collections';
+  }
   return section ?? 'home';
 }
 

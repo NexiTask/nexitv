@@ -60,7 +60,7 @@
   color: var(--text-primary) !important;
 }
 
-.favoritesIcon {
+.listIcon {
   flex-shrink: 0;
   margin-inline-end: var(--space-2);
 }

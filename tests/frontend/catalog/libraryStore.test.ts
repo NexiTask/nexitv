@@ -26,6 +26,7 @@ beforeEach(() => {
   useSettingsStore.getState().resetSettings();
   useNotificationStore.setState({ notifications: [] });
   useLibraryStore.setState({
+    savedItems: [],
     favorites: [],
     collections: [],
     history: [],
@@ -36,6 +37,62 @@ beforeEach(() => {
 });
 
 describe('library store', () => {
+  it('persists saved items without stream transport and leaves other lists independent', async () => {
+    const item = {
+      ...movie,
+      sourceId: 'm3u-source',
+      sourceItemId: 'item-1',
+      streamUrl: 'https://stream.test/movie?token=secret',
+      httpHeaders: { Authorization: 'secret' },
+      fallbacks: [{ streamUrl: 'https://stream.test/fallback' }],
+      catchupSource: 'https://stream.test/catchup',
+    };
+    const library = useLibraryStore.getState();
+    library.toggleSavedItem(item);
+    expect(useLibraryStore.getState().favorites).toEqual([]);
+    expect(useLibraryStore.getState().collections).toEqual([]);
+    window.dispatchEvent(new Event('beforeunload'));
+
+    const snapshot = JSON.parse(localStorage.getItem('iptv-library-storage')!);
+    const safeItem = { ...movie, sourceId: item.sourceId, sourceItemId: item.sourceItemId };
+    expect(snapshot.state.savedItems).toEqual([safeItem]);
+    useLibraryStore.setState({ savedItems: [] });
+    await useLibraryStore.persist.rehydrate();
+    expect(useLibraryStore.getState().savedItems).toEqual([safeItem]);
+
+    library.addFavorite(movie);
+    const list = library.createCollection('Weekend');
+    library.addToCollection(list, movie);
+    library.toggleSavedItem(item);
+    expect(useLibraryStore.getState()).toMatchObject({
+      savedItems: [],
+      favorites: [movie],
+      collections: [{ id: list, items: [movie] }],
+    });
+    library.toggleSavedItem(item);
+    library.clearAllData();
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
+  });
+
+  it('keeps old favorites and ignores malformed saved entries during hydration', async () => {
+    localStorage.setItem(
+      'iptv-library-storage',
+      JSON.stringify({ version: 3, state: { favorites: [movie] } }),
+    );
+    await useLibraryStore.persist.rehydrate();
+    expect(useLibraryStore.getState().favorites).toEqual([movie]);
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
+
+    localStorage.setItem(
+      'iptv-library-storage',
+      JSON.stringify({
+        version: 4,
+        state: { savedItems: [null, 3, { id: 'no-title' }, movie, movie] },
+      }),
+    );
+    await useLibraryStore.persist.rehydrate();
+    expect(useLibraryStore.getState().savedItems).toEqual([movie]);
+  });
   it('deduplicates favorites and toggles watched state', () => {
     const store = useLibraryStore.getState();
     store.addFavorite(movie);

@@ -170,6 +170,7 @@ interface Collection {
 }
 
 interface LibraryState {
+  savedItems: MediaItem[];
   favorites: MediaItem[];
   collections: Collection[];
   history: HistoryItem[];
@@ -200,6 +201,7 @@ interface LibraryState {
   recentChannels: string[];
   addRecentChannel: (id: string) => void;
 
+  toggleSavedItem: (item: MediaItem) => void;
   addFavorite: (item: MediaItem) => void;
   removeFavorite: (id: string) => void;
   isFavorite: (id: string) => boolean;
@@ -253,13 +255,16 @@ function withoutPlaybackTransport<T extends MediaItem>(item: T): T {
   const safe: MediaItem = { ...item };
   delete safe.streamUrl;
   delete safe.httpHeaders;
+  delete safe.fallbacks;
+  delete safe.catchupSource;
   return safe as T;
 }
 
 function sanitizedLibraryData(
-  state: Pick<LibraryState, 'favorites' | 'collections' | 'history' | 'watched'>,
+  state: Pick<LibraryState, 'savedItems' | 'favorites' | 'collections' | 'history' | 'watched'>,
 ) {
   return {
+    savedItems: state.savedItems.map(withoutPlaybackTransport),
     favorites: state.favorites.map(withoutPlaybackTransport),
     collections: state.collections.map((collection) => ({
       ...collection,
@@ -268,6 +273,24 @@ function sanitizedLibraryData(
     history: state.history.map(withoutPlaybackTransport),
     watched: state.watched,
   };
+}
+
+function normalizeSavedItems(value: unknown): MediaItem[] {
+  if (!Array.isArray(value)) return [];
+  const items = new Map<string, MediaItem>();
+  for (const item of value) {
+    if (
+      item &&
+      typeof item.id === 'string' &&
+      item.id.length > 0 &&
+      typeof item.title === 'string' &&
+      typeof item.posterUrl === 'string' &&
+      !items.has(item.id)
+    ) {
+      items.set(item.id, withoutPlaybackTransport(item));
+    }
+  }
+  return [...items.values()];
 }
 
 export function migrateLibraryState(persistedState: unknown): LibraryState {
@@ -279,6 +302,7 @@ export function migrateLibraryState(persistedState: unknown): LibraryState {
 
   const normalized = {
     ...nextState,
+    savedItems: normalizeSavedItems(state.savedItems),
     favorites: Array.isArray(state.favorites) ? state.favorites : [],
     collections: Array.isArray(state.collections) ? state.collections : [],
     history: Array.isArray(state.history) ? state.history : [],
@@ -310,6 +334,7 @@ import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 export const useLibraryStore = create<LibraryState>()(
   persist(
     (set, get) => ({
+      savedItems: [],
       favorites: [],
       collections: [],
       history: [],
@@ -386,6 +411,23 @@ export const useLibraryStore = create<LibraryState>()(
             MAX_RECENT_CHANNELS,
           ),
         }));
+      },
+
+      toggleSavedItem: (item) => {
+        const { savedItems } = get();
+        const isSaved = savedItems.some((entry) => entry.id === item.id);
+        set({
+          savedItems: isSaved
+            ? savedItems.filter((entry) => entry.id !== item.id)
+            : [...savedItems, item],
+        });
+        notify.info(
+          isSaved ? 'Removed from Library' : 'Added to Library',
+          getDisplayTitle(item.title, item.type),
+          undefined,
+          undefined,
+          'library',
+        );
       },
 
       addFavorite: (item) => {
@@ -739,6 +781,7 @@ export const useLibraryStore = create<LibraryState>()(
 
       clearAllData: () => {
         set({
+          savedItems: [],
           favorites: [],
           collections: [],
           history: [],
@@ -748,19 +791,17 @@ export const useLibraryStore = create<LibraryState>()(
           syncedSeries: [],
           recentChannels: [],
         });
-        notify.warning(
-          'Library Reset',
-          'All history, favorites, collections, and watched state cleared.',
-          undefined,
-          undefined,
-          'library',
-        );
+        notify.warning('Library Reset', 'Library data cleared.', undefined, undefined, 'library');
         debugLog.warn('library', 'Cleared all library data');
       },
     }),
     {
       name: 'iptv-library-storage',
-      version: 3,
+      version: 4,
+      merge: (persisted, current) => {
+        const state = persisted as Partial<LibraryState> | undefined;
+        return { ...current, ...state, savedItems: normalizeSavedItems(state?.savedItems) };
+      },
       migrate: migrateLibraryState,
       storage: createDebouncedStorage<LibraryState>(),
       partialize: (state) => ({ ...state, ...sanitizedLibraryData(state) }),

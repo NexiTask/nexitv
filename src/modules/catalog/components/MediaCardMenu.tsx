@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  Bookmark,
   Check,
   CheckCircle,
   ChevronRight,
@@ -47,6 +48,9 @@ export function MediaCardMenu({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const isSaved = useLibraryStore((state) =>
+    state.savedItems.some((entry) => entry.id === item.id),
+  );
   const isFavorite =
     useLibraryStore((state) => state.favorites.some((entry) => entry.id === item.id)) ||
     Boolean(item.isFavorite);
@@ -164,6 +168,16 @@ export function MediaCardMenu({
                 <Download size={14} /> <span>{t('Download Content')}</span>
               </button>
             )}
+            <button
+              type="button"
+              className={styles.menuItem}
+              onClick={(event) =>
+                run(event, () => useLibraryStore.getState().toggleSavedItem(item))
+              }
+            >
+              <Bookmark size={14} fill={isSaved ? 'currentColor' : 'none'} />
+              <span>{t(isSaved ? 'Remove from Library' : 'Add to Library')}</span>
+            </button>
             <button
               type="button"
               className={styles.menuItem}

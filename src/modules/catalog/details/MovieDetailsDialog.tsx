@@ -23,6 +23,7 @@ import { useImdbFacts } from '../data/useImdbFacts';
 import styles from './MovieDetailsDialog.module.css';
 import { downloadMediaItem } from '@/modules/downloads/public/services/mediaDownload';
 import { M3uMovieDetailsDialog } from './M3uMovieDetailsDialog';
+import { SaveToLibraryButton } from './SaveToLibraryButton';
 import { useI18n } from '@/shared/i18n/i18n';
 import { useTmdbDetailEnrichment } from '@/modules/metadata/public/hooks/useTmdbDetailsEnrichment';
 import { normalizeTmdbId } from '@/modules/metadata/public/model/tmdb';
@@ -88,21 +89,21 @@ function XtreamMovieDetailsDialog({
     ready: !isLoading,
   });
   const enriched = tmdb.details;
+  const libraryItem: MediaItem = {
+    id: movieId,
+    title: movieTitle,
+    posterUrl: moviePoster,
+    type: 'vod',
+    sourceItemId: providerMovieId,
+    streamUrl: data?.movie_data.direct_stream_url,
+    httpHeaders: data?.movie_data.http_headers,
+    sourceId: data?.movie_data.source_id || sourceId,
+    containerExtension: data?.movie_data.container_extension,
+    description: data?.info.description || data?.info.plot,
+  };
   const toggleFavorite = () => {
     if (isFav) removeFavorite(movieId);
-    else
-      addFavorite({
-        id: movieId,
-        title: movieTitle,
-        posterUrl: moviePoster,
-        type: 'vod',
-        sourceItemId: providerMovieId,
-        streamUrl: data?.movie_data.direct_stream_url,
-        httpHeaders: data?.movie_data.http_headers,
-        sourceId: data?.movie_data.source_id,
-        containerExtension: data?.movie_data.container_extension,
-        description: data?.info.description || data?.info.plot,
-      });
+    else addFavorite(libraryItem);
   };
   const [isRetryingDetails, setIsRetryingDetails] = useState(false);
   const prerequisiteError = !credentials
@@ -354,6 +355,11 @@ function XtreamMovieDetailsDialog({
                       <span>{t('Play Movie')}</span>
                     </button>
                   )}
+                  <SaveToLibraryButton
+                    item={libraryItem}
+                    className={heroStyles.iconBtn}
+                    activeClassName={heroStyles.iconBtnActive}
+                  />
                   <button
                     type="button"
                     className={`${heroStyles.iconBtn} ${isFav ? heroStyles.iconBtnActive : ''}`}
