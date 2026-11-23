@@ -1,5 +1,16 @@
-import { describe, expect, it } from 'vitest';
+// @vitest-environment happy-dom
+
+import { act, renderHook } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createElement, type ReactNode } from 'react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { useWatchNext } from '@/modules/catalog/data/useWatchNext';
 import { pickWatchNext, regularEpisodeCount } from '@/modules/catalog/lib/watchNext';
+import {
+  isQueuedEpisode,
+  useLibraryStore,
+  type HistoryItem,
+} from '@/modules/library/store/useLibraryStore';
 
 const episode = (id: number, num: number) => ({
   id: String(id),
@@ -42,5 +53,52 @@ describe('pickWatchNext', () => {
   it('ignores specials', () => {
     expect(pickWatchNext({ '0': [episode(900, 1)] }, watching(900))).toBeNull();
     expect(regularEpisodeCount(episodes)).toBe(4);
+  });
+});
+
+describe('saved next episodes', () => {
+  const original = useLibraryStore.getState();
+  afterEach(() => {
+    useLibraryStore.setState({
+      history: original.history,
+      trackedSeries: original.trackedSeries,
+      watched: original.watched,
+    });
+  });
+
+  it('offers the queued episode immediately and keeps started episodes in resume history', () => {
+    const queued: HistoryItem = {
+      id: 'show-a',
+      title: 'Show A',
+      type: 'series',
+      posterUrl: '',
+      episodeId: 'episode-8',
+      seasonNum: 2,
+      episodeNum: 8,
+      progressPercentage: 0,
+      currentTime: 0,
+      lastWatchedAt: 2,
+    };
+    const resumed: HistoryItem = {
+      ...queued,
+      id: 'show-b',
+      episodeId: 'episode-9',
+      currentTime: 90,
+      progressPercentage: 3,
+    };
+    useLibraryStore.setState({ history: [queued, resumed], trackedSeries: {}, watched: [] });
+    const client = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client }, children);
+    const { result } = renderHook(useWatchNext, { wrapper });
+
+    expect(result.current).toEqual([queued]);
+    expect(useLibraryStore.getState().history.filter((item) => !isQueuedEpisode(item))).toEqual([
+      resumed,
+    ]);
+
+    act(() => useLibraryStore.getState().dismissWatchNext(queued.id));
+    expect(result.current).toEqual([]);
+    expect(useLibraryStore.getState().history).toEqual([queued, resumed]);
   });
 });

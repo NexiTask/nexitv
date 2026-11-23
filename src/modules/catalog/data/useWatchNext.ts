@@ -3,6 +3,7 @@ import { useQueries } from '@tanstack/react-query';
 import { resolveXtreamSourceId } from '@/modules/sources/public/store/useAuthStore';
 import { xtreamItemId } from '@/modules/sources/public/lib/sourceIdentity';
 import {
+  isQueuedEpisode,
   useLibraryStore,
   type HistoryItem,
   type TrackedSeries,
@@ -25,11 +26,21 @@ export function useWatchNext(): HistoryItem[] {
   const history = useLibraryStore((state) => state.history);
   const watched = useLibraryStore((state) => state.watched);
   const updateTrackedSeries = useLibraryStore((state) => state.updateTrackedSeries);
+  const watchedSet = new Set(watched);
+  const resuming = new Set(history.filter((item) => !isQueuedEpisode(item)).map((item) => item.id));
+  const queued = history.filter((item) => {
+    if (!isQueuedEpisode(item) || tracked[item.id]?.muted) return false;
+    if (!item.episodeId) return true;
+    const sourceId = resolveXtreamSourceId(item.sourceId);
+    const episodeId = sourceId ? xtreamItemId(sourceId, 'episode', item.episodeId) : item.episodeId;
+    return !watchedSet.has(episodeId) && !watchedSet.has(item.episodeId);
+  });
+  const queuedIds = new Set(queued.map((item) => item.id));
 
-  const candidates = Object.entries(tracked ?? {})
+  const candidates = Object.entries(tracked)
     .filter(
       ([id, entry]) =>
-        !entry.item.sourceId?.startsWith('m3u-') && !history.some((item) => item.id === id),
+        !entry.item.sourceId?.startsWith('m3u-') && !resuming.has(id) && !queuedIds.has(id),
     )
     .sort(([, left], [, right]) => right.lastWatchedAt - left.lastWatchedAt)
     .slice(0, MAX_CHECKED);
@@ -45,8 +56,7 @@ export function useWatchNext(): HistoryItem[] {
     }),
   });
 
-  const watchedSet = new Set(watched);
-  const items: HistoryItem[] = [];
+  const items = [...queued];
   const bookkeeping: Bookkeeping[] = [];
   candidates.forEach(([id, entry], index) => {
     const episodes = results[index]?.data?.episodes;
@@ -90,5 +100,5 @@ export function useWatchNext(): HistoryItem[] {
     }
   }, [pending, updateTrackedSeries]);
 
-  return items;
+  return items.sort((left, right) => right.lastWatchedAt - left.lastWatchedAt);
 }

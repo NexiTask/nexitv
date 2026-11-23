@@ -16,7 +16,7 @@ import {
   useContextMenuStore,
   type ContextMenuItem,
 } from '@/shared/ui/context-menu/useContextMenuStore';
-import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
+import { isQueuedEpisode, useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import { formatRemaining } from '@/shared/lib/time';
 import { usePlayerStore } from '@/modules/playback/public/store/usePlayerStore';
 import { notify } from '@/shared/notifications/useNotificationStore';
@@ -86,7 +86,7 @@ export function useMediaContextMenus() {
       const state = useLibraryStore.getState();
       const isFav = state.favorites.some((f) => f.id === item.id) || Boolean(item.isFavorite);
       const isW = (state.watched || []).includes(item.id) || Boolean(item.isWatched);
-      const inHistory = state.history.some((h) => h.id === item.id);
+      const inHistory = state.history.some((h) => h.id === item.id && !isQueuedEpisode(h));
       const collections = state.collections;
 
       const canPlay = Boolean(options?.onPlay || item.streamUrl);

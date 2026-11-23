@@ -91,6 +91,15 @@ export interface HistoryItem extends MediaItem {
   episodeTitle?: string | undefined;
 }
 
+/** Saved pointers to the next episode are not playback positions. */
+export function isQueuedEpisode(item: HistoryItem): boolean {
+  return (
+    item.type === 'series' &&
+    (Boolean(item.episodeId) || (item.seasonNum != null && item.episodeNum != null)) &&
+    !((item.currentTime ?? 0) > 0 || item.progressPercentage > 0)
+  );
+}
+
 /**
  * A series the viewer has watched episodes of, with what a card needs to show
  * it again. Watch Next draws on these when a new episode appears.
@@ -183,6 +192,7 @@ interface LibraryState {
   /** The started series by id, for Watch Next. */
   trackedSeries: Record<string, TrackedSeries>;
   updateTrackedSeries: (seriesId: string, patch: Partial<Omit<TrackedSeries, 'item'>>) => void;
+  dismissWatchNext: (seriesId: string) => void;
   /**
    * Live channels played most recently, newest first (ids only). Live
    * playback never enters `history`, which needs a duration.
@@ -198,7 +208,7 @@ interface LibraryState {
   isWatched: (id: string) => boolean;
   /** Marks many items (a season's episodes) at once, with one notice. */
   setWatched: (ids: readonly string[], watched: boolean, quiet?: boolean) => void;
-  /** Points a series' Continue Watching entry at the episode to watch next,
+  /** Points the saved series entry at the episode to watch next,
    * or drops it when there is none (the show is finished). */
   advanceSeriesHistory: (
     seriesId: string,
@@ -346,6 +356,27 @@ export const useLibraryStore = create<LibraryState>()(
         if (!existing) return;
         set({ trackedSeries: { ...tracked, [seriesId]: { ...existing, ...patch } } });
       },
+
+      dismissWatchNext: (seriesId) =>
+        set((state) => {
+          const tracked = state.trackedSeries[seriesId];
+          const queued = state.history.find(
+            (item) => item.id === seriesId && isQueuedEpisode(item),
+          );
+          const entry =
+            tracked ??
+            (queued && {
+              item: withoutPlaybackTransport(queued),
+              lastWatchedAt: queued.lastWatchedAt,
+            });
+          if (!entry) return state;
+          return {
+            trackedSeries: {
+              ...state.trackedSeries,
+              [seriesId]: { ...entry, muted: true, knownEpisodes: undefined },
+            },
+          };
+        }),
 
       addRecentChannel: (id) => {
         if (!id || get().recentChannels[0] === id) return;
@@ -559,10 +590,8 @@ export const useLibraryStore = create<LibraryState>()(
 
           // Finished: remember it as watched. Watched is recorded per episode,
           // so finishing one does not mark a whole series. For a series with a
-          // next episode already known, Continue Watching advances to that
-          // episode instead of just dropping the show — otherwise finishing
-          // the episode you're watching removed all trace of the show from
-          // Continue Watching, so there was nothing to click to keep going.
+          // next episode already known, save a pointer for Watch Next and
+          // quick play without recording playback for the new episode.
           if (remaining <= FINISHED_TAIL_SECONDS) {
             const nextWatched = watched.includes(progress.id) ? watched : [...watched, progress.id];
             const started = state.startedSeries || [];

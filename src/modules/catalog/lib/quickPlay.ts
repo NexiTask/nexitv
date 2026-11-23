@@ -22,9 +22,8 @@ import type { MediaItem } from '../model/media';
  * The card's play button: start the title without the details sheet.
  *
  * - A movie resumes where it was left, or starts from the beginning.
- * - A series resumes the episode Continue Watching holds (which already moved
- *   on to the next episode when the last one finished), or else plays the
- *   first episode not yet watched, or the very first one.
+ * - A series plays an episode shown on a Watch Next card, resumes its saved
+ *   episode, or plays the first unwatched episode.
  *
  * Playback is built exactly as the details dialogs build it, from the same
  * cached detail queries. Resolves `false` when the title cannot be started
@@ -112,14 +111,23 @@ async function playSeries(client: QueryClient, item: MediaItem): Promise<boolean
           String(episode.episode_num) === String(saved.episodeNum),
       ))
     : undefined;
+  const watchNextEpisode =
+    item.progressPercentage === 0 && item.seasonNum != null && item.episodeNum != null
+      ? ordered.find(
+          ({ season, episode }) =>
+            String(season) === String(item.seasonNum) &&
+            String(episode.episode_num) === String(item.episodeNum),
+        )
+      : undefined;
   const watchedIds = new Set(watched ?? []);
   const target =
+    watchNextEpisode ??
     savedEpisode ??
     ordered.find(({ episode }) => !watchedIds.has(libraryId(episode))) ??
     ordered[0];
   if (!target) return false;
   const { season, episode } = target;
-  const startPosition = savedEpisode ? saved?.currentTime || 0 : 0;
+  const startPosition = target === savedEpisode ? saved?.currentTime || 0 : 0;
 
   const downloaded = useDownloadStore.getState().downloadedByLibraryId[libraryId(episode)];
   if (downloaded) {

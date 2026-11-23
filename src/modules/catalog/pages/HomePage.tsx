@@ -2,7 +2,7 @@ import { perfLog, perfSync } from '@/platform/perf';
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { PageTransition } from '@/app/shell/PageTransition';
 import { HorizontalCarousel } from '@/modules/catalog/components/HorizontalCarousel';
-import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
+import { isQueuedEpisode, useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import {
   useSettingsStore,
   type HomeSectionId,
@@ -60,7 +60,7 @@ export function HomePage() {
     useMediaDetailState();
 
   const watchNext = useWatchNext();
-  const updateTrackedSeries = useLibraryStore((state) => state.updateTrackedSeries);
+  const dismissWatchNextById = useLibraryStore((state) => state.dismissWatchNext);
   const watchNextItems = useMemo(
     () =>
       watchNext.slice(0, 20).map((h) => ({
@@ -72,13 +72,14 @@ export function HomePage() {
   );
   // Dismissed until the provider lists more episodes of that show.
   const dismissWatchNext = useCallback(
-    (item: MediaItem) => updateTrackedSeries(item.id, { muted: true, knownEpisodes: undefined }),
-    [updateTrackedSeries],
+    (item: MediaItem) => dismissWatchNextById(item.id),
+    [dismissWatchNextById],
   );
 
   const continueWatchingItems = useMemo(() => {
     if (!history || history.length === 0) return [];
-    return [...history]
+    return history
+      .filter((item) => !isQueuedEpisode(item))
       .sort((a, b) => b.lastWatchedAt - a.lastWatchedAt)
       .slice(0, 20)
       .map((h) => ({
