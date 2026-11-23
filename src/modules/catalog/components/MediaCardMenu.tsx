@@ -106,9 +106,8 @@ export function MediaCardMenu({
     const name = newCollectionName.trim();
     if (!name) return;
     const store = useLibraryStore.getState();
-    store.createCollection(name);
-    const collection = useLibraryStore.getState().collections.find((entry) => entry.name === name);
-    if (collection) useLibraryStore.getState().addToCollection(collection.id, item);
+    const collectionId = store.createCollection(name);
+    store.addToCollection(collectionId, item);
     setNewCollectionName('');
     close();
   };

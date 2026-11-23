@@ -4,10 +4,11 @@ import { useSettingsStore } from '@/modules/settings/public/store/useSettingsSto
 
 type ViewMode = 'grid' | 'list';
 
-/** The section a path belongs to: its first segment ("movies", "favorites"),
- * "home" for the root. */
+/** Library lists retain the view settings from their previous pages. */
 export function viewSection(pathname: string): string {
-  return pathname.split('/').filter(Boolean)[0] ?? 'home';
+  const [section, listId] = pathname.split('/').filter(Boolean);
+  if (section === 'library') return listId === 'favorites' ? 'favorites' : 'collections';
+  return section ?? 'home';
 }
 
 /**

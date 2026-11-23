@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { Compass } from 'lucide-react';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { useI18n } from '@/shared/i18n/i18n';
@@ -7,12 +7,11 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { PageTransition } from '../shell/PageTransition';
 import styles from '../shell/AppLayout.module.css';
 import {
-  CollectionsPage,
   ContinueWatchingPage,
   DownloadsPage,
   EpgPage,
-  FavoritesPage,
   HomePage,
+  LibraryPage,
   LiveTvPage,
   M3uEditorPage,
   MoviesPage,
@@ -61,8 +60,9 @@ export function AppRoutes() {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/continue" element={<ContinueWatchingPage />} />
           <Route path="/watch-next" element={<WatchNextPage />} />
-          <Route path="/favorites" element={<FavoritesPage />} />
-          <Route path="/collections" element={<CollectionsPage />} />
+          <Route path="/library/:listId?" element={<LibraryPage />} />
+          <Route path="/favorites" element={<Navigate to="/library/favorites" replace />} />
+          <Route path="/collections" element={<Navigate to="/library" replace />} />
           <Route path="/downloads" element={<DownloadsPage />} />
           <Route path="/upcoming" element={<UpcomingPage />} />
           <Route path="/settings" element={<SettingsPage />} />

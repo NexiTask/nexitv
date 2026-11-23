@@ -220,7 +220,7 @@ interface LibraryState {
     } | null,
   ) => void;
 
-  createCollection: (name: string) => void;
+  createCollection: (name: string) => string;
   renameCollection: (id: string, newName: string) => void;
   deleteCollection: (id: string) => void;
   addToCollection: (collectionId: string, item: MediaItem) => void;
@@ -501,6 +501,7 @@ export const useLibraryStore = create<LibraryState>()(
           'library',
         );
         debugLog.info('library', `Created collection: ${name}`, { id: newCol.id });
+        return newCol.id;
       },
 
       renameCollection: (id, newName) => {

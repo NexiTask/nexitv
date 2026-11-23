@@ -9,8 +9,7 @@ const loaders = {
   '/search': () => import('@/modules/search/pages/SearchPage'),
   '/continue': () => import('@/modules/library/pages/ContinueWatchingPage'),
   '/watch-next': () => import('@/modules/library/pages/WatchNextPage'),
-  '/favorites': () => import('@/modules/library/pages/FavoritesPage'),
-  '/collections': () => import('@/modules/library/pages/CollectionsPage'),
+  '/library': () => import('@/modules/library/pages/LibraryPage'),
   '/downloads': () => import('@/modules/downloads/pages/DownloadsPage'),
   '/upcoming': () => import('@/modules/guide/pages/UpcomingPage'),
   '/settings': () => import('@/modules/settings/pages/SettingsPage'),
@@ -40,11 +39,8 @@ export const SeriesPage = lazy(() =>
 export const SearchPage = lazy(() =>
   loaders['/search']().then((module) => ({ default: module.SearchPage })),
 );
-export const FavoritesPage = lazy(() =>
-  loaders['/favorites']().then((module) => ({ default: module.FavoritesPage })),
-);
-export const CollectionsPage = lazy(() =>
-  loaders['/collections']().then((module) => ({ default: module.CollectionsPage })),
+export const LibraryPage = lazy(() =>
+  loaders['/library']().then((module) => ({ default: module.LibraryPage })),
 );
 export const ContinueWatchingPage = lazy(() =>
   loaders['/continue']().then((module) => ({ default: module.ContinueWatchingPage })),

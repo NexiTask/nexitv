@@ -1,13 +1,9 @@
-import { PanelLeftClose, PanelLeft } from 'lucide-react';
+import { LibraryBig, PanelLeftClose, PanelLeft } from 'lucide-react';
 import {
   RiCalendarScheduleFill,
   RiCalendarScheduleLine,
   RiDownload2Fill,
   RiDownload2Line,
-  RiFolderFill,
-  RiFolderLine,
-  RiHeartFill,
-  RiHeartLine,
   RiHistoryFill,
   RiHistoryLine,
   RiHome5Fill,
@@ -55,8 +51,6 @@ export function Sidebar() {
     (state) => state.history.filter((item) => !isQueuedEpisode(item)).length,
   );
   const { items: watchNext } = useWatchNext();
-  const favorites = useLibraryStore((state) => state.favorites);
-  const collections = useLibraryStore((state) => state.collections);
   const downloads = useDownloadStore((state) => state.jobs);
   const sources = useEnabledSources();
   const prefetch = (path: string) => void prefetchNavigationData(path, sources);
@@ -109,16 +103,10 @@ export function Sidebar() {
         ]
       : []),
     {
-      icons: { line: RiHeartLine, fill: RiHeartFill },
-      label: 'Favorites',
-      path: '/favorites',
-      badge: favorites.length,
-    },
-    {
-      icons: { line: RiFolderLine, fill: RiFolderFill },
-      label: 'Collections',
-      path: '/collections',
-      badge: collections.length,
+      icons: { line: LibraryBig, fill: LibraryBig },
+      label: 'Library',
+      path: '/library',
+      badge: 0,
     },
     {
       icons: { line: RiDownload2Line, fill: RiDownload2Fill },

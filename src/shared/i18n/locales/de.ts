@@ -192,6 +192,8 @@ export const DE_MESSAGES: Record<string, string> = {
   'No Downloads Yet': 'Noch keine Downloads',
   'No Watch History': 'Kein Wiedergabeverlauf',
   'Your Favorites Are Empty': 'Ihre Favoriten sind leer',
+  'Use the heart on a movie, series, or live channel to add it to Favorites.':
+    'Klicken Sie bei einem Film, einer Serie oder einem Live-Sender auf das Herz, um den Eintrag zu Ihren Favoriten hinzuzufügen.',
   'No Collections Found': 'Keine Sammlungen gefunden',
   'Loading page': 'Seite wird geladen',
   'Loading movies': 'Filme werden geladen',

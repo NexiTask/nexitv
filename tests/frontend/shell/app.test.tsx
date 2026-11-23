@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/app/shell/Sidebar', () => ({
@@ -56,7 +57,13 @@ beforeEach(() => {
     value: vi.fn(),
   });
   window.history.replaceState({}, '', '/');
-  useLibraryStore.setState({ history: [], trackedSeries: {}, watched: [] });
+  useLibraryStore.setState({
+    favorites: [],
+    collections: [],
+    history: [],
+    trackedSeries: {},
+    watched: [],
+  });
   useSettingsStore.getState().resetSettings();
   useSettingsStore.setState({ onboardingDismissed: true });
   useAuthStore.setState({
@@ -73,6 +80,82 @@ beforeEach(() => {
 });
 
 describe('application shell', () => {
+  it('moves the existing Favorites page into Library and keeps the list permanent', async () => {
+    await preloadRouteModule('/library');
+    const movie = {
+      id: 'favorite-film',
+      title: 'Favorite film',
+      posterUrl: '',
+      type: 'vod' as const,
+    };
+    const collection = { id: 'weekend', name: 'Weekend', items: [movie] };
+    useLibraryStore.setState({ favorites: [movie], collections: [collection] });
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800);
+    useSettingsStore.setState({ lastCollectionId: collection.id });
+    window.history.replaceState({}, '', '/favorites');
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Favorites', level: 1 })).toBeTruthy();
+    expect(window.location.pathname).toBe('/library/favorites');
+    const library = within(screen.getByRole('complementary', { name: 'Library' }));
+    const favorites = library.getByRole('link', { name: 'Favorites' });
+    const weekend = library.getByRole('link', { name: 'Weekend' });
+    expect(library.getAllByRole('link')).toEqual([favorites, weekend]);
+    expect(favorites.getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('group', { name: 'Open Favorite film' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Rename Collection' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete Collection' })).toBeNull();
+
+    await user.click(weekend);
+    expect(await screen.findByRole('heading', { name: 'Weekend', level: 1 })).toBeTruthy();
+    const card = screen.getByRole('group', { name: 'Open Favorite film' });
+    await user.hover(card);
+    await user.click(within(card).getByRole('button', { name: 'Remove from Favorites' }));
+    expect(useLibraryStore.getState().favorites).toEqual([]);
+    expect(useLibraryStore.getState().collections[0]?.items).toEqual([movie]);
+    await user.click(within(card).getByRole('button', { name: 'Add to Favorites' }));
+    await user.click(screen.getByRole('button', { name: 'Delete Collection' }));
+    const confirmation = within(screen.getByRole('alertdialog', { name: 'Delete Collection?' }));
+    await user.click(confirmation.getByRole('button', { name: 'Delete Collection' }));
+
+    expect(await screen.findByRole('heading', { name: 'Favorites', level: 1 })).toBeTruthy();
+    expect(window.location.pathname).toBe('/library/favorites');
+    const activeLibrary = within(screen.getByRole('complementary', { name: 'Library' }));
+    const activeFavorites = activeLibrary.getByRole('link', { name: 'Favorites' });
+    expect(activeLibrary.getAllByRole('link')).toEqual([activeFavorites]);
+    expect(useLibraryStore.getState().favorites).toEqual([movie]);
+    const favoriteCard = screen.getByRole('group', { name: 'Open Favorite film' });
+    await user.hover(favoriteCard);
+    await user.click(within(favoriteCard).getByRole('button', { name: 'Remove from Favorites' }));
+    expect(screen.getByRole('heading', { name: 'Your Favorites Are Empty' })).toBeTruthy();
+    expect(activeFavorites.getAttribute('aria-current')).toBe('page');
+  });
+
+  it('opens the saved custom list from the old Collections route and selects a new list by ID', async () => {
+    await preloadRouteModule('/library');
+    const collection = { id: 'weekend', name: 'Weekend', items: [] };
+    useLibraryStore.setState({ collections: [collection] });
+    useSettingsStore.setState({ lastCollectionId: collection.id });
+    window.history.replaceState({}, '', '/collections');
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Weekend', level: 1 })).toBeTruthy();
+    expect(window.location.pathname).toBe('/library/weekend');
+    await user.click(screen.getByRole('button', { name: 'Create Collection' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Create new collection' }));
+    await user.type(dialog.getByRole('textbox', { name: 'Collection name' }), collection.name);
+    await user.click(dialog.getByRole('button', { name: 'Create Collection' }));
+
+    const [first, created] = useLibraryStore.getState().collections;
+    expect(first).toEqual(collection);
+    expect(created?.name).toBe(collection.name);
+    expect(window.location.pathname).toBe(`/library/${created?.id}`);
+    expect(useSettingsStore.getState().lastCollectionId).toBe(created?.id);
+  });
+
   it('opens the Watch Next page and counts queued episodes separately from resume entries', async () => {
     await preloadRouteModule('/watch-next');
     const queued = {

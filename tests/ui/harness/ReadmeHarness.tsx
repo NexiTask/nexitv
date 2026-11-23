@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MotionConfig } from 'framer-motion';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { type M3uEntry, type M3uPlaylist } from '@/modules/sources/data/m3uClient';
 import { detailQueryKeys } from '@/modules/catalog/data/useDetails';
 import {
@@ -24,11 +24,10 @@ import { SeriesDetailsDialog } from '@/modules/catalog/details/SeriesDetailsDial
 import { M3uEditor } from '@/modules/m3u-editor/components/M3uEditor';
 import { PlayerShell } from '@/modules/playback/components/PlayerShell';
 import { DownloadsPage } from '@/modules/downloads/pages/DownloadsPage';
-import { CollectionsPage } from '@/modules/library/pages/CollectionsPage';
+import { LibraryPage } from '@/modules/library/pages/LibraryPage';
 import { ContinueWatchingPage } from '@/modules/library/pages/ContinueWatchingPage';
 import { EpgPage } from '@/modules/guide/pages/EpgPage';
 import { HomePage } from '@/modules/catalog/pages/HomePage';
-import { FavoritesPage } from '@/modules/library/pages/FavoritesPage';
 import { LiveTvPage } from '@/modules/catalog/pages/LiveTVPage';
 import { MoviesPage } from '@/modules/catalog/pages/MoviesPage';
 import { SearchPage } from '@/modules/search/pages/SearchPage';
@@ -1238,8 +1237,13 @@ function Surface({ surface }: { surface: ReadmeSurface | ReadmeFeatureSurface })
   if (surface === 'movies') return <MoviesPage />;
   if (surface === 'series') return <SeriesPage />;
   if (surface === 'continue-watching') return <ContinueWatchingPage />;
-  if (surface === 'favorites') return <FavoritesPage />;
-  if (surface === 'collections') return <CollectionsPage />;
+  if (surface === 'favorites' || surface === 'collections') {
+    return (
+      <Routes>
+        <Route path="/library/:listId" element={<LibraryPage />} />
+      </Routes>
+    );
+  }
   if (surface === 'not-found') return <NotFoundPage />;
   if (surface === 'live-tv') return <LiveTvPage />;
   if (surface === 'live-epg') return <EpgPage />;
@@ -1391,8 +1395,8 @@ const ROUTES: Record<ReadmeSurface, string> = {
   movies: '/movies',
   series: '/series',
   'continue-watching': '/continue',
-  favorites: '/favorites',
-  collections: '/collections',
+  favorites: '/library/favorites',
+  collections: '/library/weekend',
   'not-found': '/does-not-exist',
   'live-tv': '/live',
   'live-epg': '/epg',

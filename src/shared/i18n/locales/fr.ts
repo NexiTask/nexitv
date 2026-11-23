@@ -190,6 +190,8 @@ export const FR_MESSAGES: Record<string, string> = {
   'No Downloads Yet': "Aucun téléchargement pour l'instant",
   'No Watch History': 'Aucun historique de visionnage',
   'Your Favorites Are Empty': 'Vos favoris sont vides',
+  'Use the heart on a movie, series, or live channel to add it to Favorites.':
+    'Cliquez sur le cœur d’un film, d’une série ou d’une chaîne en direct pour l’ajouter aux favoris.',
   'No Collections Found': 'Aucune collection trouvée',
   'Loading page': 'Chargement de la page',
   'Loading movies': 'Chargement de films',

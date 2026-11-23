@@ -187,6 +187,8 @@ export const PL_MESSAGES: Record<string, string> = {
   'No Downloads Yet': 'Nie ma jeszcze pobrań',
   'No Watch History': 'Brak historii oglądania',
   'Your Favorites Are Empty': 'Twoje ulubione są puste',
+  'Use the heart on a movie, series, or live channel to add it to Favorites.':
+    'Kliknij serce przy filmie, serialu lub kanale na żywo, aby dodać go do ulubionych.',
   'No Collections Found': 'Nie znaleziono kolekcji',
   'Loading page': 'Ładowanie strony',
   'Loading movies': 'Ładowanie filmów',

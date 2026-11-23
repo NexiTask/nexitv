@@ -1,4 +1,4 @@
-.collectionsPage {
+.libraryPage {
   display: flex;
   flex-direction: row;
   flex: 1;
@@ -24,6 +24,7 @@
   font-weight: var(--font-weight-medium);
   cursor: pointer;
   text-align: left;
+  text-decoration: none;
   width: 100%;
   position: relative;
   min-height: var(--control-height-md);
@@ -34,7 +35,7 @@
   color: var(--text-primary);
 }
 
-.collectionRow.active {
+.collectionRow[aria-current='page'] {
   background-color: var(--bg-active) !important;
   color: var(--text-primary) !important;
   font-weight: var(--font-weight-semibold);
@@ -55,14 +56,13 @@
   margin-left: var(--space-2);
 }
 
-.collectionRow.active .collectionCount {
+.collectionRow[aria-current='page'] .collectionCount {
   color: var(--text-primary) !important;
 }
 
-.emptySidebarText {
-  color: var(--text-muted);
-  font-size: var(--font-size-control);
-  margin: var(--space-2) 0;
+.favoritesIcon {
+  flex-shrink: 0;
+  margin-inline-end: var(--space-2);
 }
 
 .collectionActions {
@@ -136,7 +136,7 @@
 }
 
 @media (max-width: 640px) {
-  .collectionsPage {
+  .libraryPage {
     flex-direction: column;
   }
 

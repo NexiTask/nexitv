@@ -186,6 +186,8 @@ export const NL_MESSAGES: Record<string, string> = {
   'No Downloads Yet': 'Nog geen downloads',
   'No Watch History': 'Geen kijkgeschiedenis',
   'Your Favorites Are Empty': 'Je favorieten zijn leeg',
+  'Use the heart on a movie, series, or live channel to add it to Favorites.':
+    'Klik op het hartje bij een film, serie of livezender om deze aan je favorieten toe te voegen.',
   'No Collections Found': 'Geen collecties gevonden',
   'Loading page': 'Pagina laden',
   'Loading movies': 'Films laden',

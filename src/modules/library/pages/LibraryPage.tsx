@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { VirtualizedGrid } from '@/modules/catalog/public/components/VirtualizedGrid';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { CatalogViewToggle } from '@/modules/catalog/public/components/CatalogViewToggle';
-import { FolderHeart, Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Heart, FolderHeart, Plus, Edit2, Trash2, X } from 'lucide-react';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { HeaderSearch } from '@/modules/search/public/components/HeaderSearch';
 import appStyles from '@/app/shell/AppLayout.module.css';
-import styles from './CollectionsPage.module.css';
+import styles from './LibraryPage.module.css';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import { WorkspaceSidebar } from '@/shared/ui/WorkspaceSidebar';
 import { CatalogPageHeader } from '@/modules/catalog/public/components/CatalogPageHeader';
@@ -17,19 +18,28 @@ import { MediaDetailsDialogs } from '@/modules/catalog/public/details/MediaDetai
 import { useMediaDetailState } from '@/modules/catalog/public/hooks/useMediaDetailsState';
 import { useI18n } from '@/shared/i18n/i18n';
 
-export function CollectionsPage() {
+export function LibraryPage() {
   const { t, tn, number } = useI18n();
+  const { listId } = useParams<'listId'>();
+  const navigate = useNavigate();
+  const favorites = useLibraryStore((state) => state.favorites);
   const collections = useLibraryStore((state) => state.collections);
   const createCollection = useLibraryStore((state) => state.createCollection);
   const renameCollection = useLibraryStore((state) => state.renameCollection);
   const deleteCollection = useLibraryStore((state) => state.deleteCollection);
   const sidebarWidth = useSettingsStore((state) => state.sidebarWidth);
-  const activeCollectionId = useSettingsStore((state) => state.lastCollectionId);
+  const lastCollectionId = useSettingsStore((state) => state.lastCollectionId);
   const updateSetting = useSettingsStore((state) => state.updateSetting);
-  const setActiveCollectionId = useCallback(
-    (id: string | null) => updateSetting('lastCollectionId', id),
-    [updateSetting],
-  );
+  const activeCollection = collections.find((collection) => collection.id === listId);
+  const showingFavorites = listId === 'favorites';
+  const items = activeCollection?.items ?? favorites;
+
+  const selectedCollectionId = showingFavorites ? null : activeCollection?.id;
+  useEffect(() => {
+    if (selectedCollectionId !== undefined && selectedCollectionId !== lastCollectionId) {
+      updateSetting('lastCollectionId', selectedCollectionId);
+    }
+  }, [selectedCollectionId, lastCollectionId, updateSetting]);
 
   const { selectedMovie, selectedSeries, handleCloseMovie, handleCloseSeries, handleItemClick } =
     useMediaDetailState({ enableSourceOnOpen: true });
@@ -43,18 +53,11 @@ export function CollectionsPage() {
   const closeCreateModal = useCallback(() => setIsCreateOpen(false), []);
   const closeRenameModal = useCallback(() => setIsRenameOpen(false), []);
 
-  // Keep activeCollectionId synced if collection list changes
-  useEffect(() => {
-    if (collections.length === 0) {
-      setActiveCollectionId(null);
-    } else if (activeCollectionId && !collections.some((c) => c.id === activeCollectionId)) {
-      setActiveCollectionId(collections[0]!.id);
-    } else if (!activeCollectionId && collections.length > 0) {
-      setActiveCollectionId(collections[0]!.id);
-    }
-  }, [collections, activeCollectionId, setActiveCollectionId]);
-
-  const activeCollection = collections.find((c) => c.id === activeCollectionId);
+  if (!showingFavorites && !activeCollection) {
+    const lastCollection =
+      listId === undefined && collections.find((collection) => collection.id === lastCollectionId);
+    return <Navigate to={`/library/${lastCollection ? lastCollection.id : 'favorites'}`} replace />;
+  }
 
   const openCreateModal = () => {
     setNewCollectionName('');
@@ -64,14 +67,9 @@ export function CollectionsPage() {
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newCollectionName && newCollectionName.trim()) {
-      const trimmed = newCollectionName.trim();
-      createCollection(trimmed);
+      const id = createCollection(newCollectionName.trim());
       setIsCreateOpen(false);
-      queueMicrotask(() => {
-        const latest = useLibraryStore.getState().collections;
-        const created = latest.find((c) => c.name === trimmed);
-        if (created) setActiveCollectionId(created.id);
-      });
+      void navigate(`/library/${id}`);
     }
   };
 
@@ -98,14 +96,14 @@ export function CollectionsPage() {
     if (!activeCollection) return;
     deleteCollection(activeCollection.id);
     setIsDeleteOpen(false);
+    void navigate('/library/favorites', { replace: true });
   };
 
   return (
     <>
-      <div className={`${appStyles.page} ${styles.collectionsPage}`}>
+      <div className={`${appStyles.page} ${styles.libraryPage}`}>
         <WorkspaceSidebar
-          title="Collections"
-          count={collections.length}
+          title="Library"
           width={sidebarWidth}
           onWidthChange={(width) => updateSetting('sidebarWidth', width)}
           headerAction={
@@ -121,37 +119,40 @@ export function CollectionsPage() {
             </Button>
           }
         >
-          {collections.length === 0 ? (
-            <p className={styles.emptySidebarText}>{t('No custom collections.')}</p>
-          ) : (
-            <>
-              {collections.map((c) => (
-                <button
-                  type="button"
-                  key={c.id}
-                  onClick={() => setActiveCollectionId(c.id)}
-                  className={`${styles.collectionRow} ${activeCollectionId === c.id ? styles.active : ''}`}
-                  aria-label={c.name}
-                  aria-current={activeCollectionId === c.id ? 'page' : undefined}
-                >
-                  <span className={styles.collectionName}>{c.name}</span>
-                  <span className={styles.collectionCount}>{c.items.length}</span>
-                </button>
-              ))}
-            </>
-          )}
+          <NavLink
+            to="/library/favorites"
+            end
+            className={styles.collectionRow ?? ''}
+            aria-label={t('Favorites')}
+          >
+            <Heart size={16} className={styles.favoritesIcon} aria-hidden="true" />
+            <span className={styles.collectionName}>{t('Favorites')}</span>
+            <span className={styles.collectionCount} aria-hidden="true">
+              {number(favorites.length)}
+            </span>
+          </NavLink>
+          {collections.map((collection) => (
+            <NavLink
+              key={collection.id}
+              to={`/library/${collection.id}`}
+              end
+              className={styles.collectionRow ?? ''}
+              aria-label={collection.name}
+            >
+              <span className={styles.collectionName}>{collection.name}</span>
+              <span className={styles.collectionCount} aria-hidden="true">
+                {number(collection.items.length)}
+              </span>
+            </NavLink>
+          ))}
         </WorkspaceSidebar>
 
         <div className={appStyles.catalogMain}>
           <CatalogPageHeader
-            title={activeCollection ? activeCollection.name : 'Collections'}
-            meta={
-              activeCollection
-                ? tn('{count} item', '{count} items', activeCollection.items.length, {
-                    count: number(activeCollection.items.length),
-                  })
-                : t('Create collections to group your content')
-            }
+            title={activeCollection?.name ?? 'Favorites'}
+            meta={tn('{count} item', '{count} items', items.length, {
+              count: number(items.length),
+            })}
             titleActions={
               activeCollection ? (
                 <div className={styles.collectionActions}>
@@ -184,29 +185,26 @@ export function CollectionsPage() {
             }
           />
 
-          {activeCollection && activeCollection.items.length > 0 ? (
+          {items.length > 0 ? (
             <div className={appStyles.catalogContent}>
               <VirtualizedGrid
-                items={activeCollection.items}
+                items={items}
                 onItemClick={handleItemClick}
-                currentCollectionId={activeCollection.id}
+                currentCollectionId={activeCollection?.id}
               />
             </div>
           ) : (
             <EmptyState
-              icon={FolderHeart}
-              title={activeCollection ? 'Collection Empty' : 'No Collections Found'}
+              icon={activeCollection ? FolderHeart : Heart}
+              title={activeCollection ? 'Collection Empty' : 'Your Favorites Are Empty'}
               description={
                 activeCollection
                   ? t(
                       '"{name}" has no items yet. Add movies or series from their detail modals or context menus.',
                       { name: activeCollection.name },
                     )
-                  : 'Group your favorite movies and shows into custom playlists and collections.'
+                  : 'Use the heart on a movie, series, or live channel to add it to Favorites.'
               }
-              actionLabel={!activeCollection ? 'Create Collection' : undefined}
-              actionIcon={!activeCollection ? Plus : undefined}
-              onAction={!activeCollection ? openCreateModal : undefined}
             />
           )}
         </div>

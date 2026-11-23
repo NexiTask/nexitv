@@ -252,18 +252,23 @@ describe('Sidebar', () => {
     return mediaQuery;
   }
 
-  it('identifies the Library navigation without a visible heading and lists playback first', () => {
+  it('keeps playback first and provides a single Library link', () => {
     useSettingsStore.setState({ upcomingEnabled: true, sidebarCollapsed: false });
 
-    renderSidebar();
+    renderSidebar('/library/favorites');
 
-    expect(screen.queryByText('Library')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Library' })).toBeNull();
     const library = within(screen.getByRole('navigation', { name: 'Library' }));
     expect(library.getAllByRole('link').slice(0, 3)).toEqual([
       library.getByRole('link', { name: 'Continue Watching' }),
       library.getByRole('link', { name: 'Watch Next' }),
       library.getByRole('link', { name: 'Coming Up' }),
     ]);
+    const link = library.getByRole('link', { name: 'Library' });
+    expect(link.getAttribute('href')).toBe('/library');
+    expect(link.getAttribute('aria-current')).toBe('page');
+    expect(library.queryByRole('link', { name: 'Favorites' })).toBeNull();
+    expect(library.queryByRole('link', { name: 'Collections' })).toBeNull();
   });
 
   it('hides the Coming Up workspace when its master preference is disabled', () => {
