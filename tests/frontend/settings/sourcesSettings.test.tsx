@@ -247,9 +247,15 @@ describe('unified source settings', () => {
 
     await waitFor(() => expect(refreshSource).toHaveBeenCalledWith(remoteProfile.id));
     expect(refreshSource).not.toHaveBeenCalledWith(editedProfile.id);
-    expect(screen.getByRole('status').textContent).toBe('Refreshing sources… 40%');
+    expect(screen.getByText('40%')).toBeTruthy();
+    expect(
+      screen
+        .getByRole('progressbar', { name: 'Refreshing sources…' })
+        .getAttribute('aria-valuenow'),
+    ).toBe('40');
     finishLiveList(new Response('[{"stream_id":4,"name":"Channel"}]'));
     expect(await screen.findByText('Sources Refreshed')).toBeTruthy();
+    expect(screen.queryByRole('progressbar')).toBeNull();
     expect(fetchCatalog.mock.calls.map(([url]) => new URL(url).searchParams.get('action'))).toEqual(
       ['get_live_streams', 'get_vod_streams', 'get_series'],
     );

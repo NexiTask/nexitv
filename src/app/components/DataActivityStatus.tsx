@@ -10,24 +10,40 @@ const SHOW_DELAY_MS = 400;
 function ActivityRow({
   label,
   compact,
+  percent,
   state = 'working',
 }: {
   label: string;
   compact: boolean;
+  percent?: number | undefined;
   state?: 'working' | 'complete' | 'error';
 }) {
+  const { number } = useI18n();
   const Icon = state === 'working' ? LoaderCircle : state === 'complete' ? Check : CircleAlert;
+  const value = percent === undefined ? undefined : number(percent / 100, { style: 'percent' });
+
   return (
     <div
-      className={compact ? `${styles.row} ${styles.compact}` : styles.row}
-      title={compact ? label : undefined}
+      className={styles.row}
+      title={compact ? [label, value].filter(Boolean).join(' ') : undefined}
     >
-      <Icon
-        size={16}
-        aria-hidden="true"
-        className={state === 'working' ? styles.spinner : undefined}
-      />
-      <span className={styles.label}>{label}</span>
+      <Icon size={16} aria-hidden="true" className={styles.icon} data-state={state} />
+      <div className={styles.details}>
+        <div className={styles.heading}>
+          <span className={styles.label}>{label}</span>
+          {value !== undefined && <span className={styles.value}>{value}</span>}
+        </div>
+        {percent !== undefined && (
+          <div
+            className={styles.track}
+            role="progressbar"
+            aria-label={label}
+            aria-valuenow={percent}
+          >
+            <span className={styles.fill} style={{ transform: `scaleX(${percent / 100})` }} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -41,7 +57,7 @@ function ActivityLabels({
   compact: boolean;
   progress: ReadonlyMap<DataActivity, number>;
 }) {
-  const { t, number } = useI18n();
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -57,20 +73,18 @@ function ActivityLabels({
     playlist: t('Loading playlists…'),
     guide: t('Loading the TV guide…'),
   };
-  const label = active
-    .map((activity) => {
-      const percent = progress.get(activity);
-      return percent === undefined
-        ? labels[activity]
-        : `${labels[activity]} ${number(percent / 100, { style: 'percent', maximumFractionDigits: 0 })}`;
-    })
-    .join(' ');
-
-  return <ActivityRow label={label} compact={compact} />;
+  return active.map((activity) => (
+    <ActivityRow
+      key={activity}
+      label={labels[activity]}
+      compact={compact}
+      percent={progress.get(activity)}
+    />
+  ));
 }
 
 export function DataActivityStatus({ compact }: { compact: boolean }) {
-  const { t, number } = useI18n();
+  const { t } = useI18n();
   const counts = useDataActivities();
   const active = ACTIVITIES.filter((activity) => counts[activity] > 0);
   const progress = new Map<DataActivity, number>();
@@ -79,18 +93,19 @@ export function DataActivityStatus({ compact }: { compact: boolean }) {
   }
   const refresh = counts.sourceRefresh?.phase;
   const refreshLabels = {
-    refreshing: `${t('Refreshing sources…')} ${number((counts.sourceRefresh?.percent ?? 0) / 100, { style: 'percent', maximumFractionDigits: 0 })}`,
+    refreshing: t('Refreshing sources…'),
     complete: t('Sources Refreshed'),
     incomplete: t('Refresh Incomplete'),
     failed: t('Refresh Failed'),
   };
 
   return (
-    <div role="status">
+    <div className={compact ? `${styles.card} ${styles.compact}` : styles.card} role="status">
       {refresh ? (
         <ActivityRow
           label={refreshLabels[refresh]}
           compact={compact}
+          percent={refresh === 'refreshing' ? counts.sourceRefresh?.percent : undefined}
           state={
             refresh === 'refreshing' ? 'working' : refresh === 'complete' ? 'complete' : 'error'
           }

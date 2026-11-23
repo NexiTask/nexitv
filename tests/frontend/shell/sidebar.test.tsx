@@ -77,23 +77,29 @@ describe('Sidebar', () => {
       expect(status.textContent).toBe('');
 
       act(() => vi.advanceTimersByTime(400));
-      const activeLabel = 'Loading the provider catalog… Preparing the library index…';
-      expect(status.textContent).toBe(activeLabel);
+      expect(screen.getByText('Loading the provider catalog…')).toBeTruthy();
+      expect(screen.getByText('Preparing the library index…')).toBeTruthy();
+      expect(screen.queryByRole('progressbar')).toBeNull();
       expect(status.nextElementSibling?.contains(settings)).toBe(true);
 
       act(() => useSettingsStore.setState({ sidebarCollapsed: true }));
-      expect(screen.getByTitle(activeLabel).textContent).toBe(activeLabel);
+      expect(screen.getByTitle('Loading the provider catalog…')).toBeTruthy();
 
       act(() => reportIndex(25));
-      expect(status.textContent).toBe('Loading the provider catalog… Indexing titles… 25%');
+      const progress = screen.getByRole('progressbar', { name: 'Indexing titles…' });
+      expect(progress.getAttribute('aria-valuenow')).toBe('25');
+      expect(screen.getByTitle('Indexing titles… 25%').contains(progress)).toBe(true);
+      expect(screen.getByText('25%')).toBeTruthy();
 
       await act(async () => {
         finishCatalog();
         await catalog;
       });
-      expect(status.textContent).toBe('Indexing titles… 25%');
+      expect(screen.queryByText('Loading the provider catalog…')).toBeNull();
+      expect(screen.getByRole('progressbar', { name: 'Indexing titles…' })).toBe(progress);
       act(() => reportIndex(null));
       expect(status.textContent).toBe('Preparing the library index…');
+      expect(screen.queryByRole('progressbar')).toBeNull();
 
       await act(async () => {
         const error = new Error('Index unavailable');
