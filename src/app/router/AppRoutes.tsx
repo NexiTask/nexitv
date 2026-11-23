@@ -7,7 +7,6 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { PageTransition } from '../shell/PageTransition';
 import styles from '../shell/AppLayout.module.css';
 import {
-  ContinueWatchingPage,
   DownloadsPage,
   EpgPage,
   HomePage,
@@ -19,7 +18,6 @@ import {
   SeriesPage,
   SettingsPage,
   UpcomingPage,
-  WatchNextPage,
 } from './routeModules';
 
 export function NotFoundPage() {
@@ -58,8 +56,8 @@ export function AppRoutes() {
           <Route path="/movies" element={<MoviesPage />} />
           <Route path="/series" element={<SeriesPage />} />
           <Route path="/search" element={<SearchPage />} />
-          <Route path="/continue" element={<ContinueWatchingPage />} />
-          <Route path="/watch-next" element={<WatchNextPage />} />
+          <Route path="/continue" element={<Navigate to="/library/continue" replace />} />
+          <Route path="/watch-next" element={<Navigate to="/library/watch-next" replace />} />
           <Route path="/library/:listId?" element={<LibraryPage />} />
           <Route path="/favorites" element={<Navigate to="/library/favorites" replace />} />
           <Route path="/collections" element={<Navigate to="/library" replace />} />

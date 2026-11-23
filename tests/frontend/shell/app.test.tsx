@@ -104,7 +104,13 @@ describe('application shell', () => {
     const favorites = library.getByRole('link', { name: 'Favorites' });
     const weekend = library.getByRole('link', { name: 'Weekend' });
     const saved = library.getByRole('link', { name: 'Saved' });
-    expect(library.getAllByRole('link')).toEqual([saved, favorites, weekend]);
+    expect(library.getAllByRole('link')).toEqual([
+      library.getByRole('link', { name: 'Continue Watching' }),
+      library.getByRole('link', { name: 'Watch Next' }),
+      saved,
+      favorites,
+      weekend,
+    ]);
     expect(favorites.getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('group', { name: 'Open Favorite film' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Rename Collection' })).toBeNull();
@@ -129,7 +135,7 @@ describe('application shell', () => {
     const activeLibrary = within(screen.getByRole('complementary', { name: 'Library' }));
     const activeSaved = activeLibrary.getByRole('link', { name: 'Saved' });
     const activeFavorites = activeLibrary.getByRole('link', { name: 'Favorites' });
-    expect(activeLibrary.getAllByRole('link')).toEqual([activeSaved, activeFavorites]);
+    expect(activeLibrary.queryByRole('link', { name: 'Weekend' })).toBeNull();
     expect(activeSaved.getAttribute('aria-current')).toBe('page');
     expect(useLibraryStore.getState().favorites).toEqual([movie]);
     expect(screen.queryByRole('button', { name: 'Delete Collection' })).toBeNull();
@@ -184,8 +190,8 @@ describe('application shell', () => {
     expect(useSettingsStore.getState().lastCollectionId).toBe(created?.id);
   });
 
-  it('opens the Watch Next page and counts queued episodes separately from resume entries', async () => {
-    await preloadRouteModule('/watch-next');
+  it('opens the legacy Watch Next route in Library and keeps playback counts and actions separate', async () => {
+    await preloadRouteModule('/library/watch-next');
     const queued = {
       id: 'queued',
       title: 'Queued show',
@@ -203,9 +209,37 @@ describe('application shell', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Watch Next' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/library/watch-next');
+    const library = within(screen.getByRole('complementary', { name: 'Library' }));
+    const watchNext = library.getByRole('link', { name: 'Watch Next' });
+    const continueWatching = library.getByRole('link', { name: 'Continue Watching' });
+    expect(watchNext.getAttribute('aria-current')).toBe('page');
+    expect(within(watchNext).getByText('1')).toBeTruthy();
+    expect(within(continueWatching).getByText('1')).toBeTruthy();
     expect(screen.getByText('1 episode')).toBeTruthy();
     act(() => useLibraryStore.getState().dismissWatchNext(queued.id));
     expect(screen.getByRole('heading', { name: 'No Next Episodes' })).toBeTruthy();
+    expect(within(watchNext).getByText('0')).toBeTruthy();
+    expect(within(continueWatching).getByText('1')).toBeTruthy();
+
+    const user = userEvent.setup();
+    await user.click(continueWatching);
+    expect(await screen.findByRole('heading', { name: 'Continue Watching' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/library/continue');
+    expect(screen.getByText('1 item to resume')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Clear all watch history' }));
+    const confirmation = within(screen.getByRole('alertdialog', { name: 'Clear Watch History?' }));
+    await user.click(confirmation.getByRole('button', { name: 'Clear History' }));
+    expect(screen.getByRole('heading', { name: 'No Watch History' })).toBeTruthy();
+  });
+
+  it('redirects the old Continue Watching route into Library', async () => {
+    await preloadRouteModule('/library/continue');
+    window.history.replaceState({}, '', '/continue');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Continue Watching' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/library/continue');
   });
 
   it('restores M3U and Xtream sources in parallel', async () => {

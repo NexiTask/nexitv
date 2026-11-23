@@ -209,7 +209,7 @@ export function HomePage() {
             title="Continue Watching"
             items={continueWatchingItems}
             onItemClick={handleItemClick}
-            onSeeAll={() => navigate('/continue')}
+            onSeeAll={() => navigate('/library/continue')}
             onRemoveItem={removeFromHistory}
             removeLabel="Remove from Continue Watching"
           />
@@ -221,7 +221,7 @@ export function HomePage() {
             title="Watch Next"
             items={watchNextItems}
             onItemClick={handleItemClick}
-            onSeeAll={() => navigate('/watch-next')}
+            onSeeAll={() => navigate('/library/watch-next')}
             onRemoveItem={dismissWatchNext}
             removeLabel="Remove from Watch Next"
           />

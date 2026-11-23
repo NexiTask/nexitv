@@ -16,7 +16,6 @@ import {
   Grid3X3,
   HardDrive,
   Heart,
-  History,
   Home,
   Import,
   Keyboard,
@@ -76,8 +75,6 @@ export const RiHardDrive2Fill = HardDrive;
 export const RiHardDrive2Line = HardDrive;
 export const RiHeartFill = Heart;
 export const RiHeartLine = Heart;
-export const RiHistoryFill = History;
-export const RiHistoryLine = History;
 export const RiHome5Fill = Home;
 export const RiHome5Line = Home;
 export const RiHomeLine = Home;

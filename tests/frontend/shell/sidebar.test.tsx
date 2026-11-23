@@ -6,7 +6,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { LiveTvViewToggle } from '@/modules/catalog/components/LiveTvViewToggle';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from '@/app/shell/Sidebar';
-import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
+import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import {
   trackDataActivity,
@@ -29,22 +29,10 @@ describe('Sidebar', () => {
   const originalMatchMedia = window.matchMedia;
 
   beforeEach(() => {
-    useLibraryStore.setState({
-      history: [
-        {
-          id: 'history-1',
-          title: 'Movie',
-          type: 'vod',
-          posterUrl: '',
-          progressPercentage: 42,
-          lastWatchedAt: 1,
-        },
-      ],
-      favorites: [],
-      collections: [],
-      trackedSeries: {},
-      watched: [],
-    });
+    useDownloadStore.setState({ jobs: [] });
+    useDownloadStore
+      .getState()
+      .enqueue({ id: 'download', sourceUrl: 'https://media.test/video.mp4' });
   });
 
   it('shows ongoing data tasks above Settings and clears them as they finish', async () => {
@@ -144,46 +132,9 @@ describe('Sidebar', () => {
 
     renderSidebar();
 
-    const link = screen.getByRole('link', { name: 'Continue Watching, 1 item' });
-    expect(link.getAttribute('title')).toBe('Continue Watching (1)');
+    const link = screen.getByRole('link', { name: 'Downloads, 1 item' });
+    expect(link.getAttribute('title')).toBe('Downloads (1)');
     expect(link.querySelector('[class*="collapsedBadge"]')?.textContent).toBe('1');
-  });
-
-  it('counts the Watch Next queue separately and updates after dismissal', () => {
-    useSettingsStore.setState({ sidebarCollapsed: false });
-    const episode = {
-      id: 'queued-show',
-      title: 'Queued show',
-      type: 'series' as const,
-      posterUrl: '',
-      episodeId: 'next-episode',
-      seasonNum: 2,
-      episodeNum: 8,
-      progressPercentage: 0,
-      lastWatchedAt: 2,
-    };
-    useLibraryStore.setState(({ history }) => ({
-      history: [episode, { ...episode, id: 'paused-show', currentTime: 120 }, ...history],
-    }));
-    renderSidebar('/watch-next');
-
-    const watchNext = screen.getByRole('link', { name: 'Watch Next' });
-    expect(watchNext.getAttribute('href')).toBe('/watch-next');
-    expect(watchNext.getAttribute('aria-current')).toBe('page');
-    expect(watchNext.querySelector('[class*="badge"]')?.textContent).toBe('1');
-    const resume = screen.getByRole('link', { name: 'Continue Watching' });
-    expect(resume.getAttribute('href')).toBe('/continue');
-    expect(resume.querySelector('[class*="badge"]')?.textContent).toBe('2');
-
-    act(() =>
-      useSettingsStore.setState({ sidebarCollapsed: true, showCollapsedSidebarBadges: true }),
-    );
-    expect(screen.getByRole('link', { name: 'Watch Next, 1 item' })).toBe(watchNext);
-    expect(watchNext.querySelector('[class*="collapsedBadge"]')?.textContent).toBe('1');
-
-    act(() => useLibraryStore.getState().dismissWatchNext(episode.id));
-    expect(screen.getByRole('link', { name: 'Watch Next' })).toBe(watchNext);
-    expect(watchNext.querySelector('[class*="collapsedBadge"]')).toBeNull();
   });
 
   it('can hide collapsed library counts without changing their accessible labels', () => {
@@ -191,8 +142,8 @@ describe('Sidebar', () => {
 
     renderSidebar();
 
-    const link = screen.getByRole('link', { name: 'Continue Watching, 1 item' });
-    expect(link.getAttribute('title')).toBe('Continue Watching (1)');
+    const link = screen.getByRole('link', { name: 'Downloads, 1 item' });
+    expect(link.getAttribute('title')).toBe('Downloads (1)');
     expect(document.querySelector('aside')?.className).not.toContain('showCollapsedBadges');
   });
 
@@ -201,7 +152,7 @@ describe('Sidebar', () => {
 
     renderSidebar();
 
-    expect(screen.getByRole('link', { name: /Continue Watching/ }).textContent).toContain('1');
+    expect(screen.getByRole('link', { name: /Downloads/ }).textContent).toContain('1');
     // Seasonal decorations only rest on the full-width footer.
     expect(document.querySelector('[data-seasonal-decor="sidebar-footer"]')).toBeTruthy();
   });
@@ -252,17 +203,17 @@ describe('Sidebar', () => {
     return mediaQuery;
   }
 
-  it('keeps playback first and provides a single Library link', () => {
+  it('uses one Library link for its lists', () => {
     useSettingsStore.setState({ upcomingEnabled: true, sidebarCollapsed: false });
 
     renderSidebar('/library/favorites');
 
     expect(screen.queryByRole('heading', { name: 'Library' })).toBeNull();
     const library = within(screen.getByRole('navigation', { name: 'Library' }));
-    expect(library.getAllByRole('link').slice(0, 3)).toEqual([
-      library.getByRole('link', { name: 'Continue Watching' }),
-      library.getByRole('link', { name: 'Watch Next' }),
-      library.getByRole('link', { name: 'Coming Up' }),
+    expect(library.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      '/library',
+      '/upcoming',
+      '/downloads',
     ]);
     const link = library.getByRole('link', { name: 'Library' });
     expect(link.getAttribute('href')).toBe('/library');

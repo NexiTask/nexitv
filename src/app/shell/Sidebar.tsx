@@ -4,14 +4,10 @@ import {
   RiCalendarScheduleLine,
   RiDownload2Fill,
   RiDownload2Line,
-  RiHistoryFill,
-  RiHistoryLine,
   RiHome5Fill,
   RiHome5Line,
   RiMovie2Fill,
   RiMovie2Line,
-  RiPlayList2Fill,
-  RiPlayList2Line,
   RiSearchFill,
   RiSearchLine,
   RiSettings3Fill,
@@ -23,8 +19,6 @@ import {
 } from '@/shared/ui/icons';
 import { NavLink, useLocation } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { isQueuedEpisode, useLibraryStore } from '@/modules/library/store/useLibraryStore';
-import { useWatchNext } from '@/modules/catalog/public/data/useWatchNext';
 import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 import { StateIcon } from '@/shared/ui/StateIcon';
@@ -47,10 +41,6 @@ export function Sidebar() {
   const updateSetting = useSettingsStore((state) => state.updateSetting);
   const setIsCollapsed = (collapsed: boolean) => updateSetting('sidebarCollapsed', collapsed);
 
-  const resumeCount = useLibraryStore(
-    (state) => state.history.filter((item) => !isQueuedEpisode(item)).length,
-  );
-  const { items: watchNext } = useWatchNext();
   const downloads = useDownloadStore((state) => state.jobs);
   const sources = useEnabledSources();
   const prefetch = (path: string) => void prefetchNavigationData(path, sources);
@@ -81,16 +71,10 @@ export function Sidebar() {
 
   const libraryItems = [
     {
-      icons: { line: RiHistoryLine, fill: RiHistoryFill },
-      label: 'Continue Watching',
-      path: '/continue',
-      badge: resumeCount,
-    },
-    {
-      icons: { line: RiPlayList2Line, fill: RiPlayList2Fill },
-      label: 'Watch Next',
-      path: '/watch-next',
-      badge: watchNext.length,
+      icons: { line: LibraryBig, fill: LibraryBig },
+      label: 'Library',
+      path: '/library',
+      badge: 0,
     },
     ...(upcomingEnabled
       ? [
@@ -102,12 +86,6 @@ export function Sidebar() {
           },
         ]
       : []),
-    {
-      icons: { line: LibraryBig, fill: LibraryBig },
-      label: 'Library',
-      path: '/library',
-      badge: 0,
-    },
     {
       icons: { line: RiDownload2Line, fill: RiDownload2Fill },
       label: 'Downloads',

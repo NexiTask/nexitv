@@ -25,7 +25,6 @@ import { M3uEditor } from '@/modules/m3u-editor/components/M3uEditor';
 import { PlayerShell } from '@/modules/playback/components/PlayerShell';
 import { DownloadsPage } from '@/modules/downloads/pages/DownloadsPage';
 import { LibraryPage } from '@/modules/library/pages/LibraryPage';
-import { ContinueWatchingPage } from '@/modules/library/pages/ContinueWatchingPage';
 import { EpgPage } from '@/modules/guide/pages/EpgPage';
 import { HomePage } from '@/modules/catalog/pages/HomePage';
 import { LiveTvPage } from '@/modules/catalog/pages/LiveTVPage';
@@ -1236,8 +1235,7 @@ function Surface({ surface }: { surface: ReadmeSurface | ReadmeFeatureSurface })
   if (surface === 'hero' || surface === 'light-theme') return <HomePage />;
   if (surface === 'movies') return <MoviesPage />;
   if (surface === 'series') return <SeriesPage />;
-  if (surface === 'continue-watching') return <ContinueWatchingPage />;
-  if (surface === 'favorites' || surface === 'collections') {
+  if (surface === 'continue-watching' || surface === 'favorites' || surface === 'collections') {
     return (
       <Routes>
         <Route path="/library/:listId" element={<LibraryPage />} />
@@ -1394,7 +1392,7 @@ const ROUTES: Record<ReadmeSurface, string> = {
   hero: '/',
   movies: '/movies',
   series: '/series',
-  'continue-watching': '/continue',
+  'continue-watching': '/library/continue',
   favorites: '/library/favorites',
   collections: '/library/weekend',
   'not-found': '/does-not-exist',

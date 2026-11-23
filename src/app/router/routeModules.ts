@@ -7,8 +7,6 @@ const loaders = {
   '/movies': () => import('@/modules/catalog/pages/MoviesPage'),
   '/series': () => import('@/modules/catalog/pages/SeriesPage'),
   '/search': () => import('@/modules/search/pages/SearchPage'),
-  '/continue': () => import('@/modules/library/pages/ContinueWatchingPage'),
-  '/watch-next': () => import('@/modules/library/pages/WatchNextPage'),
   '/library': () => import('@/modules/library/pages/LibraryPage'),
   '/downloads': () => import('@/modules/downloads/pages/DownloadsPage'),
   '/upcoming': () => import('@/modules/guide/pages/UpcomingPage'),
@@ -19,7 +17,11 @@ const loaders = {
 type PreloadableRoute = keyof typeof loaders;
 
 export function preloadRouteModule(path: string): Promise<unknown> | undefined {
-  const route = path.startsWith('/m3u-editor') ? '/m3u-editor' : path;
+  const route = path.startsWith('/m3u-editor')
+    ? '/m3u-editor'
+    : path.startsWith('/library/')
+      ? '/library'
+      : path;
   return loaders[route as PreloadableRoute]?.();
 }
 
@@ -41,12 +43,6 @@ export const SearchPage = lazy(() =>
 );
 export const LibraryPage = lazy(() =>
   loaders['/library']().then((module) => ({ default: module.LibraryPage })),
-);
-export const ContinueWatchingPage = lazy(() =>
-  loaders['/continue']().then((module) => ({ default: module.ContinueWatchingPage })),
-);
-export const WatchNextPage = lazy(() =>
-  loaders['/watch-next']().then((module) => ({ default: module.WatchNextPage })),
 );
 export const DownloadsPage = lazy(() =>
   loaders['/downloads']().then((module) => ({ default: module.DownloadsPage })),

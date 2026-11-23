@@ -8,7 +8,13 @@ type ViewMode = 'grid' | 'list';
 export function viewSection(pathname: string): string {
   const [section, listId] = pathname.split('/').filter(Boolean);
   if (section === 'library') {
-    if (listId === 'favorites' || listId === 'saved') return listId;
+    if (
+      listId === 'favorites' ||
+      listId === 'saved' ||
+      listId === 'continue' ||
+      listId === 'watch-next'
+    )
+      return listId;
     return 'collections';
   }
   return section ?? 'home';

@@ -3,7 +3,8 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useWatchNext } from '@/modules/catalog/data/useWatchNext';
 import { seriesInfoQuery } from '@/modules/catalog/data/useDetails';
@@ -89,7 +90,7 @@ describe('saved next episodes', () => {
     vi.mocked(getSeriesInfo).mockReset();
   });
 
-  it('offers the queued episode immediately and keeps started episodes in resume history', () => {
+  it('offers the queued episode immediately and keeps started episodes in resume history', async () => {
     const queued: HistoryItem = {
       id: 'show-a',
       title: 'Show A',
@@ -120,14 +121,25 @@ describe('saved next episodes', () => {
       resumed,
     ]);
 
+    function CurrentPath() {
+      return createElement('output', { 'aria-label': 'Current path' }, useLocation().pathname);
+    }
     const home = render(
       createElement(
         MemoryRouter,
         null,
-        createElement(QueryClientProvider, { client }, createElement(HomePage)),
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(HomePage),
+          createElement(CurrentPath),
+        ),
       ),
     );
-    expect(screen.getByRole('button', { name: 'See all for Watch Next' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'See all for Watch Next' }));
+    expect(screen.getByRole('status', { name: 'Current path' }).textContent).toBe(
+      '/library/watch-next',
+    );
     home.unmount();
 
     act(() => useLibraryStore.getState().dismissWatchNext(queued.id));

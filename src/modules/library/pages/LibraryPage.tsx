@@ -1,9 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { VirtualizedGrid } from '@/modules/catalog/public/components/VirtualizedGrid';
-import { useLibraryStore } from '../store/useLibraryStore';
+import { isQueuedEpisode, useLibraryStore } from '../store/useLibraryStore';
 import { CatalogViewToggle } from '@/modules/catalog/public/components/CatalogViewToggle';
-import { Bookmark, Heart, FolderHeart, Plus, Edit2, Trash2, X } from 'lucide-react';
+import {
+  Bookmark,
+  Heart,
+  FolderHeart,
+  History,
+  ListVideo,
+  Plus,
+  Edit2,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { HeaderSearch } from '@/modules/search/public/components/HeaderSearch';
 import appStyles from '@/app/shell/AppLayout.module.css';
@@ -16,12 +26,18 @@ import { Button, IconButton } from '@/shared/ui/Button';
 import { DialogShell } from '@/shared/ui/DialogShell';
 import { MediaDetailsDialogs } from '@/modules/catalog/public/details/MediaDetailsDialogs';
 import { useMediaDetailState } from '@/modules/catalog/public/hooks/useMediaDetailsState';
+import { useWatchNext } from '@/modules/catalog/public/data/useWatchNext';
+import { ContinueWatchingList } from './ContinueWatchingList';
+import { WatchNextList } from './WatchNextList';
 import { useI18n } from '@/shared/i18n/i18n';
 
 export function LibraryPage() {
   const { t, tn, number } = useI18n();
   const { listId } = useParams<'listId'>();
   const navigate = useNavigate();
+  const history = useLibraryStore((state) => state.history);
+  const resumeItems = history.filter((item) => !isQueuedEpisode(item));
+  const watchNext = useWatchNext();
   const savedItems = useLibraryStore((state) => state.savedItems);
   const favorites = useLibraryStore((state) => state.favorites);
   const collections = useLibraryStore((state) => state.collections);
@@ -32,6 +48,18 @@ export function LibraryPage() {
   const lastCollectionId = useSettingsStore((state) => state.lastCollectionId);
   const updateSetting = useSettingsStore((state) => state.updateSetting);
   const builtInLists = [
+    {
+      id: 'continue',
+      name: 'Continue Watching',
+      icon: History,
+      items: resumeItems,
+    },
+    {
+      id: 'watch-next',
+      name: 'Watch Next',
+      icon: ListVideo,
+      items: watchNext.items,
+    },
     {
       id: 'saved',
       name: 'Saved',
@@ -176,63 +204,71 @@ export function LibraryPage() {
         </WorkspaceSidebar>
 
         <div className={appStyles.catalogMain}>
-          <CatalogPageHeader
-            title={selectedList.name}
-            meta={tn('{count} item', '{count} items', items.length, {
-              count: number(items.length),
-            })}
-            titleActions={
-              activeCollection ? (
-                <div className={styles.collectionActions}>
-                  <IconButton
-                    size="sm"
-                    onClick={openRenameModal}
-                    title="Rename Collection"
-                    aria-label="Rename Collection"
-                    className={styles.actionBtn}
-                  >
-                    <Edit2 size={13} />
-                  </IconButton>
-                  <IconButton
-                    size="sm"
-                    onClick={openDeleteModal}
-                    title="Delete Collection"
-                    aria-label="Delete Collection"
-                    className={`${styles.actionBtn} ${styles.deleteBtn}`}
-                  >
-                    <Trash2 size={13} />
-                  </IconButton>
-                </div>
-              ) : undefined
-            }
-            actions={
-              <>
-                <HeaderSearch onItemClick={handleItemClick} />
-                <CatalogViewToggle />
-              </>
-            }
-          />
-
-          {items.length > 0 ? (
-            <div className={appStyles.catalogContent}>
-              <VirtualizedGrid
-                items={items}
-                onItemClick={handleItemClick}
-                currentCollectionId={activeCollection?.id}
-              />
-            </div>
+          {listId === 'continue' ? (
+            <ContinueWatchingList items={resumeItems} onItemClick={handleItemClick} />
+          ) : listId === 'watch-next' ? (
+            <WatchNextList queue={watchNext} onItemClick={handleItemClick} />
           ) : (
-            <EmptyState
-              icon={builtInList?.icon ?? FolderHeart}
-              title={builtInList?.emptyTitle ?? 'Collection Empty'}
-              description={
-                builtInList?.emptyDescription ??
-                t(
-                  '"{name}" has no items yet. Add movies or series from their detail modals or context menus.',
-                  { name: selectedList.name },
-                )
-              }
-            />
+            <>
+              <CatalogPageHeader
+                title={selectedList.name}
+                meta={tn('{count} item', '{count} items', items.length, {
+                  count: number(items.length),
+                })}
+                titleActions={
+                  activeCollection ? (
+                    <div className={styles.collectionActions}>
+                      <IconButton
+                        size="sm"
+                        onClick={openRenameModal}
+                        title="Rename Collection"
+                        aria-label="Rename Collection"
+                        className={styles.actionBtn}
+                      >
+                        <Edit2 size={13} />
+                      </IconButton>
+                      <IconButton
+                        size="sm"
+                        onClick={openDeleteModal}
+                        title="Delete Collection"
+                        aria-label="Delete Collection"
+                        className={`${styles.actionBtn} ${styles.deleteBtn}`}
+                      >
+                        <Trash2 size={13} />
+                      </IconButton>
+                    </div>
+                  ) : undefined
+                }
+                actions={
+                  <>
+                    <HeaderSearch onItemClick={handleItemClick} />
+                    <CatalogViewToggle />
+                  </>
+                }
+              />
+
+              {items.length > 0 ? (
+                <div className={appStyles.catalogContent}>
+                  <VirtualizedGrid
+                    items={items}
+                    onItemClick={handleItemClick}
+                    currentCollectionId={activeCollection?.id}
+                  />
+                </div>
+              ) : (
+                <EmptyState
+                  icon={builtInList?.icon ?? FolderHeart}
+                  title={builtInList?.emptyTitle ?? 'Collection Empty'}
+                  description={
+                    builtInList?.emptyDescription ??
+                    t(
+                      '"{name}" has no items yet. Add movies or series from their detail modals or context menus.',
+                      { name: selectedList.name },
+                    )
+                  }
+                />
+              )}
+            </>
           )}
         </div>
 

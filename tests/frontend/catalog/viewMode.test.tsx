@@ -23,6 +23,8 @@ describe('grid/list view per section', () => {
     expect(viewSection('/library/abc')).toBe('collections');
     expect(viewSection('/library/favorites')).toBe('favorites');
     expect(viewSection('/library/saved')).toBe('saved');
+    expect(viewSection('/library/continue')).toBe('continue');
+    expect(viewSection('/library/watch-next')).toBe('watch-next');
     expect(viewSection('/')).toBe('home');
   });
 
