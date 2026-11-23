@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { LiveTvViewToggle } from '@/modules/catalog/components/LiveTvViewToggle';
@@ -251,6 +251,19 @@ describe('Sidebar', () => {
     });
     return mediaQuery;
   }
+
+  it('puts Continue Watching and Watch Next first in the Library', () => {
+    useSettingsStore.setState({ upcomingEnabled: true, sidebarCollapsed: false });
+
+    renderSidebar();
+
+    const library = within(screen.getByRole('navigation', { name: 'Library' }));
+    expect(library.getAllByRole('link').slice(0, 3)).toEqual([
+      library.getByRole('link', { name: 'Continue Watching' }),
+      library.getByRole('link', { name: 'Watch Next' }),
+      library.getByRole('link', { name: 'Coming Up' }),
+    ]);
+  });
 
   it('hides the Coming Up workspace when its master preference is disabled', () => {
     useSettingsStore.setState({ upcomingEnabled: false, sidebarCollapsed: false });

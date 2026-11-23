@@ -86,16 +86,6 @@ export function Sidebar() {
   ];
 
   const libraryItems = [
-    ...(upcomingEnabled
-      ? [
-          {
-            icons: { line: RiCalendarScheduleLine, fill: RiCalendarScheduleFill },
-            label: 'Coming Up',
-            path: '/upcoming',
-            badge: 0,
-          },
-        ]
-      : []),
     {
       icons: { line: RiHistoryLine, fill: RiHistoryFill },
       label: 'Continue Watching',
@@ -108,6 +98,16 @@ export function Sidebar() {
       path: '/watch-next',
       badge: watchNext.length,
     },
+    ...(upcomingEnabled
+      ? [
+          {
+            icons: { line: RiCalendarScheduleLine, fill: RiCalendarScheduleFill },
+            label: 'Coming Up',
+            path: '/upcoming',
+            badge: 0,
+          },
+        ]
+      : []),
     {
       icons: { line: RiHeartLine, fill: RiHeartFill },
       label: 'Favorites',
