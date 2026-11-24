@@ -35,6 +35,7 @@ describe('settings store', () => {
 
     expect(useSettingsStore.getState().homeSections).toEqual([
       ...savedLayout.slice(0, 2),
+      { id: 'automatedRecommendations', enabled: true },
       { id: 'recommendations', enabled: true },
       ...savedLayout.slice(2),
     ]);

@@ -763,8 +763,8 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'iptv-settings-storage',
-      // Repair saved Home layouts that predate Recommendations.
-      version: 16,
+      // Add the Automated Recommendations row to saved Home layouts.
+      version: 17,
       migrate: migrateSettingsState,
       partialize: ({ tmdbApiKey: _tmdbApiKey, ...persistedState }) => persistedState,
     },

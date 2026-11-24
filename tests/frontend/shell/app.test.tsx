@@ -86,8 +86,10 @@ beforeEach(() => {
 });
 
 describe('application shell', () => {
-  it('hides the Recommendations list and redirects its route when disabled', async () => {
+  it('keeps Automated Recommendations available when Smart Recommendations is disabled', async () => {
     await preloadRouteModule('/library');
+    const show = { id: 'saved-show', title: 'Saved Show', posterUrl: '', type: 'series' as const };
+    useLibraryStore.setState({ savedItems: [show] });
     useSettingsStore.setState({
       recommendationsEnabled: false,
       lastCollectionId: 'recommendations',
@@ -95,8 +97,14 @@ describe('application shell', () => {
     window.history.replaceState({}, '', '/library/recommendations');
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Saved', level: 1 })).toBeTruthy();
-    expect(screen.queryByRole('link', { name: 'Recommendations' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Smart Recommendations' })).toBeNull();
     expect(window.location.pathname).toBe('/library/saved');
+    const automated = screen.getByRole('link', { name: 'Automated Recommendations' });
+    await userEvent.click(automated);
+    expect(await screen.findByRole('heading', { name: 'Automated Recommendations' })).toBeTruthy();
+    expect(within(automated).getByText('1')).toBeTruthy();
+    act(() => useLibraryStore.getState().setSeriesStarted(show.id, true, show));
+    expect(screen.getByRole('heading', { name: 'No unstarted series' })).toBeTruthy();
   });
 
   it('moves the existing Favorites page into Library and keeps the list permanent', async () => {
@@ -125,7 +133,8 @@ describe('application shell', () => {
     expect(library.getAllByRole('link')).toEqual([
       library.getByRole('link', { name: 'Continue Watching' }),
       library.getByRole('link', { name: 'Watch Next' }),
-      library.getByRole('link', { name: 'Recommendations' }),
+      library.getByRole('link', { name: 'Automated Recommendations' }),
+      library.getByRole('link', { name: 'Smart Recommendations' }),
       saved,
       favorites,
       library.getByRole('link', { name: 'Downloads' }),
@@ -284,7 +293,8 @@ describe('application shell', () => {
       'Continue Watching',
       'Watch Next',
       'Coming Up',
-      'Recommendations',
+      'Automated Recommendations',
+      'Smart Recommendations',
       'Saved',
       'Favorites',
       'Downloads',

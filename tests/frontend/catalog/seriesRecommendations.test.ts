@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { collectSeriesRecommendations } from '@/modules/library/data/seriesRecommendations';
+import {
+  collectAutomatedRecommendations,
+  collectSeriesRecommendations,
+} from '@/modules/library/data/seriesRecommendations';
 import type { MediaItem } from '@/modules/catalog/public/model/media';
 
 const series = (id: string, genre: string, added?: string): MediaItem => ({
@@ -77,7 +80,7 @@ describe('series recommendation inputs', () => {
     });
     const request = input.createRequest();
     expect(request.library.map(({ title }) => title)).toEqual(['favorite', 'related']);
-    expect(request.catalogue.map(({ title }) => title)).toEqual(['generic', 'related']);
+    expect(request.catalogue.map(({ title }) => title)).toEqual(['generic']);
     expect(request.library[1]).toEqual({
       title: 'related',
       localKey: JSON.stringify(['series', 'related']),
@@ -87,6 +90,43 @@ describe('series recommendation inputs', () => {
       year: undefined,
     });
   });
+});
+
+it('recommends only unstarted library series and excludes alternate copies of started shows', () => {
+  const started = series('started', 'Crime');
+  const saved = series('saved', 'Drama');
+  const copy = { ...started, id: 'dub', title: 'FR - started' };
+  const completed = series('completed', 'Comedy');
+  const resuming = series('resuming', 'Sci-Fi');
+  const items = collectAutomatedRecommendations(
+    [
+      saved,
+      { ...saved, id: 'alt' },
+      started,
+      copy,
+      completed,
+      resuming,
+      { id: 'movie', title: 'movie', posterUrl: '', type: 'vod' },
+    ],
+    {
+      started: [started.id],
+      watched: [completed.id],
+      history: [
+        {
+          ...resuming,
+          id: 'episode',
+          seriesId: resuming.id,
+          progressPercentage: 20,
+          lastWatchedAt: 1,
+        },
+      ],
+      trackedSeries: {},
+      next: [],
+      upcoming: [],
+      today: '2026-11-24',
+    },
+  );
+  expect(items).toEqual([saved]);
 });
 
 it('filters all three viewing lists across catalogue copies while grouping other picks', () => {

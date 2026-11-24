@@ -99,7 +99,7 @@ export function RecommendationsList({
   return (
     <>
       <CatalogPageHeader
-        title="Recommendations"
+        title="Smart Recommendations"
         meta={
           snapshot.data
             ? t('Last generated {date}', {

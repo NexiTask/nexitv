@@ -98,19 +98,18 @@ export function HomeSettingsSection() {
       </SettingsGroup>
       <SettingsGroup title="Recommendations">
         <SettingsRow
-          title="Enable recommendations"
-          description="Show TV series recommendations in Library and allow access to their Home row."
+          title="Enable Smart Recommendations"
+          description="Show ChatGPT recommendations in Library and allow access to their Home row."
         >
           <SettingsToggle
-            label="Enable recommendations"
+            label="Enable Smart Recommendations"
             checked={recommendationsEnabled}
             onChange={(checked) => updateSetting('recommendationsEnabled', checked)}
           />
         </SettingsRow>
         <SettingsRow
           title="Recommendations on Home"
-          description="Maximum number of saved recommendations shown on Home."
-          disabled={!recommendationsEnabled}
+          description="Maximum number of series shown in each recommendation row on Home."
         >
           <Select
             value={recommendationsHomeLimit}
@@ -120,7 +119,6 @@ export function HomeSettingsSection() {
               localize: false,
             }))}
             onChange={(value) => updateSetting('recommendationsHomeLimit', value)}
-            disabled={!recommendationsEnabled}
             variant="settings"
             ariaLabel="Maximum recommendations on Home"
           />

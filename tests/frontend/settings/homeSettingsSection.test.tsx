@@ -18,20 +18,20 @@ describe('Home layout settings', () => {
     render(<HomeSettingsSection />);
     await user.click(screen.getByRole('button', { name: 'Maximum recommendations on Home' }));
     await user.click(screen.getByRole('option', { name: '12' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Show Recommendations' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Show Smart Recommendations' }));
     expect(useSettingsStore.getState().recommendationsHomeLimit).toBe(12);
     expect(useSettingsStore.getState().recommendationsEnabled).toBe(true);
     expect(
       useSettingsStore.getState().homeSections.find((section) => section.id === 'recommendations')
         ?.enabled,
     ).toBe(false);
-    await user.click(screen.getByRole('checkbox', { name: 'Enable recommendations' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Enable Smart Recommendations' }));
     expect(useSettingsStore.getState().recommendationsEnabled).toBe(false);
     expect(
       screen
         .getByRole('button', { name: 'Maximum recommendations on Home' })
         .hasAttribute('disabled'),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('toggles a row off and back on', async () => {
@@ -66,6 +66,7 @@ describe('Home layout settings', () => {
       'continueWatching',
       'upcoming',
       'watchNext',
+      'automatedRecommendations',
       'recommendations',
       'recentMovies',
       'recentSeries',

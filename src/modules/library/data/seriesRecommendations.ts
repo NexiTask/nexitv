@@ -77,6 +77,39 @@ function uniqueSeries(items: MediaItem[], seriesKey: (item: MediaItem) => string
   });
 }
 
+function upcomingSeries(releases: UpcomingRelease[], today: string) {
+  return releases
+    .filter(({ kind, airDate }) => kind === 'episode' && airDate >= today)
+    .map(({ favorite }) => favorite);
+}
+
+export function collectAutomatedRecommendations(
+  library: MediaItem[],
+  viewing: Pick<Inputs, 'history' | 'trackedSeries' | 'next' | 'started' | 'upcoming' | 'today'> & {
+    watched: string[];
+  },
+) {
+  const saved = library.filter((item) => item.type === 'series');
+  const seenIds = new Set([...viewing.started, ...viewing.watched]);
+  const inProgress = [
+    ...Object.values(viewing.trackedSeries).map(({ item }) => item),
+    ...viewing.history.filter((item) => !isQueuedEpisode(item)),
+    ...viewing.next,
+    ...upcomingSeries(viewing.upcoming, viewing.today),
+  ].filter((item) => item.type === 'series');
+  const seriesKey = seriesKeys([...inProgress, ...saved]);
+  const seen = new Set(
+    [...inProgress, ...saved.filter((item) => seenIds.has(item.id) || item.isWatched)].map(
+      seriesKey,
+    ),
+  );
+  for (const item of inProgress) seenIds.add(item.seriesId ?? item.id);
+  return uniqueSeries(
+    saved.filter((item) => !seenIds.has(item.id) && !seen.has(seriesKey(item))),
+    seriesKey,
+  );
+}
+
 function summarize(items: MediaItem[], categories: Map<string, string>): string[] {
   const counts = new Map<string, number>();
   for (const item of items) {
@@ -105,10 +138,15 @@ export function collectSeriesRecommendations(input: Inputs) {
     .sort((a, b) => b.lastWatchedAt - a.lastWatchedAt)
     .map(({ item }) => current(item));
   const watchNext = input.next.filter((item) => item.type === 'series').map(current);
-  const comingUp = input.upcoming
-    .filter(({ kind, airDate }) => kind === 'episode' && airDate >= input.today)
-    .map(({ favorite }) => current(favorite));
-  const excluded = [...favoriteSeries, ...recentlyViewed, ...watchNext, ...comingUp];
+  const comingUp = upcomingSeries(input.upcoming, input.today).map(current);
+  const savedSeries = (input.saved ?? []).filter((item) => item.type === 'series').map(current);
+  const excluded = [
+    ...favoriteSeries,
+    ...savedSeries,
+    ...recentlyViewed,
+    ...watchNext,
+    ...comingUp,
+  ];
   // Home may only pass the catalogue rows named in saved picks. Include the
   // overlapping rows when establishing title aliases and known release years.
   const seriesKey = seriesKeys([...excluded, ...catalogue]);
@@ -145,13 +183,7 @@ export function collectSeriesRecommendations(input: Inputs) {
   }
 
   function createRequest(): SeriesRecommendationRequest {
-    const library = uniqueSeries(
-      [
-        ...favoriteAnchors,
-        ...(input.saved ?? []).filter((item) => item.type === 'series').map(current),
-      ],
-      seriesKey,
-    );
+    const library = uniqueSeries([...favoriteAnchors, ...savedSeries], seriesKey);
     const details = (item: MediaItem): RecommendationSeries => {
       const title = item.seriesTitle ?? item.title;
       const { cleanTitle, releaseYear } = parseMediaDisplayTitle(title, item.year);

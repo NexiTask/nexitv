@@ -11,6 +11,7 @@ import {
   FolderHeart,
   History,
   ListVideo,
+  Clapperboard,
   Sparkles,
   Plus,
   Edit2,
@@ -36,6 +37,7 @@ import { useWatchNext } from '@/modules/catalog/public/data/useWatchNext';
 import { ContinueWatchingList } from './ContinueWatchingList';
 import { WatchNextList } from './WatchNextList';
 import { RecommendationsList } from './RecommendationsList';
+import { useAutomatedRecommendations } from '../data/useAutomatedRecommendations';
 import { useI18n } from '@/shared/i18n/i18n';
 
 export function LibraryPage() {
@@ -45,6 +47,8 @@ export function LibraryPage() {
   const history = useLibraryStore((state) => state.history);
   const resumeItems = history.filter((item) => !isQueuedEpisode(item));
   const watchNext = useWatchNext();
+  const showAutomated = listId === 'automated-recommendations';
+  const automatedItems = useAutomatedRecommendations(watchNext.items, showAutomated);
   const savedItems = useLibraryStore((state) => state.savedItems);
   const downloadCount = useDownloadStore((state) => state.jobs.length);
   const favorites = useLibraryStore((state) => state.favorites);
@@ -76,8 +80,16 @@ export function LibraryPage() {
       icon: CalendarClock,
     },
     {
+      id: 'automated-recommendations',
+      name: 'Automated Recommendations',
+      icon: Clapperboard,
+      items: showAutomated ? automatedItems : undefined,
+      emptyTitle: 'No unstarted series',
+      emptyDescription: 'Save a series to your library to see it here before you start watching.',
+    },
+    {
       id: 'recommendations',
-      name: 'Recommendations',
+      name: 'Smart Recommendations',
       icon: Sparkles,
     },
     {

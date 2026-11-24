@@ -76,10 +76,7 @@ export function useSeriesRecommendations(
             )
           : [],
         favorites: loadCandidates ? favorites : [],
-        saved:
-          prepareEmpty && loadCandidates
-            ? [...saved, ...collections.flatMap(({ items }) => items)]
-            : [],
+        saved: loadCandidates ? [...saved, ...collections.flatMap(({ items }) => items)] : [],
         history: loadCandidates ? history : [],
         trackedSeries: loadCandidates ? trackedSeries : {},
         started: loadCandidates ? started : [],
