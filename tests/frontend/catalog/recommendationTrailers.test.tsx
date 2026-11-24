@@ -20,6 +20,7 @@ vi.mock('@/platform/desktop', () => ({
 vi.mock('@/modules/metadata/public/hooks/useTmdbDetailsEnrichment', () => ({
   useTmdbDetailEnrichment: (_mediaType: string, { title }: { title: string }) => ({
     details: {
+      backdropUrl: `https://images.example.test/${encodeURIComponent(title)}.jpg`,
       videos: ids[title]
         ? [
             {
@@ -71,9 +72,21 @@ it('plays one muted trailer in view, switches series and stops outside the viewp
     .mockResolvedValue('http://127.0.0.1:12345/trailers/fixture/');
   const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
   const frame = () => document.querySelector('iframe');
+  const reportPlayerEvent = (data: string) => {
+    Object.defineProperty(frame()!, 'contentWindow', { value: window });
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data,
+          origin: 'http://127.0.0.1:12345',
+          source: window,
+        }),
+      );
+    });
+  };
   const open = vi.fn();
   render(
-    <RecommendationTrailers items={items} onOpen={open}>
+    <RecommendationTrailers items={items} onOpen={open} fullWidth>
       {(preview, selectedId, select) => (
         <div data-testid="recommendations-page">
           {preview}
@@ -94,6 +107,7 @@ it('plays one muted trailer in view, switches series and stops outside the viewp
 
   setVisible(0.5);
   expect(frame()).toBeNull();
+  expect(document.querySelectorAll('img')).toHaveLength(1);
   expect(endpoint).not.toHaveBeenCalled();
   setVisible(0.75);
   await waitFor(() => expect(frame()?.getAttribute('src')).toContain(ids.Dark));
@@ -120,26 +134,22 @@ it('plays one muted trailer in view, switches series and stops outside the viewp
   expect(frame()).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Watch teaser' }));
   expect(frame()).not.toBeNull();
-  const activeFrame = frame()!;
-  Object.defineProperty(activeFrame, 'contentWindow', { value: window });
-  act(() => {
-    window.dispatchEvent(
-      new MessageEvent('message', {
-        data: 'nexitv:trailer-ended',
-        origin: 'http://127.0.0.1:12345',
-        source: window,
-      }),
-    );
-  });
+  reportPlayerEvent('nexitv:trailer-ended');
   expect(frame()).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Watch teaser' }));
   fireEvent.click(screen.getByRole('button', { name: 'Close trailer' }));
   expect(frame()).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Watch teaser' }));
+  reportPlayerEvent('nexitv:trailer-error');
+  expect(frame()).toBeNull();
+  expect(screen.getByRole('button', { name: 'Open trailer in browser' })).toBeTruthy();
+  expect(document.querySelectorAll('img')).toHaveLength(1);
 
   fireEvent.click(screen.getByRole('button', { name: 'No Trailer' }));
   setVisible(0.75);
   expect(screen.getByText('No official trailer available')).toBeTruthy();
   expect(frame()).toBeNull();
+  expect(document.querySelectorAll('img')).toHaveLength(1);
   fireEvent.click(screen.getByRole('button', { name: 'Series details' }));
   expect(open).toHaveBeenCalledWith(items[2]);
 });

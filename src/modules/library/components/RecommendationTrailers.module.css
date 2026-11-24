@@ -8,6 +8,8 @@
 }
 
 .feature {
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1fr) min(58%, calc(clamp(270px, 34vh, 390px) * 16 / 9));
   overflow: hidden;
@@ -131,6 +133,20 @@
 
 .poster {
   object-fit: contain;
+}
+
+@container (width > 660px) {
+  .backdropStage {
+    position: static;
+    background: transparent;
+  }
+
+  .backdropStage .backdrop {
+    z-index: -1;
+    object-position: right center;
+    mask-image: linear-gradient(to right, transparent 37%, var(--surface-player) 83%);
+    pointer-events: none;
+  }
 }
 
 @container (max-width: 660px) {

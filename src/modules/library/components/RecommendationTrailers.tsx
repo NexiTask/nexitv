@@ -172,7 +172,9 @@ function TrailerFeature({
     return () => window.removeEventListener('message', onPlayerMessage);
   }, [desktop, embedUrl, mode]);
   const playerUrl = embedFailed ? undefined : embedUrl;
-  const art = details?.backdropUrl || details?.posterUrl || item.posterUrl;
+  const backdrop = details?.backdropUrl;
+  const art = backdrop || details?.posterUrl || item.posterUrl;
+  const showFullBackdrop = fullWidth && !playerUrl && Boolean(backdrop);
   const summary = details?.overview || item.description;
   const year = details?.releaseYear ?? releaseYear;
   const metadata = [year, trailer && t(isTeaser ? 'Teaser' : 'Trailer')]
@@ -191,13 +193,8 @@ function TrailerFeature({
     >
       <div className={styles.feature}>
         <div className={styles.details}>
-          {fullWidth && details?.backdropUrl && (
-            <img
-              className={styles.detailsBackdrop}
-              src={details.backdropUrl}
-              alt=""
-              loading="lazy"
-            />
+          {fullWidth && playerUrl && backdrop && (
+            <img className={styles.detailsBackdrop} src={backdrop} alt="" loading="lazy" />
           )}
           <h3>{title}</h3>
           {metadata && <p className={styles.metadata}>{metadata}</p>}
@@ -252,7 +249,10 @@ function TrailerFeature({
             )}
           </div>
         </div>
-        <div className={styles.stage} ref={stage}>
+        <div
+          className={showFullBackdrop ? `${styles.stage} ${styles.backdropStage}` : styles.stage}
+          ref={stage}
+        >
           {playerUrl ? (
             <iframe
               ref={frame}
@@ -270,7 +270,7 @@ function TrailerFeature({
                 src={art}
                 alt=""
                 loading="lazy"
-                className={details?.backdropUrl ? styles.backdrop : styles.poster}
+                className={backdrop ? styles.backdrop : styles.poster}
               />
             )
           )}
