@@ -154,7 +154,7 @@ impl<'a> Catalogue<'a> {
                 .flatten()
                 .copied()
                 .filter(|&id| {
-                    proposal.year.as_ref().is_none_or(|year| {
+                    proposal.year.as_ref().map_or(true, |year| {
                         self.request.catalogue[id].year.as_ref() == Some(year)
                     })
                 })
