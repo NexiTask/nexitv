@@ -8,7 +8,6 @@ const loaders = {
   '/series': () => import('@/modules/catalog/pages/SeriesPage'),
   '/search': () => import('@/modules/search/pages/SearchPage'),
   '/library': () => import('@/modules/library/pages/LibraryPage'),
-  '/downloads': () => import('@/modules/downloads/pages/DownloadsPage'),
   '/settings': () => import('@/modules/settings/pages/SettingsPage'),
   '/m3u-editor': () => import('@/modules/m3u-editor/pages/M3uEditorPage'),
 } as const;
@@ -42,9 +41,6 @@ export const SearchPage = lazy(() =>
 );
 export const LibraryPage = lazy(() =>
   loaders['/library']().then((module) => ({ default: module.LibraryPage })),
-);
-export const DownloadsPage = lazy(() =>
-  loaders['/downloads']().then((module) => ({ default: module.DownloadsPage })),
 );
 export const SettingsPage = lazy(() =>
   loaders['/settings']().then((module) => ({ default: module.SettingsPage })),

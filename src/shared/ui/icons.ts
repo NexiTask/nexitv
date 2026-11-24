@@ -9,7 +9,6 @@ import {
   Clapperboard,
   Clock3,
   Contrast,
-  Download,
   Film,
   Folder,
   Gauge,
@@ -63,8 +62,6 @@ export const RiClosedCaptioningFill = Captions;
 export const RiClosedCaptioningLine = Captions;
 export const RiContrastFill = Contrast;
 export const RiContrastLine = Contrast;
-export const RiDownload2Fill = Download;
-export const RiDownload2Line = Download;
 export const RiEqualizer3Fill = Gauge;
 export const RiEqualizer3Line = Gauge;
 export const RiFolderFill = Folder;

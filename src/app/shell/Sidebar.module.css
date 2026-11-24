@@ -305,9 +305,3 @@
   color: var(--text-primary);
   background-color: rgba(var(--accent-color-rgb), var(--alpha-25));
 }
-
-.divider {
-  height: 1px;
-  background-color: var(--border-subtle);
-  margin: var(--space-3) 0 var(--space-2);
-}

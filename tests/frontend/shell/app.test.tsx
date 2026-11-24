@@ -45,6 +45,7 @@ vi.mock('@/modules/search/pages/SearchPage', () => ({
 
 import App from '@/app/App';
 import { preloadRouteModule } from '@/app/router/routeModules';
+import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
 import { useAuthStore } from '@/modules/sources/store/useAuthStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
@@ -60,6 +61,7 @@ beforeEach(() => {
     value: vi.fn(),
   });
   window.history.replaceState({}, '', '/');
+  useDownloadStore.setState({ jobs: [], downloadedByLibraryId: {} });
   useLibraryStore.setState({
     savedItems: [],
     favorites: [],
@@ -112,6 +114,7 @@ describe('application shell', () => {
       library.getByRole('link', { name: 'Watch Next' }),
       saved,
       favorites,
+      library.getByRole('link', { name: 'Downloads' }),
       weekend,
     ]);
     expect(favorites.getAttribute('aria-current')).toBe('page');
@@ -269,6 +272,7 @@ describe('application shell', () => {
       'Coming Up',
       'Saved',
       'Favorites',
+      'Downloads',
     ]);
     expect(library.getByRole('link', { name: 'Coming Up' }).getAttribute('aria-current')).toBe(
       'page',
@@ -287,6 +291,26 @@ describe('application shell', () => {
     expect(screen.getByRole('heading', { name: 'Coming Up is disabled' })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Open Settings' }));
     await waitFor(() => expect(window.location.search).toBe('?section=coming-up'));
+  });
+
+  it('opens the previous Downloads route inside Library with the current queue', async () => {
+    await preloadRouteModule('/library/downloads');
+    useDownloadStore.getState().enqueue({
+      id: 'download-1',
+      fileName: 'Saved film.mp4',
+      sourceUrl: 'https://media.test/video.mp4',
+    });
+    window.history.replaceState({}, '', '/downloads');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Downloads', level: 1 })).toBeTruthy();
+    expect(window.location.pathname).toBe('/library/downloads');
+    const library = within(screen.getByRole('complementary', { name: 'Library' }));
+    const downloads = library.getByRole('link', { name: 'Downloads' });
+    expect(downloads.getAttribute('aria-current')).toBe('page');
+    expect(within(downloads).getByText('1')).toBeTruthy();
+    expect(screen.getByText('Saved film.mp4')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Downloading' })).toBeTruthy();
   });
 
   it('restores M3U and Xtream sources in parallel', async () => {

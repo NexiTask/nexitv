@@ -183,8 +183,8 @@ describe('Sidebar', () => {
 
     renderSidebar();
 
-    const link = screen.getByRole('link', { name: 'Downloads, 1 item' });
-    expect(link.getAttribute('title')).toBe('Downloads (1)');
+    const link = screen.getByRole('link', { name: 'Library, 1 download' });
+    expect(link.getAttribute('title')).toBe('Library (1)');
     expect(link.querySelector('[class*="collapsedBadge"]')?.textContent).toBe('1');
   });
 
@@ -193,8 +193,8 @@ describe('Sidebar', () => {
 
     renderSidebar();
 
-    const link = screen.getByRole('link', { name: 'Downloads, 1 item' });
-    expect(link.getAttribute('title')).toBe('Downloads (1)');
+    const link = screen.getByRole('link', { name: 'Library, 1 download' });
+    expect(link.getAttribute('title')).toBe('Library (1)');
     expect(document.querySelector('aside')?.className).not.toContain('showCollapsedBadges');
   });
 
@@ -203,7 +203,7 @@ describe('Sidebar', () => {
 
     renderSidebar();
 
-    expect(screen.getByRole('link', { name: /Downloads/ }).textContent).toContain('1');
+    expect(screen.getByRole('link', { name: 'Library' }).textContent).toContain('1');
     // Seasonal decorations only rest on the full-width footer.
     expect(document.querySelector('[data-seasonal-decor="sidebar-footer"]')).toBeTruthy();
   });
@@ -260,16 +260,13 @@ describe('Sidebar', () => {
     renderSidebar('/library/favorites');
 
     expect(screen.queryByRole('heading', { name: 'Library' })).toBeNull();
-    const library = within(screen.getByRole('navigation', { name: 'Library' }));
-    expect(library.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
-      '/library',
-      '/downloads',
-    ]);
-    const link = library.getByRole('link', { name: 'Library' });
-    expect(link.getAttribute('href')).toBe('/library');
-    expect(link.getAttribute('aria-current')).toBe('page');
-    expect(library.queryByRole('link', { name: 'Favorites' })).toBeNull();
-    expect(library.queryByRole('link', { name: 'Coming Up' })).toBeNull();
+    const browse = within(screen.getByRole('navigation', { name: 'Browse' }));
+    const search = browse.getByRole('link', { name: 'Search' });
+    const library = browse.getByRole('link', { name: 'Library' });
+    expect(search.nextElementSibling).toBe(library);
+    expect(library.getAttribute('href')).toBe('/library');
+    expect(library.getAttribute('aria-current')).toBe('page');
+    expect(screen.queryByRole('link', { name: 'Downloads' })).toBeNull();
   });
 
   it('uses the compact rail without changing the saved normal-width preference', () => {

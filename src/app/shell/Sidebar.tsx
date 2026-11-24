@@ -1,7 +1,5 @@
 import { LibraryBig, PanelLeftClose, PanelLeft } from 'lucide-react';
 import {
-  RiDownload2Fill,
-  RiDownload2Line,
   RiHome5Fill,
   RiHome5Line,
   RiMovie2Fill,
@@ -38,7 +36,7 @@ export function Sidebar() {
   const updateSetting = useSettingsStore((state) => state.updateSetting);
   const setIsCollapsed = (collapsed: boolean) => updateSetting('sidebarCollapsed', collapsed);
 
-  const downloads = useDownloadStore((state) => state.jobs);
+  const downloadCount = useDownloadStore((state) => state.jobs.length);
   const sources = useEnabledSources();
   const prefetch = (path: string) => void prefetchNavigationData(path, sources);
 
@@ -51,6 +49,7 @@ export function Sidebar() {
     icons: { line: LucideIcon; fill: LucideIcon };
     label: string;
     path: string;
+    badge?: number;
     alsoActiveOn?: readonly string[];
   }[] = [
     { icons: { line: RiHome5Line, fill: RiHome5Fill }, label: 'Home', path: '/' },
@@ -64,20 +63,11 @@ export function Sidebar() {
     { icons: { line: RiMovie2Line, fill: RiMovie2Fill }, label: 'Movies', path: '/movies' },
     { icons: { line: RiSlideshow3Line, fill: RiSlideshow3Fill }, label: 'Series', path: '/series' },
     { icons: { line: RiSearchLine, fill: RiSearchFill }, label: 'Search', path: '/search' },
-  ];
-
-  const libraryItems = [
     {
       icons: { line: LibraryBig, fill: LibraryBig },
       label: 'Library',
       path: '/library',
-      badge: 0,
-    },
-    {
-      icons: { line: RiDownload2Line, fill: RiDownload2Fill },
-      label: 'Downloads',
-      path: '/downloads',
-      badge: downloads.length,
+      badge: downloadCount,
     },
   ];
 
@@ -105,8 +95,16 @@ export function Sidebar() {
             <NavLink
               key={item.path}
               to={item.path}
-              title={isCollapsed ? t(item.label) : undefined}
-              aria-label={isCollapsed ? t(item.label) : undefined}
+              title={
+                isCollapsed
+                  ? `${t(item.label)}${item.badge ? ` (${number(item.badge)})` : ''}`
+                  : undefined
+              }
+              aria-label={
+                isCollapsed
+                  ? `${t(item.label)}${item.badge ? `, ${tn('{count} download', '{count} downloads', item.badge, { count: number(item.badge) })}` : ''}`
+                  : undefined
+              }
               onMouseEnter={() => prefetch(item.path)}
               onFocus={() => prefetch(item.path)}
               className={({ isActive }) =>
@@ -125,55 +123,17 @@ export function Sidebar() {
                   />
                   <span className={styles.labelSlot}>
                     <span className={styles.label}>{t(item.label)}</span>
-                  </span>
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className={styles.divider} />
-
-        <nav className={styles.navGroup} aria-label={t('Library')}>
-          {libraryItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              title={
-                isCollapsed
-                  ? `${t(item.label)}${item.badge > 0 ? ` (${number(item.badge)})` : ''}`
-                  : undefined
-              }
-              aria-label={
-                isCollapsed
-                  ? `${t(item.label)}${item.badge > 0 ? `, ${tn('{count} item', '{count} items', item.badge, { count: number(item.badge) })}` : ''}`
-                  : undefined
-              }
-              className={({ isActive }) =>
-                isActive ? `${styles.navItem} ${styles.active}` : styles.navItem
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <StateIcon
-                    icons={item.icons}
-                    active={isActive}
-                    className={styles.icon}
-                    size={20}
-                  />
-                  <span className={styles.labelSlot}>
-                    <span className={styles.label}>{t(item.label)}</span>
-                    {item.badge > 0 && (
+                    {item.badge ? (
                       <span className={styles.badge} aria-hidden="true">
                         {item.badge}
                       </span>
-                    )}
+                    ) : null}
                   </span>
-                  {item.badge > 0 && (
+                  {item.badge ? (
                     <span className={styles.collapsedBadge} aria-hidden="true">
                       {item.badge}
                     </span>
-                  )}
+                  ) : null}
                 </>
               )}
             </NavLink>

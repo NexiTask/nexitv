@@ -18,12 +18,10 @@ import type { EpgProgramme } from '@/modules/guide/data/useEpg';
 import type { XmltvGuide } from '@/modules/guide/data/xmltvClient';
 import { Sidebar } from '@/app/shell/Sidebar';
 import { WindowChrome } from '@/app/shell/WindowChrome';
-import { PageTransition } from '@/app/shell/PageTransition';
 import { MovieDetailsDialog } from '@/modules/catalog/details/MovieDetailsDialog';
 import { SeriesDetailsDialog } from '@/modules/catalog/details/SeriesDetailsDialog';
 import { M3uEditor } from '@/modules/m3u-editor/components/M3uEditor';
 import { PlayerShell } from '@/modules/playback/components/PlayerShell';
-import { DownloadsPage } from '@/modules/downloads/pages/DownloadsPage';
 import { LibraryPage } from '@/modules/library/pages/LibraryPage';
 import { EpgPage } from '@/modules/guide/pages/EpgPage';
 import { HomePage } from '@/modules/catalog/pages/HomePage';
@@ -1238,7 +1236,8 @@ function Surface({ surface }: { surface: ReadmeSurface | ReadmeFeatureSurface })
     surface === 'continue-watching' ||
     surface === 'favorites' ||
     surface === 'collections' ||
-    surface === 'upcoming'
+    surface === 'upcoming' ||
+    surface === 'downloads'
   ) {
     return (
       <Routes>
@@ -1250,12 +1249,6 @@ function Surface({ surface }: { surface: ReadmeSurface | ReadmeFeatureSurface })
   if (surface === 'live-tv') return <LiveTvPage />;
   if (surface === 'live-epg') return <EpgPage />;
   if (surface === 'search') return <SearchPage />;
-  if (surface === 'downloads')
-    return (
-      <PageTransition>
-        <DownloadsPage />
-      </PageTransition>
-    );
   if (surface === 'settings' || surface === 'playback-settings') return <SettingsPage />;
   if (surface === 'm3u-editor')
     return <M3uEditor initialSourceId={SOURCE_ID} onClose={() => undefined} />;
@@ -1409,7 +1402,7 @@ const ROUTES: Record<ReadmeSurface, string> = {
   search: '/search?q=dune',
   'm3u-editor': `/m3u-editor/${SOURCE_ID}`,
   'm3u-raw-editor': `/m3u-editor/${SOURCE_ID}`,
-  downloads: '/downloads',
+  downloads: '/library/downloads',
   settings: '/settings?section=sources',
   'playback-settings': '/settings?section=playback',
   'light-theme': '/',

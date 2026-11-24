@@ -18,14 +18,13 @@ import { playableFromDownloadedItem } from '@/modules/playback/public/lib/playba
 import { tauriApi } from '@/platform/tauri';
 import { notify } from '@/shared/notifications/useNotificationStore';
 import { getUserFacingErrorMessage } from '@/shared/lib/error';
-import appStyles from '@/app/shell/AppLayout.module.css';
-import styles from './DownloadsPage.module.css';
+import styles from './DownloadsPanel.module.css';
 import { Button, IconButton } from '@/shared/ui/Button';
 import { useI18n } from '@/shared/i18n/i18n';
 import { formatBytes } from '@/shared/lib/formatBytes';
 import { MediaCard } from '@/modules/catalog/public/components/MediaCard';
 import type { MediaItem } from '@/modules/catalog/public/model/media';
-import { DownloadedSeriesView } from '../components/DownloadedSeriesView';
+import { DownloadedSeriesView } from './DownloadedSeriesView';
 
 function DownloadRow({ job }: { job: DownloadJob }) {
   const { t, number } = useI18n();
@@ -317,7 +316,7 @@ function DownloadedSeriesCard({
   return <MediaCard item={item} onClick={() => onOpen(group)} />;
 }
 
-export function DownloadsPage() {
+export function DownloadsPanel() {
   const { t, tn, number } = useI18n();
   const jobs = useDownloadStore((state) => state.jobs);
   const downloadedByLibraryId = useDownloadStore((state) => state.downloadedByLibraryId);
@@ -356,7 +355,7 @@ export function DownloadsPage() {
   };
 
   return (
-    <div className={appStyles.page}>
+    <>
       <CatalogPageHeader
         title="Downloads"
         meta={`${tn('{count} download', '{count} downloads', totalDownloadedCount, { count: number(totalDownloadedCount) })}${activeCount > 0 ? ` · ${tn('{count} active', '{count} active', activeCount, { count: number(activeCount) })}` : ''}`}
@@ -433,6 +432,6 @@ export function DownloadsPage() {
           onClose={() => setSelectedSeriesGroup(null)}
         />
       )}
-    </div>
+    </>
   );
 }

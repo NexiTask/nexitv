@@ -11,7 +11,7 @@ vi.mock('@tauri-apps/api/core', () => ({
   isTauri: () => false,
 }));
 
-import { DownloadsPage } from '@/modules/downloads/pages/DownloadsPage';
+import { DownloadsPanel } from '@/modules/downloads/components/DownloadsPanel';
 import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import { usePlayerStore } from '@/modules/playback/store/usePlayerStore';
 
@@ -30,7 +30,7 @@ describe('Downloads page', () => {
   it('explains where player downloads appear when the queue is empty', () => {
     renderWithClient(
       <MemoryRouter>
-        <DownloadsPage />
+        <DownloadsPanel />
       </MemoryRouter>,
     );
 
@@ -61,7 +61,7 @@ describe('Downloads page', () => {
     const user = userEvent.setup();
     renderWithClient(
       <MemoryRouter>
-        <DownloadsPage />
+        <DownloadsPanel />
       </MemoryRouter>,
     );
 
@@ -92,7 +92,7 @@ describe('Downloads page', () => {
 
     renderWithClient(
       <MemoryRouter>
-        <DownloadsPage />
+        <DownloadsPanel />
       </MemoryRouter>,
     );
 
@@ -114,7 +114,7 @@ describe('Downloads page', () => {
     const user = userEvent.setup();
     renderWithClient(
       <MemoryRouter>
-        <DownloadsPage />
+        <DownloadsPanel />
       </MemoryRouter>,
     );
 
@@ -166,7 +166,7 @@ describe('Downloads page', () => {
     const user = userEvent.setup();
     renderWithClient(
       <MemoryRouter>
-        <DownloadsPage />
+        <DownloadsPanel />
       </MemoryRouter>,
     );
 
@@ -202,7 +202,7 @@ describe('Downloads page', () => {
     const user = userEvent.setup();
     renderWithClient(
       <MemoryRouter>
-        <DownloadsPage />
+        <DownloadsPanel />
       </MemoryRouter>,
     );
 

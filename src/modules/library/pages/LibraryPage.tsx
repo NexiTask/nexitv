@@ -6,6 +6,7 @@ import { CatalogViewToggle } from '@/modules/catalog/public/components/CatalogVi
 import {
   Bookmark,
   CalendarClock,
+  Download,
   Heart,
   FolderHeart,
   History,
@@ -27,6 +28,8 @@ import { Button, IconButton } from '@/shared/ui/Button';
 import { DialogShell } from '@/shared/ui/DialogShell';
 import { MediaDetailsDialogs } from '@/modules/catalog/public/details/MediaDetailsDialogs';
 import { useMediaDetailState } from '@/modules/catalog/public/hooks/useMediaDetailsState';
+import { DownloadsPanel } from '@/modules/downloads/public/components/DownloadsPanel';
+import { useDownloadStore } from '@/modules/downloads/public/store/useDownloadStore';
 import { UpcomingSchedule } from '@/modules/guide/public/components/UpcomingSchedule';
 import { useWatchNext } from '@/modules/catalog/public/data/useWatchNext';
 import { ContinueWatchingList } from './ContinueWatchingList';
@@ -41,6 +44,7 @@ export function LibraryPage() {
   const resumeItems = history.filter((item) => !isQueuedEpisode(item));
   const watchNext = useWatchNext();
   const savedItems = useLibraryStore((state) => state.savedItems);
+  const downloadCount = useDownloadStore((state) => state.jobs.length);
   const favorites = useLibraryStore((state) => state.favorites);
   const collections = useLibraryStore((state) => state.collections);
   const createCollection = useLibraryStore((state) => state.createCollection);
@@ -83,6 +87,12 @@ export function LibraryPage() {
       items: favorites,
       emptyTitle: 'Your Favorites Are Empty',
       emptyDescription: 'Use the heart on a movie, series, or live channel to add it to Favorites.',
+    },
+    {
+      id: 'downloads',
+      name: 'Downloads',
+      icon: Download,
+      count: downloadCount,
     },
   ];
   const visibleBuiltInLists = builtInLists.filter(
@@ -184,7 +194,7 @@ export function LibraryPage() {
             </Button>
           }
         >
-          {visibleBuiltInLists.map(({ id, name, icon: Icon, items }) => (
+          {visibleBuiltInLists.map(({ id, name, icon: Icon, items, count = items?.length }) => (
             <NavLink
               key={id}
               to={`/library/${id}`}
@@ -194,9 +204,9 @@ export function LibraryPage() {
             >
               <Icon size={16} className={styles.listIcon} aria-hidden="true" />
               <span className={styles.collectionName}>{t(name)}</span>
-              {items && (
+              {count !== undefined && (
                 <span className={styles.collectionCount} aria-hidden="true">
-                  {number(items.length)}
+                  {number(count)}
                 </span>
               )}
             </NavLink>
@@ -224,6 +234,8 @@ export function LibraryPage() {
             <WatchNextList queue={watchNext} onItemClick={handleItemClick} />
           ) : listId === 'upcoming' ? (
             <UpcomingSchedule onOpen={handleItemClick} />
+          ) : listId === 'downloads' ? (
+            <DownloadsPanel />
           ) : (
             <>
               <CatalogPageHeader
