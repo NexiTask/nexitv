@@ -103,7 +103,8 @@ function TrailerFeature({
   const youtube = videos?.find(({ site, url }) => site === 'YouTube' && youtubeVideoId(url));
   const trailer = youtube ?? videos?.[0];
   const videoId = youtube && youtubeVideoId(youtube.url);
-  const playLabel = trailer?.type?.toLowerCase() === 'teaser' ? 'Watch teaser' : 'Watch trailer';
+  const isTeaser = trailer?.type?.toLowerCase() === 'teaser';
+  const playLabel = isTeaser ? 'Watch teaser' : 'Watch trailer';
 
   useEffect(() => {
     const element = stage.current;
@@ -165,6 +166,7 @@ function TrailerFeature({
       const source = frame.current?.contentWindow;
       if (!source || event.origin !== origin || event.source !== source) return;
       if (event.data === 'nexitv:trailer-blocked' && mode === 'auto') setMode('closed');
+      if (event.data === 'nexitv:trailer-ended') setMode('closed');
       if (event.data === 'nexitv:trailer-error') setEmbedFailed(true);
     };
     window.addEventListener('message', onPlayerMessage);
@@ -173,6 +175,10 @@ function TrailerFeature({
   const playerUrl = embedFailed ? undefined : embedUrl;
   const art = details?.backdropUrl || details?.posterUrl || item.posterUrl;
   const summary = details?.overview || item.description;
+  const year = details?.releaseYear ?? releaseYear;
+  const metadata = [year, trailer && t(isTeaser ? 'Teaser' : 'Trailer')]
+    .filter(Boolean)
+    .join(' · ');
   const openExternally = () => {
     if (!trailer) return;
     setMode('closed');
@@ -181,21 +187,10 @@ function TrailerFeature({
 
   return (
     <section className={styles.panel} aria-label={t('Recommendation preview')}>
-      <label className={styles.autoplay}>
-        <input
-          type="checkbox"
-          checked={autoplay}
-          onChange={(event) => {
-            const enabled = event.currentTarget.checked;
-            if (enabled) setMode('auto');
-            onAutoplayChange(enabled);
-          }}
-        />
-        {t('Autoplay trailers')}
-      </label>
       <div className={styles.feature}>
         <div className={styles.details}>
           <h3>{title}</h3>
+          {metadata && <p className={styles.metadata}>{metadata}</p>}
           {summary && <p className={styles.summary}>{summary}</p>}
           {!trailer && rating.status !== 'pending' && (
             <p className={styles.status}>{t('No official trailer available')}</p>
@@ -227,11 +222,25 @@ function TrailerFeature({
               Series details
             </Button>
           </div>
-          {playerUrl && (
-            <Button size="sm" variant="ghost" onClick={openExternally}>
-              Open on YouTube
-            </Button>
-          )}
+          <div className={styles.preferences}>
+            <label className={styles.autoplay}>
+              <input
+                type="checkbox"
+                checked={autoplay}
+                onChange={(event) => {
+                  const enabled = event.currentTarget.checked;
+                  if (enabled) setMode('auto');
+                  onAutoplayChange(enabled);
+                }}
+              />
+              {t('Autoplay trailers')}
+            </label>
+            {playerUrl && (
+              <Button size="sm" variant="ghost" onClick={openExternally}>
+                Open on YouTube
+              </Button>
+            )}
+          </div>
         </div>
         <div className={styles.stage} ref={stage}>
           {playerUrl ? (

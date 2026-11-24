@@ -84,6 +84,9 @@ fn player_page(id: &str, app_id: &str) -> Option<String> {
 <script>
 function onYouTubeIframeAPIReady() {{
   new YT.Player('player', {{events: {{
+    onStateChange: (event) => {{
+      if (event.data === YT.PlayerState.ENDED) parent.postMessage('nexitv:trailer-ended', '*');
+    }},
     onAutoplayBlocked: () => parent.postMessage('nexitv:trailer-blocked', '*'),
     onError: () => parent.postMessage('nexitv:trailer-error', '*')
   }}}});

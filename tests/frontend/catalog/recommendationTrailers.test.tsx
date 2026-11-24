@@ -111,6 +111,19 @@ it('plays one muted trailer in view, switches series and stops outside the viewp
   expect(frame()).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Watch teaser' }));
   expect(frame()).not.toBeNull();
+  const activeFrame = frame()!;
+  Object.defineProperty(activeFrame, 'contentWindow', { value: window });
+  act(() => {
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: 'nexitv:trailer-ended',
+        origin: 'http://127.0.0.1:12345',
+        source: window,
+      }),
+    );
+  });
+  expect(frame()).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Watch teaser' }));
   fireEvent.click(screen.getByRole('button', { name: 'Close trailer' }));
   expect(frame()).toBeNull();
 

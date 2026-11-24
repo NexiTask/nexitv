@@ -1,13 +1,69 @@
 .panel {
   container-type: inline-size;
-  max-width: 1080px;
+  max-width: 1280px;
+}
+
+.feature {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) min(58%, calc(clamp(270px, 34vh, 390px) * 16 / 9));
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: linear-gradient(125deg, var(--surface-elevated), var(--bg-surface));
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6);
+  min-width: 0;
+}
+
+.details h3 {
+  margin: 0;
+  font-size: var(--font-size-detail-title);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.metadata,
+.summary,
+.status {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-body);
+}
+
+.metadata {
+  font-size: var(--font-size-control);
+  font-weight: var(--font-weight-medium);
+}
+
+.summary {
+  display: -webkit-box;
+  max-width: 44ch;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.actions,
+.preferences {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.preferences {
+  column-gap: var(--space-3);
 }
 
 .autoplay {
   display: flex;
-  justify-self: end;
   align-items: center;
   min-height: var(--control-height-sm);
   gap: var(--space-2);
@@ -17,58 +73,14 @@
 }
 
 .autoplay input {
+  margin: 0;
   accent-color: var(--accent-color);
-}
-
-.feature {
-  display: grid;
-  grid-template-columns: minmax(200px, 0.6fr) minmax(0, 1fr);
-  align-items: stretch;
-  overflow: hidden;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
-}
-
-.details {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: start;
-  gap: var(--space-3);
-  padding: var(--space-5);
-  min-width: 0;
-}
-
-.details h3 {
-  margin: 0;
-  font-size: var(--font-size-display);
-  line-height: 1.1;
-  overflow-wrap: anywhere;
-}
-
-.summary,
-.status {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-body);
-}
-
-.summary {
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
 }
 
 .stage {
   position: relative;
+  width: 100%;
+  min-width: 0;
   min-height: 200px;
   aspect-ratio: 16 / 9;
   background: var(--surface-player);

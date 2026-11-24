@@ -949,3 +949,17 @@
 .cardContainer[aria-current='true']:focus-visible {
   outline-color: var(--text-primary);
 }
+
+.cardContainer[aria-current] .posterDetails {
+  top: auto;
+  max-height: 64%;
+  background: linear-gradient(
+    to top,
+    rgba(var(--neutral-black-rgb), var(--alpha-90)) 82%,
+    transparent
+  );
+}
+
+.cardContainer[aria-current] .recommendationBadge ~ .posterDetails {
+  padding-top: var(--space-5);
+}
