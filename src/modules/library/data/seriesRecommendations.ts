@@ -25,12 +25,37 @@ interface Inputs {
   today: string;
 }
 
-function seriesKey(item: MediaItem) {
+function seriesTitle(item: MediaItem) {
   const title = parseMediaDisplayTitle(item.title, item.year);
-  return JSON.stringify([
-    title.cleanTitle.normalize('NFKC').toLowerCase(),
-    title.releaseYear ?? '',
-  ]);
+  return { name: title.cleanTitle.normalize('NFKC').toLowerCase(), year: title.releaseYear ?? '' };
+}
+
+function seriesKeys(catalogue: MediaItem[]) {
+  const titles = new Map(catalogue.map((item) => [item.id, seriesTitle(item)]));
+  const years = new Map<string, Set<string>>();
+  for (const { name, year } of titles.values()) {
+    const known = years.get(name) ?? new Set<string>();
+    if (year) known.add(year);
+    years.set(name, known);
+  }
+  return (item: MediaItem) => {
+    let { name, year } = titles.get(item.id) ?? seriesTitle(item);
+    // Some providers append a localized title after the same Latin title.
+    // Only strip it when that shorter title actually exists in the catalogue.
+    const alias = name.match(
+      /^([\p{Script=Latin}][\p{Script=Latin}\p{M}\p{P}\p{N} ]+?)\s+(?=[\p{Script=Arabic}\p{Script=Han}\p{Script=Hangul}\p{Script=Cyrillic}\p{Script=Hiragana}\p{Script=Katakana}])/u,
+    )?.[1];
+    const aliasYears = alias ? years.get(alias) : undefined;
+    if (
+      alias &&
+      aliasYears &&
+      (year ? aliasYears.size === 0 || aliasYears.has(year) : aliasYears.size <= 1)
+    )
+      name = alias;
+    const known = years.get(name);
+    if (!year && known?.size === 1) year = known.values().next().value ?? '';
+    return JSON.stringify([name, year]);
+  };
 }
 
 function genres(item: MediaItem, categories: Map<string, string>): readonly string[] {
@@ -39,7 +64,7 @@ function genres(item: MediaItem, categories: Map<string, string>): readonly stri
   return CATALOG_GENRES.filter((_, bit) => (mask & (1 << bit)) !== 0);
 }
 
-function uniqueSeries(items: MediaItem[]) {
+function uniqueSeries(items: MediaItem[], seriesKey: (item: MediaItem) => string) {
   const seen = new Set<string>();
   return items.filter((item) => {
     const key = seriesKey(item);
@@ -51,11 +76,7 @@ function uniqueSeries(items: MediaItem[]) {
 
 function summarize(items: MediaItem[], categories: Map<string, string>): string[] {
   const counts = new Map<string, number>();
-  const seen = new Set<string>();
   for (const item of items) {
-    const key = seriesKey(item);
-    if (seen.has(key)) continue;
-    seen.add(key);
     for (const genre of genres(item, categories)) counts.set(genre, (counts.get(genre) ?? 0) + 1);
   }
   return [...counts]
@@ -70,6 +91,7 @@ function episodeKey(item: HistoryItem) {
 
 export function collectSeriesRecommendations(input: Inputs) {
   const catalogue = input.catalogue.filter((item) => item.type === 'series');
+  const seriesKey = seriesKeys(catalogue);
   const byId = new Map(catalogue.map((item) => [item.id, item]));
   const current = (item: MediaItem) => byId.get(item.seriesId ?? item.id) ?? byId.get(item.id);
   const favoriteSeries = input.favorites
@@ -85,8 +107,9 @@ export function collectSeriesRecommendations(input: Inputs) {
   ]
     .sort((a, b) => b.lastWatchedAt - a.lastWatchedAt)
     .map(({ item }) => current(item) ?? item);
-  const favoriteGenres = summarize(favoriteSeries, input.categories);
-  const watchAnchors = uniqueSeries(recentlyViewed).slice(0, 32);
+  const favoriteAnchors = uniqueSeries(favoriteSeries, seriesKey);
+  const favoriteGenres = summarize(favoriteAnchors, input.categories);
+  const watchAnchors = uniqueSeries(recentlyViewed, seriesKey).slice(0, 32);
   const watchingGenres = summarize(watchAnchors, input.categories);
   const seen = new Set(
     [
@@ -97,6 +120,7 @@ export function collectSeriesRecommendations(input: Inputs) {
   );
 
   const candidates = new Map<string, Candidate>();
+  const relatedDetails: Candidate[] = [];
   const add = (candidate: Candidate) => candidates.set(candidate.key, candidate);
   const activity = (kind: 'resume' | 'next', entries: HistoryItem[]) => {
     const result: Candidate[] = [];
@@ -115,6 +139,7 @@ export function collectSeriesRecommendations(input: Inputs) {
       };
       const candidate = { key, kind, item };
       add(candidate);
+      relatedDetails.push(candidate);
       if (result.length < 4) result.push(candidate);
     }
     return result;
@@ -140,6 +165,7 @@ export function collectSeriesRecommendations(input: Inputs) {
       release,
     };
     add(candidate);
+    relatedDetails.push(candidate);
     const title = seriesKey(series);
     if (upcoming.length < 4 && !upcomingTitles.has(title)) {
       upcomingTitles.add(title);
@@ -178,18 +204,53 @@ export function collectSeriesRecommendations(input: Inputs) {
     const rankedDiscoveries = rankDiscoveries(
       discoveries.map(signals),
       watchAnchors.map((item) => signals({ item })),
-      uniqueSeries(favoriteSeries)
-        .slice(0, 32)
-        .map((item) => signals({ item })),
+      favoriteAnchors.slice(0, 32).map((item) => signals({ item })),
       input.categories,
     );
+    const seenGroups = new Set<string>();
     return {
       favorites: favoriteGenres,
       watching: watchingGenres,
-      candidates: [...related.map(signals), ...rankedDiscoveries.slice(0, 16)].map(
-        ({ key, kind, genres }) => ({ localKey: key, kind, genres }),
-      ),
+      candidates: [...related.map(signals), ...rankedDiscoveries.slice(0, 16)]
+        .filter(({ item }) => {
+          const key = seriesKey(item);
+          if (seenGroups.has(key)) return false;
+          seenGroups.add(key);
+          return true;
+        })
+        .map(({ key, kind, genres }) => ({ localKey: key, kind, genres })),
     };
+  }
+
+  function groupPicks(picks: { key: string; genreMatch: boolean }[]) {
+    const groups = new Map<string, { selected: Candidate[]; genreMatch: boolean }>();
+    for (const pick of picks) {
+      const candidate = candidates.get(pick.key);
+      if (!candidate) continue;
+      const key = seriesKey(candidate.item);
+      const group = groups.get(key) ?? { selected: [], genreMatch: false };
+      group.selected.push(candidate);
+      group.genreMatch ||= pick.genreMatch;
+      groups.set(key, group);
+    }
+    const detailsByGroup = new Map<string, Candidate[]>();
+    for (const candidate of relatedDetails) {
+      const key = seriesKey(candidate.item);
+      const details = detailsByGroup.get(key) ?? [];
+      details.push(candidate);
+      detailsByGroup.set(key, details);
+    }
+    const priority: SeriesRecommendationKind[] = ['resume', 'next', 'upcoming'];
+    return [...groups].map(([key, { selected, genreMatch }]) => {
+      const details = [...selected, ...(detailsByGroup.get(key) ?? [])];
+      const signals = priority.flatMap(
+        (kind) => details.find((candidate) => candidate.kind === kind) ?? [],
+      );
+      if (!signals.length)
+        signals.push(details.find((candidate) => candidate.kind === 'new') ?? selected[0]!);
+      const primary = signals[0]!;
+      return { key, item: primary.item, signals, genreMatch };
+    });
   }
   function matchingGenres(item: MediaItem) {
     const available = genres(item, input.categories);
@@ -201,6 +262,7 @@ export function collectSeriesRecommendations(input: Inputs) {
   return {
     candidates,
     createRequest,
+    groupPicks,
     matchingGenres,
     hasCandidates: related.length + discoveries.length > 0,
   };

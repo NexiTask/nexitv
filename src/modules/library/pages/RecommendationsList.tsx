@@ -85,7 +85,7 @@ export function RecommendationsList({
   const upcoming = useUpcomingReleases({ favoriteIds });
   const today = new Date().toLocaleDateString('sv-SE');
 
-  const { candidates, createRequest, matchingGenres, hasCandidates } = useMemo(
+  const { groupPicks, createRequest, matchingGenres, hasCandidates } = useMemo(
     () =>
       collectSeriesRecommendations({
         catalogue: catalogue.data.filter((item) => !hideAdult || !item.adult),
@@ -142,10 +142,8 @@ export function RecommendationsList({
   const canGenerate = Boolean(
     permission && !generating && !snapshot.isFetching && !catalogue.isLoading && hasCandidates,
   );
-  const results = (snapshot.data?.picks ?? []).flatMap((pick) => {
-    const candidate = candidates.get(pick.key);
-    if (!candidate) return [];
-    const match = pick.genreMatch ? matchingGenres(candidate.item) : undefined;
+  const results = groupPicks(snapshot.data?.picks ?? []).map((card) => {
+    const match = card.genreMatch ? matchingGenres(card.item) : undefined;
     const reason = match?.genres.length
       ? t(
           match.watched
@@ -156,7 +154,7 @@ export function RecommendationsList({
           },
         )
       : undefined;
-    return [{ ...candidate, reason }];
+    return { ...card, reason };
   });
 
   return (
@@ -213,7 +211,7 @@ export function RecommendationsList({
         )}
         {results.length > 0 ? (
           <ul className={styles.results}>
-            {results.map(({ key, kind, item, release, reason }) => (
+            {results.map(({ key, item, signals, reason }) => (
               <li className={styles.card} key={key}>
                 {item.posterUrl && (
                   <img
@@ -229,23 +227,28 @@ export function RecommendationsList({
                 )}
                 <div className={styles.details}>
                   <h2>{getDisplayTitle(item.title, 'series')}</h2>
-                  <p>
-                    {t(labels[kind])}
-                    {reason && <> · {reason}</>}
-                  </p>
-                  {release && (
-                    <p>
-                      {release.title} ·{' '}
-                      <time dateTime={release.airDate}>
-                        {date(new Date(`${release.airDate}T12:00:00`))}
-                      </time>
+                  {signals.map(({ kind, item: signalItem, release }) => (
+                    <p key={kind}>
+                      {t(labels[kind])}
+                      {release ? (
+                        <>
+                          {' '}
+                          · {release.title} ·{' '}
+                          <time dateTime={release.airDate}>
+                            {date(new Date(`${release.airDate}T12:00:00`))}
+                          </time>
+                        </>
+                      ) : signalItem.episodeTitle ? (
+                        <> · {signalItem.episodeTitle}</>
+                      ) : null}
                     </p>
-                  )}
-                  {!release && item.episodeTitle && <p>{item.episodeTitle}</p>}
+                  ))}
+                  {reason && <p>{reason}</p>}
                   <div className={styles.actions}>
                     <Button
                       size="sm"
-                      onClick={() =>
+                      onClick={() => {
+                        const release = signals[0]?.release;
                         onOpen(
                           item,
                           release
@@ -254,12 +257,17 @@ export function RecommendationsList({
                                 episodeNumber: release.episodeNumber ?? undefined,
                               }
                             : undefined,
-                        )
-                      }
+                        );
+                      }}
                     >
                       {t('Open series')}
                     </Button>
-                    {(release || kind === 'new') && <Teaser item={item} tmdbId={release?.tmdbId} />}
+                    {signals.some(({ kind }) => kind === 'upcoming' || kind === 'new') && (
+                      <Teaser
+                        item={item}
+                        tmdbId={signals.find(({ release }) => release)?.release?.tmdbId}
+                      />
+                    )}
                   </div>
                 </div>
               </li>

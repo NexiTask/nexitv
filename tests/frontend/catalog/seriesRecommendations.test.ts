@@ -92,3 +92,59 @@ describe('series recommendation inputs', () => {
     ]);
   });
 });
+
+it('groups saved picks and outgoing candidates across variants and episode signals', () => {
+  const silo = { ...series('silo', 'Sci-Fi'), title: 'NL - SILO', year: '2023' };
+  const judge = {
+    ...series('judge', 'Crime'),
+    title: 'EN - The Judge From Hell (2024) (KR)',
+    year: '2024',
+  };
+  const dub = { ...judge, id: 'judge-dub', title: 'IR - The Judge From Hell قاضی جهنمی (DUB)' };
+  const remake = { ...judge, id: 'remake', title: 'The Judge From Hell', year: '2030' };
+  const next = {
+    ...silo,
+    episodeId: '10',
+    episodeTitle: 'Troy',
+    progressPercentage: 0,
+    lastWatchedAt: 1,
+  };
+  const input = collectSeriesRecommendations({
+    catalogue: [silo, judge, dub, remake],
+    favorites: [silo],
+    history: [],
+    trackedSeries: {},
+    next: [next],
+    started: [],
+    upcoming: [
+      {
+        favorite: silo,
+        tmdbId: 1,
+        airDate: '2027-07-09',
+        kind: 'episode',
+        title: 'Premiere',
+        seasonNumber: 4,
+        episodeNumber: 1,
+        artworkUrl: null,
+        exactAirTime: null,
+        timeSource: 'tmdb',
+      },
+    ],
+    categories: new Map(),
+    today: '2026-11-24',
+  });
+  const cards = input.groupPicks(
+    [
+      ['series', 'judge-dub'],
+      ['next', 'silo', '10'],
+      ['series', 'judge'],
+      ['upcoming', 'silo', 4, 1],
+      ['series', 'remake'],
+    ].map((parts) => ({ key: JSON.stringify(parts), genreMatch: true })),
+  );
+  expect(cards).toHaveLength(3);
+  expect(cards[1]?.signals.map(({ kind }) => kind)).toEqual(['next', 'upcoming']);
+  expect(cards[1]?.item.episodeTitle).toBe('Troy');
+  expect(cards[2]?.item.id).toBe('remake');
+  expect(input.createRequest().candidates).toHaveLength(3);
+});
