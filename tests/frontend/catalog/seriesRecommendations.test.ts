@@ -37,10 +37,10 @@ describe('series recommendation inputs', () => {
     const request = input.createRequest();
     expect(request.favorites).toEqual([]);
     expect(request.watching).toEqual(['Crime', 'Drama']);
-    expect(request.candidates.map(({ kind }) => kind)).toEqual(['resume', 'next', 'discover']);
+    expect(request.candidates.map(({ kind }) => kind)).toEqual(['discover']);
     expect(
       request.candidates.map(({ localKey }) => input.candidates.get(localKey)?.item.id),
-    ).toEqual(['started show', 'finished show', 'new show']);
+    ).toEqual(['new show']);
   });
 
   it('prioritizes specific similarities to completed shows over unrelated recent entries', () => {
@@ -93,8 +93,11 @@ describe('series recommendation inputs', () => {
   });
 });
 
-it('groups saved picks and outgoing candidates across variants and episode signals', () => {
-  const silo = { ...series('silo', 'Sci-Fi'), title: 'NL - SILO', year: '2023' };
+it('filters all three viewing lists across catalogue copies while grouping other picks', () => {
+  const resume = series('resume', 'Drama');
+  const next = { ...series('next', 'Sci-Fi'), title: 'Silo', year: '2023' };
+  const nextDub = { ...next, id: 'next-dub', title: 'IR - Silo سیلو' };
+  const scheduled = series('scheduled', 'Comedy');
   const judge = {
     ...series('judge', 'Crime'),
     title: 'EN - The Judge From Hell (2024) (KR)',
@@ -102,23 +105,25 @@ it('groups saved picks and outgoing candidates across variants and episode signa
   };
   const dub = { ...judge, id: 'judge-dub', title: 'IR - The Judge From Hell قاضی جهنمی (DUB)' };
   const remake = { ...judge, id: 'remake', title: 'The Judge From Hell', year: '2030' };
-  const next = {
-    ...silo,
-    episodeId: '10',
-    episodeTitle: 'Troy',
-    progressPercentage: 0,
-    lastWatchedAt: 1,
-  };
   const input = collectSeriesRecommendations({
-    catalogue: [silo, judge, dub, remake],
-    favorites: [silo],
-    history: [],
+    catalogue: [resume, nextDub, scheduled, judge, dub, remake],
+    favorites: [],
+    history: [
+      {
+        ...resume,
+        id: 'episode-1',
+        seriesId: resume.id,
+        episodeId: '1',
+        progressPercentage: 50,
+        lastWatchedAt: 1,
+      },
+    ],
     trackedSeries: {},
-    next: [next],
+    next: [{ ...next, episodeId: '10', progressPercentage: 0, lastWatchedAt: 1 }],
     started: [],
     upcoming: [
       {
-        favorite: silo,
+        favorite: scheduled,
         tmdbId: 1,
         airDate: '2027-07-09',
         kind: 'episode',
@@ -136,15 +141,19 @@ it('groups saved picks and outgoing candidates across variants and episode signa
   const cards = input.groupPicks(
     [
       ['series', 'judge-dub'],
-      ['next', 'silo', '10'],
+      ['resume', 'resume', '1'],
+      ['series', 'resume'],
+      ['next', 'next', '10'],
+      ['series', 'next-dub'],
       ['series', 'judge'],
-      ['upcoming', 'silo', 4, 1],
+      ['upcoming', 'scheduled', 4, 1],
+      ['series', 'scheduled'],
       ['series', 'remake'],
     ].map((parts) => ({ key: JSON.stringify(parts), genreMatch: true })),
   );
-  expect(cards).toHaveLength(3);
-  expect(cards[1]?.signals.map(({ kind }) => kind)).toEqual(['next', 'upcoming']);
-  expect(cards[1]?.item.episodeTitle).toBe('Troy');
-  expect(cards[2]?.item.id).toBe('remake');
-  expect(input.createRequest().candidates).toHaveLength(3);
+  expect(cards.map(({ item }) => item.id)).toEqual(['judge-dub', 'remake']);
+  expect(input.createRequest().candidates.map(({ localKey }) => localKey)).toEqual([
+    JSON.stringify(['series', 'judge']),
+    JSON.stringify(['series', 'remake']),
+  ]);
 });

@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
 import { RecommendationsList } from '@/modules/library/pages/RecommendationsList';
 import { useSeriesRecommendations } from '@/modules/library/public/data/useSeriesRecommendations';
+import type { HistoryItem } from '@/modules/library/public/store/useLibraryStore';
 import { tauriApi } from '@/platform/tauri';
 
 vi.mock('@/platform/desktop', () => ({ desktopApi: { isDesktop: () => true } }));
@@ -60,10 +61,7 @@ it('reopens saved picks locally and keeps them when a manual refresh fails', asy
       description: 'Discover a series',
     });
     fireEvent.keyDown(poster, { key: 'Enter' });
-    expect(openSeries).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'test-series' }),
-      undefined,
-    );
+    expect(openSeries).toHaveBeenCalledWith(expect.objectContaining({ id: 'test-series' }));
     expect(read).toHaveBeenCalledTimes(2);
     expect(rank).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Refresh recommendations' }));
@@ -78,7 +76,7 @@ it('reopens saved picks locally and keeps them when a manual refresh fails', asy
   }
 });
 
-it('loads saved Home cards only when the row is enabled', async () => {
+it('loads saved Home cards when enabled and removes them if they enter Watch Next', async () => {
   const status = vi.spyOn(tauriApi, 'chatGptStatus').mockResolvedValue({
     activeClient: 'client',
     accounts: [{ clientId: 'client', label: 'Test', planPermission: true }],
@@ -97,13 +95,13 @@ it('loads saved Home cards only when the row is enabled', async () => {
   );
   try {
     const { result, rerender } = renderHook(
-      ({ enabled }) => useSeriesRecommendations([], enabled),
-      { initialProps: { enabled: false }, wrapper },
+      ({ enabled, next }) => useSeriesRecommendations(next, enabled),
+      { initialProps: { enabled: false, next: [] as HistoryItem[] }, wrapper },
     );
     expect(status).not.toHaveBeenCalled();
     expect(read).not.toHaveBeenCalled();
     expect(imdb).not.toHaveBeenCalled();
-    rerender({ enabled: true });
+    rerender({ enabled: true, next: [] });
     await waitFor(() =>
       expect(result.current.cards[0]?.item).toMatchObject({
         id: 'test-series',
@@ -113,7 +111,24 @@ it('loads saved Home cards only when the row is enabled', async () => {
     );
     expect(read).toHaveBeenCalledOnce();
     expect(generate).not.toHaveBeenCalled();
-    rerender({ enabled: false });
+    rerender({
+      enabled: true,
+      next: [
+        {
+          id: 'test-series',
+          title: 'The Fixture',
+          type: 'series',
+          posterUrl: '',
+          episodeId: 'episode-2',
+          lastWatchedAt: 1,
+          progressPercentage: 0,
+        },
+      ],
+    });
+    expect(result.current.cards).toEqual([]);
+    expect(read).toHaveBeenCalledOnce();
+    expect(generate).not.toHaveBeenCalled();
+    rerender({ enabled: false, next: [] });
     expect(result.current.cards).toEqual([]);
   } finally {
     status.mockRestore();

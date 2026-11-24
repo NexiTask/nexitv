@@ -10,7 +10,6 @@ interface Candidate {
   key: string;
   kind: SeriesRecommendationKind;
   item: MediaItem;
-  release?: UpcomingRelease | undefined;
 }
 
 interface Inputs {
@@ -85,18 +84,12 @@ function summarize(items: MediaItem[], categories: Map<string, string>): string[
     .map(([genre]) => genre);
 }
 
-function episodeKey(item: HistoryItem) {
-  return item.episodeId ?? JSON.stringify([item.seasonNum, item.episodeNum]);
-}
-
 export function collectSeriesRecommendations(input: Inputs) {
   const catalogue = input.catalogue.filter((item) => item.type === 'series');
-  const seriesKey = seriesKeys(catalogue);
   const byId = new Map(catalogue.map((item) => [item.id, item]));
-  const current = (item: MediaItem) => byId.get(item.seriesId ?? item.id) ?? byId.get(item.id);
-  const favoriteSeries = input.favorites
-    .filter((item) => item.type === 'series')
-    .map((item) => current(item) ?? item);
+  const current = (item: MediaItem) =>
+    byId.get(item.seriesId ?? item.id) ?? byId.get(item.id) ?? item;
+  const favoriteSeries = input.favorites.filter((item) => item.type === 'series').map(current);
   const watching = input.history.filter((item) => item.type === 'series' && !isQueuedEpisode(item));
   const tracked = Object.values(input.trackedSeries).sort(
     (a, b) => b.lastWatchedAt - a.lastWatchedAt,
@@ -106,72 +99,24 @@ export function collectSeriesRecommendations(input: Inputs) {
     ...watching.map((item) => ({ item, lastWatchedAt: item.lastWatchedAt })),
   ]
     .sort((a, b) => b.lastWatchedAt - a.lastWatchedAt)
-    .map(({ item }) => current(item) ?? item);
+    .map(({ item }) => current(item));
+  const watchNext = input.next.filter((item) => item.type === 'series').map(current);
+  const comingUp = input.upcoming
+    .filter(({ kind, airDate }) => kind === 'episode' && airDate >= input.today)
+    .map(({ favorite }) => current(favorite));
+  const excluded = [...favoriteSeries, ...recentlyViewed, ...watchNext, ...comingUp];
+  // Home may only pass the catalogue rows named in saved picks. Include the
+  // overlapping rows when establishing title aliases and known release years.
+  const seriesKey = seriesKeys([...excluded, ...catalogue]);
   const favoriteAnchors = uniqueSeries(favoriteSeries, seriesKey);
   const favoriteGenres = summarize(favoriteAnchors, input.categories);
   const watchAnchors = uniqueSeries(recentlyViewed, seriesKey).slice(0, 32);
   const watchingGenres = summarize(watchAnchors, input.categories);
   const seen = new Set(
-    [
-      ...favoriteSeries,
-      ...recentlyViewed,
-      ...input.started.flatMap((id) => byId.get(id) ?? []),
-    ].map(seriesKey),
+    [...excluded, ...input.started.flatMap((id) => byId.get(id) ?? [])].map(seriesKey),
   );
 
   const candidates = new Map<string, Candidate>();
-  const relatedDetails: Candidate[] = [];
-  const add = (candidate: Candidate) => candidates.set(candidate.key, candidate);
-  const activity = (kind: 'resume' | 'next', entries: HistoryItem[]) => {
-    const result: Candidate[] = [];
-    const titles = new Set<string>();
-    for (const entry of entries) {
-      const series = current(entry);
-      if (!series || titles.has(seriesKey(series))) continue;
-      titles.add(seriesKey(series));
-      const key = JSON.stringify([kind, series.id, episodeKey(entry)]);
-      const item = {
-        ...series,
-        seasonNum: entry.seasonNum,
-        episodeNum: entry.episodeNum,
-        episodeTitle: entry.episodeTitle,
-        progress: kind === 'resume' ? entry.progressPercentage / 100 : undefined,
-      };
-      const candidate = { key, kind, item };
-      add(candidate);
-      relatedDetails.push(candidate);
-      if (result.length < 4) result.push(candidate);
-    }
-    return result;
-  };
-  const resume = activity('resume', watching);
-  const next = activity('next', input.next);
-  const upcoming: Candidate[] = [];
-  const upcomingTitles = new Set<string>();
-  for (const release of input.upcoming) {
-    if (release.kind !== 'episode' || release.airDate < input.today) continue;
-    const series = current(release.favorite);
-    if (!series) continue;
-    const key = JSON.stringify([
-      'upcoming',
-      series.id,
-      release.seasonNumber,
-      release.episodeNumber,
-    ]);
-    const candidate: Candidate = {
-      key,
-      kind: 'upcoming',
-      item: series,
-      release,
-    };
-    add(candidate);
-    relatedDetails.push(candidate);
-    const title = seriesKey(series);
-    if (upcoming.length < 4 && !upcomingTitles.has(title)) {
-      upcomingTitles.add(title);
-      upcoming.push(candidate);
-    }
-  }
 
   const titles = new Set<string>();
   // Resolve all current series by ID even when a new catalogue changes the shortlist.
@@ -191,11 +136,10 @@ export function collectSeriesRecommendations(input: Inputs) {
       item,
       kind: added >= recentCutoff ? 'new' : 'discover',
     };
-    add(candidate);
+    candidates.set(key, candidate);
     if (first) discoveries.push(candidate);
   }
 
-  const related = [...resume, ...next, ...upcoming];
   function createRequest(): SeriesRecommendationRequest {
     const signals = <T extends { item: MediaItem }>(candidate: T) => ({
       ...candidate,
@@ -207,50 +151,27 @@ export function collectSeriesRecommendations(input: Inputs) {
       favoriteAnchors.slice(0, 32).map((item) => signals({ item })),
       input.categories,
     );
-    const seenGroups = new Set<string>();
     return {
       favorites: favoriteGenres,
       watching: watchingGenres,
-      candidates: [...related.map(signals), ...rankedDiscoveries.slice(0, 16)]
-        .filter(({ item }) => {
-          const key = seriesKey(item);
-          if (seenGroups.has(key)) return false;
-          seenGroups.add(key);
-          return true;
-        })
+      candidates: rankedDiscoveries
+        .slice(0, 16)
         .map(({ key, kind, genres }) => ({ localKey: key, kind, genres })),
     };
   }
 
   function groupPicks(picks: { key: string; genreMatch: boolean }[]) {
-    const groups = new Map<string, { selected: Candidate[]; genreMatch: boolean }>();
+    const groups = new Map<string, Candidate & { genreMatch: boolean }>();
     for (const pick of picks) {
       const candidate = candidates.get(pick.key);
       if (!candidate) continue;
       const key = seriesKey(candidate.item);
-      const group = groups.get(key) ?? { selected: [], genreMatch: false };
-      group.selected.push(candidate);
-      group.genreMatch ||= pick.genreMatch;
-      groups.set(key, group);
+      const group = groups.get(key);
+      const preferred =
+        !group || (group.kind !== 'new' && candidate.kind === 'new') ? candidate : group;
+      groups.set(key, { ...preferred, key, genreMatch: pick.genreMatch || !!group?.genreMatch });
     }
-    const detailsByGroup = new Map<string, Candidate[]>();
-    for (const candidate of relatedDetails) {
-      const key = seriesKey(candidate.item);
-      const details = detailsByGroup.get(key) ?? [];
-      details.push(candidate);
-      detailsByGroup.set(key, details);
-    }
-    const priority: SeriesRecommendationKind[] = ['resume', 'next', 'upcoming'];
-    return [...groups].map(([key, { selected, genreMatch }]) => {
-      const details = [...selected, ...(detailsByGroup.get(key) ?? [])];
-      const signals = priority.flatMap(
-        (kind) => details.find((candidate) => candidate.kind === kind) ?? [],
-      );
-      if (!signals.length)
-        signals.push(details.find((candidate) => candidate.kind === 'new') ?? selected[0]!);
-      const primary = signals[0]!;
-      return { key, item: primary.item, signals, genreMatch };
-    });
+    return [...groups.values()];
   }
   function matchingGenres(item: MediaItem) {
     const available = genres(item, input.categories);
@@ -264,6 +185,6 @@ export function collectSeriesRecommendations(input: Inputs) {
     createRequest,
     groupPicks,
     matchingGenres,
-    hasCandidates: related.length + discoveries.length > 0,
+    hasCandidates: discoveries.length > 0,
   };
 }

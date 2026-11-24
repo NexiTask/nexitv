@@ -36,20 +36,21 @@ export function useSeriesRecommendations(
     retry: false,
   });
 
-  const loadCandidates =
-    enabled && desktop && (prepareEmpty || Boolean(snapshot.data?.picks.length));
   const savedSeriesIds = useMemo(() => {
     const ids = new Set<string>();
     for (const { key } of snapshot.data?.picks ?? []) {
       try {
         const parts: unknown = JSON.parse(key);
-        if (Array.isArray(parts) && typeof parts[1] === 'string') ids.add(parts[1]);
+        if (Array.isArray(parts) && parts[0] === 'series' && typeof parts[1] === 'string') {
+          ids.add(parts[1]);
+        }
       } catch {
         // An unreadable cached pick has no catalogue card to show.
       }
     }
     return ids;
   }, [snapshot.data]);
+  const loadCandidates = enabled && desktop && (prepareEmpty || savedSeriesIds.size > 0);
   const favorites = useLibraryStore((state) => state.favorites);
   const history = useLibraryStore((state) => state.history);
   const trackedSeries = useLibraryStore((state) => state.trackedSeries);
@@ -57,14 +58,9 @@ export function useSeriesRecommendations(
   const hideAdult = useSettingsStore((state) => state.catalogHideAdult);
   const catalogue = useVisibleCatalog('series', { enabled: loadCandidates });
   const categoryList = useCategories('series', { enabled: loadCandidates });
-  const favoriteIds = useMemo(
-    () => favorites.filter(({ type }) => type === 'series').map(({ id }) => id),
-    [favorites],
-  );
   const upcoming = useUpcomingReleases({
-    favoriteIds,
     enabled: loadCandidates,
-    cachedOnly: !prepareEmpty,
+    cachedOnly: true,
   });
   const today = new Date().toLocaleDateString('sv-SE');
 

@@ -27,16 +27,13 @@ const GENRES: &[&str] = &[
 ];
 const MAX_CANDIDATES: usize = 48;
 const MAX_PICKS: usize = 12;
-const INSTRUCTIONS: &str = "Rank TV series and episodes for this viewer. The discover and new candidates arrive together in descending order of similarity to shows actually watched. Use that ordering as the strongest evidence for discovery. Watched genres take priority over favorite genres. A broad genre tag, especially Drama, and recent catalogue additions alone are weak evidence. Prefer fewer strong picks to filling the list. Include up to 12 picks and use only supplied IDs, once each. Set genreMatch only when the candidate shares a genre with the viewer's summary.";
+const INSTRUCTIONS: &str = "Rank TV series to discover for this viewer. The discover and new candidates arrive together in descending order of similarity to shows actually watched. Use that ordering as the strongest evidence for discovery. Watched genres take priority over favorite genres. A broad genre tag, especially Drama, and recent catalogue additions alone are weak evidence. Prefer fewer strong picks to filling the list. Include up to 12 picks and use only supplied IDs, once each. Set genreMatch only when the candidate shares a genre with the viewer's summary.";
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum Kind {
-    Resume,
-    Next,
     Discover,
     New,
-    Upcoming,
 }
 
 #[derive(Deserialize, Serialize)]

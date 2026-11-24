@@ -5,7 +5,7 @@ interface ChatGptConnectionStatus {
   accounts: { clientId: string; label: string; planPermission: boolean }[];
 }
 
-export type SeriesRecommendationKind = 'resume' | 'next' | 'discover' | 'new' | 'upcoming';
+export type SeriesRecommendationKind = 'discover' | 'new';
 
 export interface SeriesRecommendationRequest {
   favorites: readonly string[];
