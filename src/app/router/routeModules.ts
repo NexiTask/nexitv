@@ -7,12 +7,7 @@ const loaders = {
   '/movies': () => import('@/modules/catalog/pages/MoviesPage'),
   '/series': () => import('@/modules/catalog/pages/SeriesPage'),
   '/search': () => import('@/modules/search/pages/SearchPage'),
-  '/continue': () => import('@/modules/library/pages/ContinueWatchingPage'),
-  '/watch-next': () => import('@/modules/library/pages/WatchNextPage'),
-  '/favorites': () => import('@/modules/library/pages/FavoritesPage'),
-  '/collections': () => import('@/modules/library/pages/CollectionsPage'),
-  '/downloads': () => import('@/modules/downloads/pages/DownloadsPage'),
-  '/upcoming': () => import('@/modules/guide/pages/UpcomingPage'),
+  '/library': () => import('@/modules/library/pages/LibraryPage'),
   '/settings': () => import('@/modules/settings/pages/SettingsPage'),
   '/m3u-editor': () => import('@/modules/m3u-editor/pages/M3uEditorPage'),
 } as const;
@@ -20,7 +15,11 @@ const loaders = {
 type PreloadableRoute = keyof typeof loaders;
 
 export function preloadRouteModule(path: string): Promise<unknown> | undefined {
-  const route = path.startsWith('/m3u-editor') ? '/m3u-editor' : path;
+  const route = path.startsWith('/m3u-editor')
+    ? '/m3u-editor'
+    : path.startsWith('/library/')
+      ? '/library'
+      : path;
   return loaders[route as PreloadableRoute]?.();
 }
 
@@ -40,23 +39,8 @@ export const SeriesPage = lazy(() =>
 export const SearchPage = lazy(() =>
   loaders['/search']().then((module) => ({ default: module.SearchPage })),
 );
-export const FavoritesPage = lazy(() =>
-  loaders['/favorites']().then((module) => ({ default: module.FavoritesPage })),
-);
-export const CollectionsPage = lazy(() =>
-  loaders['/collections']().then((module) => ({ default: module.CollectionsPage })),
-);
-export const ContinueWatchingPage = lazy(() =>
-  loaders['/continue']().then((module) => ({ default: module.ContinueWatchingPage })),
-);
-export const WatchNextPage = lazy(() =>
-  loaders['/watch-next']().then((module) => ({ default: module.WatchNextPage })),
-);
-export const DownloadsPage = lazy(() =>
-  loaders['/downloads']().then((module) => ({ default: module.DownloadsPage })),
-);
-export const UpcomingPage = lazy(() =>
-  loaders['/upcoming']().then((module) => ({ default: module.UpcomingPage })),
+export const LibraryPage = lazy(() =>
+  loaders['/library']().then((module) => ({ default: module.LibraryPage })),
 );
 export const SettingsPage = lazy(() =>
   loaders['/settings']().then((module) => ({ default: module.SettingsPage })),

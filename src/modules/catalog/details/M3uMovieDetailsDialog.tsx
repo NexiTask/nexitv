@@ -7,6 +7,8 @@ import { DetailsDialogShell } from '../components/DetailsDialogShell';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { downloadMediaItem } from '@/modules/downloads/public/services/mediaDownload';
 import styles from './MovieDetailsDialog.module.css';
+import type { MediaItem } from '../model/media';
+import { SaveToLibraryButton } from './SaveToLibraryButton';
 import { useI18n } from '@/shared/i18n/i18n';
 
 interface M3uMovieDetailsDialogProps {
@@ -72,20 +74,20 @@ export function M3uMovieDetailsDialog({
       knownDuration: entry.duration > 0 ? entry.duration : undefined,
     });
   };
+  const libraryItem: MediaItem = {
+    id: movieId,
+    sourceItemId: entry.id,
+    sourceId,
+    title: parsed.cleanTitle,
+    posterUrl: entry.logo || moviePoster,
+    type: 'vod',
+    streamUrl: entry.url,
+    httpHeaders: entry.headers,
+    description: entry.description,
+  };
   const toggleFavorite = () => {
     if (isFavorite) removeFavorite(movieId);
-    else
-      addFavorite({
-        id: movieId,
-        sourceItemId: entry.id,
-        sourceId,
-        title: parsed.cleanTitle,
-        posterUrl: entry.logo || moviePoster,
-        type: 'vod',
-        streamUrl: entry.url,
-        httpHeaders: entry.headers,
-        description: entry.description,
-      });
+    else addFavorite(libraryItem);
   };
 
   return (
@@ -116,6 +118,11 @@ export function M3uMovieDetailsDialog({
               <span>{t(historyItem?.currentTime ? 'Resume' : 'Play Movie')}</span>
             </button>
             <div className={styles.iconActionRow}>
+              <SaveToLibraryButton
+                item={libraryItem}
+                className={`${styles.favoriteBtn} ${styles.iconActionButton}`}
+                activeClassName={styles.activeFavoriteBtn}
+              />
               <button
                 type="button"
                 className={`${styles.favoriteBtn} ${styles.iconActionButton} ${isFavorite ? styles.activeFavoriteBtn : ''}`}

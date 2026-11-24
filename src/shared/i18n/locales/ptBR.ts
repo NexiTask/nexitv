@@ -5,6 +5,8 @@
 export const PT_BR_MESSAGES: Record<string, string> = {
   Home: 'Início',
   Browse: 'Navegar',
+  'Show Coming Up in Library and announced episodes in the details of favorite series.':
+    'Mostra os próximos lançamentos na biblioteca e os episódios anunciados nos detalhes das séries favoritas.',
   Library: 'Biblioteca',
   'Live TV': 'TV ao vivo',
   'TV Guide': 'Guia de TV',
@@ -186,7 +188,20 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   'No channels found.': 'Nenhum canal encontrado.',
   'No Downloads Yet': 'Ainda não há downloads',
   'No Watch History': 'Sem histórico de exibição',
+  Saved: 'Salvos',
+  'Move to Saved': 'Mover para Salvos',
+  'Moved to Saved': 'Movido para Salvos',
+  'Add to Library': 'Adicionar à biblioteca',
+  'Remove from Library': 'Remover da biblioteca',
+  'Added to Library': 'Adicionado à biblioteca',
+  'Removed from Library': 'Removido da biblioteca',
+  'No saved items': 'Nenhum item salvo',
+  'Use Add to Library to save an item here.':
+    'Use “Adicionar à biblioteca” para salvar um item aqui.',
+  'Library data cleared.': 'Dados da biblioteca apagados.',
   'Your Favorites Are Empty': 'Seus favoritos estão vazios',
+  'Use the heart on a movie, series, or live channel to add it to Favorites.':
+    'Clique no coração de um filme, série ou canal ao vivo para adicioná-lo aos favoritos.',
   'No Collections Found': 'Nenhuma coleção encontrada',
   'Loading page': 'Carregando página',
   'Loading movies': 'Carregando filmes',
@@ -1309,6 +1324,7 @@ export const PT_BR_MESSAGES: Record<string, string> = {
     'Mostre atualizações do ciclo de vida quando os downloads iniciam, terminam ou falham.',
   'Download Notifications': 'Notificações de download',
   'Show download notifications': 'Mostrar notificações de download',
+  'Default download folder is {path}.': 'A pasta padrão de downloads é {path}.',
   'Download Folder': 'Pasta de downloads',
   'Choose a destination from the desktop app.': 'Escolha um destino no aplicativo de desktop.',
   'Folder Could Not Be Selected': 'A pasta não pôde ser selecionada',

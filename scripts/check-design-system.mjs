@@ -258,7 +258,7 @@ const dynamicCssModuleAllowances = new Map([
   ['shared/ui/ToastContainer.module.css', new Set(['error', 'info', 'success', 'warning'])],
   ['modules/guide/components/UpcomingReleaseCard.module.css', new Set(['discover', 'schedule'])],
   [
-    'modules/downloads/pages/DownloadsPage.module.css',
+    'modules/downloads/components/DownloadsPanel.module.css',
     new Set([
       'statuscompleted',
       'statusdownloading',

@@ -196,7 +196,7 @@ export function HomePage() {
           <UpcomingReleaseCard
             key={id}
             onOpen={handleItemClick}
-            onViewAll={() => navigate('/upcoming')}
+            onViewAll={() => navigate('/library/upcoming')}
             showEmpty
           />
         );
@@ -209,21 +209,19 @@ export function HomePage() {
             title="Continue Watching"
             items={continueWatchingItems}
             onItemClick={handleItemClick}
-            onSeeAll={() => navigate('/continue')}
+            onSeeAll={() => navigate('/library/continue')}
             onRemoveItem={removeFromHistory}
             removeLabel="Remove from Continue Watching"
           />
         );
       case 'watchNext':
-        return loading ? (
-          <CarouselSkeleton key={id} title="Watch Next" />
-        ) : (
+        return (
           <HorizontalCarousel
             key={id}
             title="Watch Next"
             items={watchNextItems}
             onItemClick={handleItemClick}
-            onSeeAll={() => navigate('/watch-next')}
+            onSeeAll={() => navigate('/library/watch-next')}
             onRemoveItem={dismissWatchNext}
             removeLabel="Remove from Watch Next"
           />

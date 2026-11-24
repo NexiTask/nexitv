@@ -1,11 +1,18 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bug, Gauge, ListVideo, MessageSquare, Music, RefreshCw, X } from 'lucide-react';
 import {
-  RiFolderLine,
+  LibraryBig,
+  Bug,
+  Gauge,
+  ListVideo,
+  MessageSquare,
+  Music,
+  RefreshCw,
+  X,
+} from 'lucide-react';
+import {
   RiFullscreenExitFill,
   RiFullscreenLine,
-  RiHeartLine,
   RiHomeLine,
   RiLiveLine,
   RiMovie2Line,
@@ -235,16 +242,10 @@ export function usePlayerContextMenus() {
           action: () => navigate('/series'),
         },
         {
-          id: 'nav-favorites',
-          label: t('Favorites'),
-          icon: <RiHeartLine size={16} />,
-          action: () => navigate('/favorites'),
-        },
-        {
-          id: 'nav-collections',
-          label: t('Collections'),
-          icon: <RiFolderLine size={16} />,
-          action: () => navigate('/collections'),
+          id: 'nav-library',
+          label: t('Library'),
+          icon: <LibraryBig size={16} />,
+          action: () => navigate('/library'),
         },
         { id: 'navigation-divider', label: '', isDivider: true },
         {

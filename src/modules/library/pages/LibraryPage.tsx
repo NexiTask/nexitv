@@ -1,12 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { VirtualizedGrid } from '@/modules/catalog/public/components/VirtualizedGrid';
-import { useLibraryStore } from '../store/useLibraryStore';
+import { isQueuedEpisode, useLibraryStore } from '../store/useLibraryStore';
 import { CatalogViewToggle } from '@/modules/catalog/public/components/CatalogViewToggle';
-import { FolderHeart, Plus, Edit2, Trash2, X } from 'lucide-react';
+import {
+  Bookmark,
+  CalendarClock,
+  Download,
+  Heart,
+  FolderHeart,
+  History,
+  ListVideo,
+  Plus,
+  Edit2,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { HeaderSearch } from '@/modules/search/public/components/HeaderSearch';
 import appStyles from '@/app/shell/AppLayout.module.css';
-import styles from './CollectionsPage.module.css';
+import styles from './LibraryPage.module.css';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import { WorkspaceSidebar } from '@/shared/ui/WorkspaceSidebar';
 import { CatalogPageHeader } from '@/modules/catalog/public/components/CatalogPageHeader';
@@ -15,24 +28,92 @@ import { Button, IconButton } from '@/shared/ui/Button';
 import { DialogShell } from '@/shared/ui/DialogShell';
 import { MediaDetailsDialogs } from '@/modules/catalog/public/details/MediaDetailsDialogs';
 import { useMediaDetailState } from '@/modules/catalog/public/hooks/useMediaDetailsState';
+import { DownloadsPanel } from '@/modules/downloads/public/components/DownloadsPanel';
+import { useDownloadStore } from '@/modules/downloads/public/store/useDownloadStore';
+import { UpcomingSchedule } from '@/modules/guide/public/components/UpcomingSchedule';
+import { useWatchNext } from '@/modules/catalog/public/data/useWatchNext';
+import { ContinueWatchingList } from './ContinueWatchingList';
+import { WatchNextList } from './WatchNextList';
 import { useI18n } from '@/shared/i18n/i18n';
 
-export function CollectionsPage() {
+export function LibraryPage() {
   const { t, tn, number } = useI18n();
+  const { listId } = useParams<'listId'>();
+  const navigate = useNavigate();
+  const history = useLibraryStore((state) => state.history);
+  const resumeItems = history.filter((item) => !isQueuedEpisode(item));
+  const watchNext = useWatchNext();
+  const savedItems = useLibraryStore((state) => state.savedItems);
+  const downloadCount = useDownloadStore((state) => state.jobs.length);
+  const favorites = useLibraryStore((state) => state.favorites);
   const collections = useLibraryStore((state) => state.collections);
   const createCollection = useLibraryStore((state) => state.createCollection);
   const renameCollection = useLibraryStore((state) => state.renameCollection);
   const deleteCollection = useLibraryStore((state) => state.deleteCollection);
+  const upcomingEnabled = useSettingsStore((state) => state.upcomingEnabled);
   const sidebarWidth = useSettingsStore((state) => state.sidebarWidth);
-  const activeCollectionId = useSettingsStore((state) => state.lastCollectionId);
+  const lastCollectionId = useSettingsStore((state) => state.lastCollectionId);
   const updateSetting = useSettingsStore((state) => state.updateSetting);
-  const setActiveCollectionId = useCallback(
-    (id: string | null) => updateSetting('lastCollectionId', id),
-    [updateSetting],
+  const builtInLists = [
+    {
+      id: 'continue',
+      name: 'Continue Watching',
+      icon: History,
+      items: resumeItems,
+    },
+    {
+      id: 'watch-next',
+      name: 'Watch Next',
+      icon: ListVideo,
+      items: watchNext.items,
+    },
+    {
+      id: 'upcoming',
+      name: 'Coming Up',
+      icon: CalendarClock,
+    },
+    {
+      id: 'saved',
+      name: 'Saved',
+      icon: Bookmark,
+      items: savedItems,
+      emptyTitle: 'No saved items',
+      emptyDescription: 'Use Add to Library to save an item here.',
+    },
+    {
+      id: 'favorites',
+      name: 'Favorites',
+      icon: Heart,
+      items: favorites,
+      emptyTitle: 'Your Favorites Are Empty',
+      emptyDescription: 'Use the heart on a movie, series, or live channel to add it to Favorites.',
+    },
+    {
+      id: 'downloads',
+      name: 'Downloads',
+      icon: Download,
+      count: downloadCount,
+    },
+  ];
+  const visibleBuiltInLists = builtInLists.filter(
+    (list) => upcomingEnabled || list.id !== 'upcoming',
   );
+  const builtInList = builtInLists.find((list) => list.id === listId);
+  const activeCollection = builtInList
+    ? undefined
+    : collections.find((collection) => collection.id === listId);
+  const selectedList = builtInList ?? activeCollection;
+  const selectedCollectionId =
+    listId === 'upcoming' && !upcomingEnabled ? undefined : selectedList?.id;
+
+  useEffect(() => {
+    if (selectedCollectionId !== undefined && selectedCollectionId !== lastCollectionId) {
+      updateSetting('lastCollectionId', selectedCollectionId);
+    }
+  }, [selectedCollectionId, lastCollectionId, updateSetting]);
 
   const { selectedMovie, selectedSeries, handleCloseMovie, handleCloseSeries, handleItemClick } =
-    useMediaDetailState({ enableSourceOnOpen: true });
+    useMediaDetailState({ enableSourceOnOpen: listId !== 'upcoming' });
 
   // Modal states for Create, Rename, Delete
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -43,18 +124,15 @@ export function CollectionsPage() {
   const closeCreateModal = useCallback(() => setIsCreateOpen(false), []);
   const closeRenameModal = useCallback(() => setIsRenameOpen(false), []);
 
-  // Keep activeCollectionId synced if collection list changes
-  useEffect(() => {
-    if (collections.length === 0) {
-      setActiveCollectionId(null);
-    } else if (activeCollectionId && !collections.some((c) => c.id === activeCollectionId)) {
-      setActiveCollectionId(collections[0]!.id);
-    } else if (!activeCollectionId && collections.length > 0) {
-      setActiveCollectionId(collections[0]!.id);
-    }
-  }, [collections, activeCollectionId, setActiveCollectionId]);
+  if (!selectedList) {
+    const lastList =
+      listId === undefined &&
+      (visibleBuiltInLists.some((list) => list.id === lastCollectionId) ||
+        collections.some((collection) => collection.id === lastCollectionId));
+    return <Navigate to={`/library/${lastList ? lastCollectionId : 'saved'}`} replace />;
+  }
 
-  const activeCollection = collections.find((c) => c.id === activeCollectionId);
+  const { items = [] } = selectedList;
 
   const openCreateModal = () => {
     setNewCollectionName('');
@@ -64,14 +142,9 @@ export function CollectionsPage() {
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newCollectionName && newCollectionName.trim()) {
-      const trimmed = newCollectionName.trim();
-      createCollection(trimmed);
+      const id = createCollection(newCollectionName.trim());
       setIsCreateOpen(false);
-      queueMicrotask(() => {
-        const latest = useLibraryStore.getState().collections;
-        const created = latest.find((c) => c.name === trimmed);
-        if (created) setActiveCollectionId(created.id);
-      });
+      void navigate(`/library/${id}`);
     }
   };
 
@@ -98,14 +171,14 @@ export function CollectionsPage() {
     if (!activeCollection) return;
     deleteCollection(activeCollection.id);
     setIsDeleteOpen(false);
+    void navigate('/library/saved', { replace: true });
   };
 
   return (
     <>
-      <div className={`${appStyles.page} ${styles.collectionsPage}`}>
+      <div className={`${appStyles.page} ${styles.libraryPage}`}>
         <WorkspaceSidebar
-          title="Collections"
-          count={collections.length}
+          title="Library"
           width={sidebarWidth}
           onWidthChange={(width) => updateSetting('sidebarWidth', width)}
           headerAction={
@@ -121,93 +194,109 @@ export function CollectionsPage() {
             </Button>
           }
         >
-          {collections.length === 0 ? (
-            <p className={styles.emptySidebarText}>{t('No custom collections.')}</p>
-          ) : (
-            <>
-              {collections.map((c) => (
-                <button
-                  type="button"
-                  key={c.id}
-                  onClick={() => setActiveCollectionId(c.id)}
-                  className={`${styles.collectionRow} ${activeCollectionId === c.id ? styles.active : ''}`}
-                  aria-label={c.name}
-                  aria-current={activeCollectionId === c.id ? 'page' : undefined}
-                >
-                  <span className={styles.collectionName}>{c.name}</span>
-                  <span className={styles.collectionCount}>{c.items.length}</span>
-                </button>
-              ))}
-            </>
-          )}
+          {visibleBuiltInLists.map(({ id, name, icon: Icon, items, count = items?.length }) => (
+            <NavLink
+              key={id}
+              to={`/library/${id}`}
+              end
+              className={styles.collectionRow ?? ''}
+              aria-label={t(name)}
+            >
+              <Icon size={16} className={styles.listIcon} aria-hidden="true" />
+              <span className={styles.collectionName}>{t(name)}</span>
+              {count !== undefined && (
+                <span className={styles.collectionCount} aria-hidden="true">
+                  {number(count)}
+                </span>
+              )}
+            </NavLink>
+          ))}
+          {collections.map((collection) => (
+            <NavLink
+              key={collection.id}
+              to={`/library/${collection.id}`}
+              end
+              className={styles.collectionRow ?? ''}
+              aria-label={collection.name}
+            >
+              <span className={styles.collectionName}>{collection.name}</span>
+              <span className={styles.collectionCount} aria-hidden="true">
+                {number(collection.items.length)}
+              </span>
+            </NavLink>
+          ))}
         </WorkspaceSidebar>
 
         <div className={appStyles.catalogMain}>
-          <CatalogPageHeader
-            title={activeCollection ? activeCollection.name : 'Collections'}
-            meta={
-              activeCollection
-                ? tn('{count} item', '{count} items', activeCollection.items.length, {
-                    count: number(activeCollection.items.length),
-                  })
-                : t('Create collections to group your content')
-            }
-            titleActions={
-              activeCollection ? (
-                <div className={styles.collectionActions}>
-                  <IconButton
-                    size="sm"
-                    onClick={openRenameModal}
-                    title="Rename Collection"
-                    aria-label="Rename Collection"
-                    className={styles.actionBtn}
-                  >
-                    <Edit2 size={13} />
-                  </IconButton>
-                  <IconButton
-                    size="sm"
-                    onClick={openDeleteModal}
-                    title="Delete Collection"
-                    aria-label="Delete Collection"
-                    className={`${styles.actionBtn} ${styles.deleteBtn}`}
-                  >
-                    <Trash2 size={13} />
-                  </IconButton>
-                </div>
-              ) : undefined
-            }
-            actions={
-              <>
-                <HeaderSearch onItemClick={handleItemClick} />
-                <CatalogViewToggle />
-              </>
-            }
-          />
-
-          {activeCollection && activeCollection.items.length > 0 ? (
-            <div className={appStyles.catalogContent}>
-              <VirtualizedGrid
-                items={activeCollection.items}
-                onItemClick={handleItemClick}
-                currentCollectionId={activeCollection.id}
-              />
-            </div>
+          {listId === 'continue' ? (
+            <ContinueWatchingList items={resumeItems} onItemClick={handleItemClick} />
+          ) : listId === 'watch-next' ? (
+            <WatchNextList queue={watchNext} onItemClick={handleItemClick} />
+          ) : listId === 'upcoming' ? (
+            <UpcomingSchedule onOpen={handleItemClick} />
+          ) : listId === 'downloads' ? (
+            <DownloadsPanel />
           ) : (
-            <EmptyState
-              icon={FolderHeart}
-              title={activeCollection ? 'Collection Empty' : 'No Collections Found'}
-              description={
-                activeCollection
-                  ? t(
+            <>
+              <CatalogPageHeader
+                title={selectedList.name}
+                meta={tn('{count} item', '{count} items', items.length, {
+                  count: number(items.length),
+                })}
+                titleActions={
+                  activeCollection ? (
+                    <div className={styles.collectionActions}>
+                      <IconButton
+                        size="sm"
+                        onClick={openRenameModal}
+                        title="Rename Collection"
+                        aria-label="Rename Collection"
+                        className={styles.actionBtn}
+                      >
+                        <Edit2 size={13} />
+                      </IconButton>
+                      <IconButton
+                        size="sm"
+                        onClick={openDeleteModal}
+                        title="Delete Collection"
+                        aria-label="Delete Collection"
+                        className={`${styles.actionBtn} ${styles.deleteBtn}`}
+                      >
+                        <Trash2 size={13} />
+                      </IconButton>
+                    </div>
+                  ) : undefined
+                }
+                actions={
+                  <>
+                    <HeaderSearch onItemClick={handleItemClick} />
+                    <CatalogViewToggle />
+                  </>
+                }
+              />
+
+              {items.length > 0 ? (
+                <div className={appStyles.catalogContent}>
+                  <VirtualizedGrid
+                    items={items}
+                    onItemClick={handleItemClick}
+                    currentCollectionId={activeCollection?.id}
+                  />
+                </div>
+              ) : (
+                <EmptyState
+                  icon={builtInList?.icon ?? FolderHeart}
+                  title={builtInList?.emptyTitle ?? 'Collection Empty'}
+                  description={
+                    builtInList?.emptyDescription ??
+                    t(
                       '"{name}" has no items yet. Add movies or series from their detail modals or context menus.',
-                      { name: activeCollection.name },
+                      { name: selectedList.name },
                     )
-                  : 'Group your favorite movies and shows into custom playlists and collections.'
-              }
-              actionLabel={!activeCollection ? 'Create Collection' : undefined}
-              actionIcon={!activeCollection ? Plus : undefined}
-              onAction={!activeCollection ? openCreateModal : undefined}
-            />
+                  }
+                />
+              )}
+            </>
           )}
         </div>
 

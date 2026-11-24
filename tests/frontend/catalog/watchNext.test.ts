@@ -1,11 +1,15 @@
 // @vitest-environment happy-dom
 
-import { act, renderHook } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useWatchNext } from '@/modules/catalog/data/useWatchNext';
 import { seriesInfoQuery } from '@/modules/catalog/data/useDetails';
+import { readWatchNextEpisodes } from '@/modules/catalog/data/watchNextCache';
+import { HomePage } from '@/modules/catalog/pages/HomePage';
 import { pickWatchNext, regularEpisodeCount } from '@/modules/catalog/lib/watchNext';
 import {
   isQueuedEpisode,
@@ -14,6 +18,19 @@ import {
 } from '@/modules/library/store/useLibraryStore';
 import { useAuthStore } from '@/modules/sources/store/useAuthStore';
 import { xtreamItemId } from '@/modules/sources/lib/sourceIdentity';
+import { getSeriesInfo, type XtreamSeriesInfoResponse } from '@/modules/sources/data/xtreamClient';
+
+vi.mock('@/modules/sources/data/xtreamClient', { spy: true });
+vi.mock('@/modules/catalog/data/useHomeRows', () => ({
+  useIndexPool: () => ({ items: null, settled: false, error: null }),
+}));
+vi.mock('@/modules/sources/public/hooks/useEnabledSources', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/modules/sources/public/hooks/useEnabledSources')>();
+  return { useEnabledSources: () => ({ ...actual.useEnabledSources(), isAvailable: true }) };
+});
+
+const cacheKey = 'nexitv-watch-next-episodes-v1';
 
 const episode = (id: number, num: number) => ({
   id: String(id),
@@ -69,9 +86,11 @@ describe('saved next episodes', () => {
       watched: original.watched,
     });
     useAuthStore.setState({ runtimes: originalRuntimes });
+    localStorage.removeItem(cacheKey);
+    vi.mocked(getSeriesInfo).mockReset();
   });
 
-  it('offers the queued episode immediately and keeps started episodes in resume history', () => {
+  it('offers the queued episode immediately and keeps started episodes in resume history', async () => {
     const queued: HistoryItem = {
       id: 'show-a',
       title: 'Show A',
@@ -101,6 +120,27 @@ describe('saved next episodes', () => {
     expect(useLibraryStore.getState().history.filter((item) => !isQueuedEpisode(item))).toEqual([
       resumed,
     ]);
+
+    function CurrentPath() {
+      return createElement('output', { 'aria-label': 'Current path' }, useLocation().pathname);
+    }
+    const home = render(
+      createElement(
+        MemoryRouter,
+        null,
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(HomePage),
+          createElement(CurrentPath),
+        ),
+      ),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'See all for Watch Next' }));
+    expect(screen.getByRole('status', { name: 'Current path' }).textContent).toBe(
+      '/library/watch-next',
+    );
+    home.unmount();
 
     act(() => useLibraryStore.getState().dismissWatchNext(queued.id));
     expect(result.current.items).toEqual([]);
@@ -143,5 +183,111 @@ describe('saved next episodes', () => {
       });
     });
     expect(result.current.items).toEqual([expect.objectContaining({ episodeId: '102' })]);
+  });
+
+  it('shows saved episodes on a cold query cache and replaces them when the provider replies', async () => {
+    const sourceId = 'xtream-cached';
+    const credentials = {
+      sourceId,
+      url: 'https://provider.test',
+      username: 'viewer',
+      password: 'account-secret',
+    };
+    const runtime = { credentials, status: 'ready' as const, error: null, revision: 1 };
+    const item = {
+      id: 'show-cached',
+      sourceId,
+      sourceItemId: '7',
+      title: 'Cached show',
+      type: 'series' as const,
+      posterUrl: '',
+    };
+    useAuthStore.setState({ runtimes: { [sourceId]: runtime } });
+    useLibraryStore.setState({
+      history: [],
+      trackedSeries: { [item.id]: { item, lastWatchedAt: 1 } },
+      watched: [xtreamItemId(sourceId, 'episode', 101)],
+    });
+    const savedResponse = {
+      info: {},
+      seasons: [],
+      episodes: {
+        ...episodes,
+        '1': [
+          ...episodes['1'].slice(1),
+          {
+            ...episodes['1'][0]!,
+            direct_source: 'https://provider.test/private-stream',
+            http_headers: { Authorization: 'stream-secret' },
+          },
+        ],
+      },
+    };
+    vi.mocked(getSeriesInfo).mockResolvedValueOnce(savedResponse);
+    const previousClient = new QueryClient();
+    await previousClient.fetchQuery(seriesInfoQuery('7', sourceId, credentials));
+    previousClient.clear();
+    const saved = localStorage.getItem(cacheKey);
+    expect(saved).toBeTruthy();
+    expect(saved).not.toMatch(/(provider\.test|account-secret|stream-secret)/);
+
+    let resolveRefresh: (data: XtreamSeriesInfoResponse) => void = () => {};
+    vi.mocked(getSeriesInfo).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    const client = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client }, children);
+    const { result, unmount } = renderHook(useWatchNext, { wrapper });
+    expect(result.current.items).toEqual([expect.objectContaining({ episodeId: '102' })]);
+    expect(result.current.isLoading).toBe(true);
+    expect(getSeriesInfo).toHaveBeenCalledTimes(2);
+
+    act(() => useLibraryStore.getState().dismissWatchNext(item.id));
+    expect(result.current.items).toEqual([]);
+    expect(useLibraryStore.getState().trackedSeries[item.id]?.knownEpisodes).toBeUndefined();
+    act(() => useLibraryStore.getState().updateTrackedSeries(item.id, { muted: false }));
+
+    act(() =>
+      resolveRefresh({
+        info: {},
+        seasons: [],
+        episodes: { '1': [episode(101, 1), episode(103, 2)] },
+      }),
+    );
+    await waitFor(() =>
+      expect(result.current.items).toEqual([expect.objectContaining({ episodeId: '103' })]),
+    );
+    expect(result.current.isLoading).toBe(false);
+
+    vi.mocked(getSeriesInfo).mockImplementationOnce(() => new Promise(() => {}));
+    act(() => {
+      useAuthStore.setState({
+        runtimes: {
+          [sourceId]: { ...runtime, credentials: { ...credentials, username: 'other' } },
+        },
+      });
+    });
+    expect(result.current.items).toEqual([]);
+    expect(result.current.isLoading).toBe(true);
+    unmount();
+    client.clear();
+  });
+
+  it('ignores malformed or expired cache entries', () => {
+    const query = seriesInfoQuery('7', 'xtream-cached', null);
+    localStorage.setItem(cacheKey, '{invalid');
+    expect(readWatchNextEpisodes().size).toBe(0);
+    localStorage.setItem(
+      cacheKey,
+      JSON.stringify([
+        { key: JSON.stringify(query.queryKey), savedAt: Date.now(), episodes: { '1': [null] } },
+        { key: JSON.stringify(query.queryKey), savedAt: 1, episodes },
+      ]),
+    );
+    expect(readWatchNextEpisodes().size).toBe(0);
   });
 });

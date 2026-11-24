@@ -170,6 +170,7 @@ interface Collection {
 }
 
 interface LibraryState {
+  savedItems: MediaItem[];
   favorites: MediaItem[];
   collections: Collection[];
   history: HistoryItem[];
@@ -200,6 +201,7 @@ interface LibraryState {
   recentChannels: string[];
   addRecentChannel: (id: string) => void;
 
+  toggleSavedItem: (item: MediaItem) => void;
   addFavorite: (item: MediaItem) => void;
   removeFavorite: (id: string) => void;
   isFavorite: (id: string) => boolean;
@@ -220,7 +222,7 @@ interface LibraryState {
     } | null,
   ) => void;
 
-  createCollection: (name: string) => void;
+  createCollection: (name: string) => string;
   renameCollection: (id: string, newName: string) => void;
   deleteCollection: (id: string) => void;
   addToCollection: (collectionId: string, item: MediaItem) => void;
@@ -253,13 +255,16 @@ function withoutPlaybackTransport<T extends MediaItem>(item: T): T {
   const safe: MediaItem = { ...item };
   delete safe.streamUrl;
   delete safe.httpHeaders;
+  delete safe.fallbacks;
+  delete safe.catchupSource;
   return safe as T;
 }
 
 function sanitizedLibraryData(
-  state: Pick<LibraryState, 'favorites' | 'collections' | 'history' | 'watched'>,
+  state: Pick<LibraryState, 'savedItems' | 'favorites' | 'collections' | 'history' | 'watched'>,
 ) {
   return {
+    savedItems: state.savedItems.map(withoutPlaybackTransport),
     favorites: state.favorites.map(withoutPlaybackTransport),
     collections: state.collections.map((collection) => ({
       ...collection,
@@ -270,6 +275,26 @@ function sanitizedLibraryData(
   };
 }
 
+function normalizeSavedItems(value: unknown, favorites: MediaItem[]): MediaItem[] {
+  if (!Array.isArray(value)) return [];
+  const items = new Map<string, MediaItem>();
+  const favoriteIds = new Set(favorites.map((item) => item?.id));
+  for (const item of value) {
+    if (
+      item &&
+      typeof item.id === 'string' &&
+      item.id.length > 0 &&
+      typeof item.title === 'string' &&
+      typeof item.posterUrl === 'string' &&
+      !items.has(item.id) &&
+      !favoriteIds.has(item.id)
+    ) {
+      items.set(item.id, withoutPlaybackTransport(item));
+    }
+  }
+  return [...items.values()];
+}
+
 export function migrateLibraryState(persistedState: unknown): LibraryState {
   const state = (
     persistedState && typeof persistedState === 'object' ? persistedState : {}
@@ -277,9 +302,11 @@ export function migrateLibraryState(persistedState: unknown): LibraryState {
   const nextState = { ...state };
   delete nextState.downloads;
 
+  const favorites = Array.isArray(state.favorites) ? state.favorites : [];
   const normalized = {
     ...nextState,
-    favorites: Array.isArray(state.favorites) ? state.favorites : [],
+    savedItems: normalizeSavedItems(state.savedItems, favorites),
+    favorites,
     collections: Array.isArray(state.collections) ? state.collections : [],
     history: Array.isArray(state.history) ? state.history : [],
     watched: Array.isArray(state.watched) ? state.watched : [],
@@ -310,6 +337,7 @@ import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 export const useLibraryStore = create<LibraryState>()(
   persist(
     (set, get) => ({
+      savedItems: [],
       favorites: [],
       collections: [],
       history: [],
@@ -388,10 +416,34 @@ export const useLibraryStore = create<LibraryState>()(
         }));
       },
 
+      toggleSavedItem: (item) => {
+        const { savedItems, favorites, removeFavorite } = get();
+        if (favorites.some((entry) => entry.id === item.id)) {
+          removeFavorite(item.id);
+          return;
+        }
+        const isSaved = savedItems.some((entry) => entry.id === item.id);
+        set({
+          savedItems: isSaved
+            ? savedItems.filter((entry) => entry.id !== item.id)
+            : [...savedItems, item],
+        });
+        notify.info(
+          isSaved ? 'Removed from Library' : 'Added to Library',
+          getDisplayTitle(item.title, item.type),
+          undefined,
+          undefined,
+          'library',
+        );
+      },
+
       addFavorite: (item) => {
         const exists = get().favorites.some((f) => f.id === item.id);
         if (!exists) {
-          set((state) => ({ favorites: [...state.favorites, item] }));
+          set((state) => ({
+            favorites: [...state.favorites, item],
+            savedItems: state.savedItems.filter((entry) => entry.id !== item.id),
+          }));
           notify.success(
             'Added to Favorites',
             getDisplayTitle(item.title, item.type),
@@ -407,16 +459,23 @@ export const useLibraryStore = create<LibraryState>()(
       },
 
       removeFavorite: (id) => {
-        const item = get().favorites.find((f) => f.id === id);
-        set((state) => ({ favorites: state.favorites.filter((f) => f.id !== id) }));
+        const { favorites, savedItems } = get();
+        const item = favorites.find((entry) => entry.id === id);
+        if (!item) return;
+        set({
+          favorites: favorites.filter((entry) => entry.id !== id),
+          savedItems: savedItems.some((entry) => entry.id === id)
+            ? savedItems
+            : [...savedItems, item],
+        });
         notify.info(
-          'Removed from Favorites',
-          item ? getDisplayTitle(item.title, item.type) : 'Item removed',
+          'Moved to Saved',
+          getDisplayTitle(item.title, item.type),
           undefined,
           undefined,
           'library',
         );
-        debugLog.info('library', `Removed favorite`, { id });
+        debugLog.info('library', 'Moved favorite to Saved', { id });
       },
 
       isFavorite: (id) => get().favorites.some((f) => f.id === id),
@@ -501,6 +560,7 @@ export const useLibraryStore = create<LibraryState>()(
           'library',
         );
         debugLog.info('library', `Created collection: ${name}`, { id: newCol.id });
+        return newCol.id;
       },
 
       renameCollection: (id, newName) => {
@@ -738,6 +798,7 @@ export const useLibraryStore = create<LibraryState>()(
 
       clearAllData: () => {
         set({
+          savedItems: [],
           favorites: [],
           collections: [],
           history: [],
@@ -747,19 +808,23 @@ export const useLibraryStore = create<LibraryState>()(
           syncedSeries: [],
           recentChannels: [],
         });
-        notify.warning(
-          'Library Reset',
-          'All history, favorites, collections, and watched state cleared.',
-          undefined,
-          undefined,
-          'library',
-        );
+        notify.warning('Library Reset', 'Library data cleared.', undefined, undefined, 'library');
         debugLog.warn('library', 'Cleared all library data');
       },
     }),
     {
       name: 'iptv-library-storage',
-      version: 3,
+      version: 5,
+      merge: (persisted, current) => {
+        const state = persisted as Partial<LibraryState> | undefined;
+        const favorites = Array.isArray(state?.favorites) ? state.favorites : current.favorites;
+        return {
+          ...current,
+          ...state,
+          favorites,
+          savedItems: normalizeSavedItems(state?.savedItems, favorites),
+        };
+      },
       migrate: migrateLibraryState,
       storage: createDebouncedStorage<LibraryState>(),
       partialize: (state) => ({ ...state, ...sanitizedLibraryData(state) }),

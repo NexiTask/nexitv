@@ -209,6 +209,7 @@ export function EpisodesDrawer() {
                         ? undefined
                         : (e) =>
                             handleMediaCardContextMenu(e, epItem, {
+                              isEpisode: true,
                               onPlay: () => playEpisode(episode, selectedSeason),
                             })
                     }

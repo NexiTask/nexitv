@@ -5,6 +5,8 @@
 export const PL_MESSAGES: Record<string, string> = {
   Home: 'Start',
   Browse: 'Przeglądaj',
+  'Show Coming Up in Library and announced episodes in the details of favorite series.':
+    'Wyświetla nadchodzące premiery w bibliotece i zapowiedziane odcinki w szczegółach ulubionych seriali.',
   Library: 'Biblioteka',
   'Live TV': 'Telewizja na żywo',
   'TV Guide': 'Przewodnik telewizyjny',
@@ -186,7 +188,20 @@ export const PL_MESSAGES: Record<string, string> = {
   'No channels found.': 'Nie znaleziono kanałów.',
   'No Downloads Yet': 'Nie ma jeszcze pobrań',
   'No Watch History': 'Brak historii oglądania',
+  Saved: 'Zapisane',
+  'Move to Saved': 'Przenieś do zapisanych',
+  'Moved to Saved': 'Przeniesiono do zapisanych',
+  'Add to Library': 'Dodaj do biblioteki',
+  'Remove from Library': 'Usuń z biblioteki',
+  'Added to Library': 'Dodano do biblioteki',
+  'Removed from Library': 'Usunięto z biblioteki',
+  'No saved items': 'Brak zapisanych pozycji',
+  'Use Add to Library to save an item here.':
+    'Wybierz „Dodaj do biblioteki”, aby zapisać tu pozycję.',
+  'Library data cleared.': 'Dane biblioteki wyczyszczone.',
   'Your Favorites Are Empty': 'Twoje ulubione są puste',
+  'Use the heart on a movie, series, or live channel to add it to Favorites.':
+    'Kliknij serce przy filmie, serialu lub kanale na żywo, aby dodać go do ulubionych.',
   'No Collections Found': 'Nie znaleziono kolekcji',
   'Loading page': 'Ładowanie strony',
   'Loading movies': 'Ładowanie filmów',
@@ -1297,6 +1312,7 @@ export const PL_MESSAGES: Record<string, string> = {
     'Pokazuj aktualizacje cyklu życia po rozpoczęciu, zakończeniu lub niepowodzeniu pobierania.',
   'Download Notifications': 'Powiadomienia o pobieraniu',
   'Show download notifications': 'Pokaż powiadomienia o pobieraniu',
+  'Default download folder is {path}.': 'Domyślny folder pobierania to {path}.',
   'Download Folder': 'Folder pobierania',
   'Choose a destination from the desktop app.':
     'Wybierz miejsce docelowe w aplikacji komputerowej.',

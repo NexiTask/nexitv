@@ -5,6 +5,8 @@
 export const NL_MESSAGES: Record<string, string> = {
   Home: 'Start',
   Browse: 'Blader',
+  'Show Coming Up in Library and announced episodes in the details of favorite series.':
+    'Toont aankomende releases in de bibliotheek en aangekondigde afleveringen bij favoriete series.',
   Library: 'Bibliotheek',
   'Live TV': 'Live-tv',
   'TV Guide': 'TV-gids',
@@ -185,7 +187,20 @@ export const NL_MESSAGES: Record<string, string> = {
   'No channels found.': 'Geen kanalen gevonden.',
   'No Downloads Yet': 'Nog geen downloads',
   'No Watch History': 'Geen kijkgeschiedenis',
+  Saved: 'Opgeslagen',
+  'Move to Saved': 'Verplaatsen naar Opgeslagen',
+  'Moved to Saved': 'Verplaatst naar Opgeslagen',
+  'Add to Library': 'Toevoegen aan bibliotheek',
+  'Remove from Library': 'Verwijderen uit bibliotheek',
+  'Added to Library': 'Toegevoegd aan bibliotheek',
+  'Removed from Library': 'Verwijderd uit bibliotheek',
+  'No saved items': 'Geen opgeslagen items',
+  'Use Add to Library to save an item here.':
+    'Kies ‘Toevoegen aan bibliotheek’ om een item hier op te slaan.',
+  'Library data cleared.': 'Bibliotheekgegevens gewist.',
   'Your Favorites Are Empty': 'Je favorieten zijn leeg',
+  'Use the heart on a movie, series, or live channel to add it to Favorites.':
+    'Klik op het hartje bij een film, serie of livezender om deze aan je favorieten toe te voegen.',
   'No Collections Found': 'Geen collecties gevonden',
   'Loading page': 'Pagina laden',
   'Loading movies': 'Films laden',
@@ -1304,6 +1319,7 @@ export const NL_MESSAGES: Record<string, string> = {
     'Toon levenscyclusupdates wanneer downloads starten, eindigen of mislukken.',
   'Download Notifications': 'Downloadmeldingen',
   'Show download notifications': 'Downloadmeldingen weergeven',
+  'Default download folder is {path}.': 'De standaard downloadmap is {path}.',
   'Download Folder': 'Downloadmap',
   'Choose a destination from the desktop app.': 'Kies een bestemming in de desktop-app.',
   'Folder Could Not Be Selected': 'Map kon niet worden geselecteerd',

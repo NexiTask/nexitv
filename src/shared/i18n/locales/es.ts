@@ -5,6 +5,8 @@
 export const ES_MESSAGES: Record<string, string> = {
   Home: 'Inicio',
   Browse: 'Navegar',
+  'Show Coming Up in Library and announced episodes in the details of favorite series.':
+    'Muestra Próximamente en la biblioteca y los episodios anunciados en los detalles de las series favoritas.',
   Library: 'Biblioteca',
   'Live TV': 'Televisión en vivo',
   'TV Guide': 'Guía de TV',
@@ -186,7 +188,20 @@ export const ES_MESSAGES: Record<string, string> = {
   'No channels found.': 'No se encontraron canales.',
   'No Downloads Yet': 'Aún no hay descargas',
   'No Watch History': 'Sin historial de visualización',
+  Saved: 'Guardado',
+  'Move to Saved': 'Mover a Guardado',
+  'Moved to Saved': 'Movido a Guardado',
+  'Add to Library': 'Añadir a la biblioteca',
+  'Remove from Library': 'Quitar de la biblioteca',
+  'Added to Library': 'Añadido a la biblioteca',
+  'Removed from Library': 'Quitado de la biblioteca',
+  'No saved items': 'No hay elementos guardados',
+  'Use Add to Library to save an item here.':
+    'Usa «Añadir a la biblioteca» para guardar un elemento aquí.',
+  'Library data cleared.': 'Datos de la biblioteca borrados.',
   'Your Favorites Are Empty': 'Tus favoritos están vacíos',
+  'Use the heart on a movie, series, or live channel to add it to Favorites.':
+    'Pulsa el corazón de una película, serie o canal en directo para añadirlo a Favoritos.',
   'No Collections Found': 'No se encontraron colecciones',
   'Loading page': 'Cargando página',
   'Loading movies': 'Cargando películas',
@@ -1309,6 +1324,7 @@ export const ES_MESSAGES: Record<string, string> = {
     'Muestra actualizaciones del ciclo de vida cuando las descargas comienzan, finalizan o fallan.',
   'Download Notifications': 'Notificaciones de descarga',
   'Show download notifications': 'Mostrar notificaciones de descarga',
+  'Default download folder is {path}.': 'La carpeta de descarga predeterminada es {path}.',
   'Download Folder': 'Carpeta de descargas',
   'Choose a destination from the desktop app.':
     'Elija un destino desde la aplicación de escritorio.',

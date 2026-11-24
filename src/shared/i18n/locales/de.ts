@@ -7,6 +7,8 @@ export const DE_MESSAGES: Record<string, string> = {
   // Global navigation and common actions
   Home: 'Start',
   Browse: 'Entdecken',
+  'Show Coming Up in Library and announced episodes in the details of favorite series.':
+    'Zeigt „Demnächst“ in der Bibliothek und angekündigte Folgen in den Details zu Lieblingsserien an.',
   Library: 'Bibliothek',
   'Live TV': 'Live-TV',
   'TV Guide': 'TV-Programm',
@@ -191,7 +193,20 @@ export const DE_MESSAGES: Record<string, string> = {
   'No channels found.': 'Keine Kanäle gefunden.',
   'No Downloads Yet': 'Noch keine Downloads',
   'No Watch History': 'Kein Wiedergabeverlauf',
+  Saved: 'Gespeichert',
+  'Move to Saved': 'Nach Gespeichert verschieben',
+  'Moved to Saved': 'Nach Gespeichert verschoben',
+  'Add to Library': 'Zur Bibliothek hinzufügen',
+  'Remove from Library': 'Aus der Bibliothek entfernen',
+  'Added to Library': 'Zur Bibliothek hinzugefügt',
+  'Removed from Library': 'Aus der Bibliothek entfernt',
+  'No saved items': 'Keine gespeicherten Einträge',
+  'Use Add to Library to save an item here.':
+    'Wählen Sie „Zur Bibliothek hinzufügen“, um einen Eintrag hier zu speichern.',
+  'Library data cleared.': 'Bibliotheksdaten gelöscht.',
   'Your Favorites Are Empty': 'Ihre Favoriten sind leer',
+  'Use the heart on a movie, series, or live channel to add it to Favorites.':
+    'Klicken Sie bei einem Film, einer Serie oder einem Live-Sender auf das Herz, um den Eintrag zu Ihren Favoriten hinzuzufügen.',
   'No Collections Found': 'Keine Sammlungen gefunden',
   'Loading page': 'Seite wird geladen',
   'Loading movies': 'Filme werden geladen',
@@ -1346,6 +1361,7 @@ export const DE_MESSAGES: Record<string, string> = {
     'Statusmeldungen anzeigen, wenn Downloads starten, abgeschlossen werden oder fehlschlagen.',
   'Download Notifications': 'Download-Benachrichtigungen',
   'Show download notifications': 'Download-Benachrichtigungen anzeigen',
+  'Default download folder is {path}.': 'Der Standard-Downloadordner ist {path}.',
   'Download Folder': 'Download-Ordner',
   'Choose a destination from the desktop app.': 'Wählen Sie in der Desktop-App einen Zielordner.',
   'Folder Could Not Be Selected': 'Ordner konnte nicht ausgewählt werden',

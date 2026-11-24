@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  Bookmark,
   Check,
   CheckCircle,
   ChevronRight,
@@ -47,9 +48,11 @@ export function MediaCardMenu({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const isFavorite =
-    useLibraryStore((state) => state.favorites.some((entry) => entry.id === item.id)) ||
-    Boolean(item.isFavorite);
+  const isSaved = useLibraryStore((state) =>
+    state.savedItems.some((entry) => entry.id === item.id),
+  );
+  const inFavorites = useLibraryStore((state) => state.isFavorite(item.id));
+  const isFavorite = inFavorites || Boolean(item.isFavorite);
   const isWatched =
     useLibraryStore((state) => state.watched.includes(item.id)) || Boolean(item.isWatched);
   const inHistory = useLibraryStore((state) =>
@@ -106,9 +109,8 @@ export function MediaCardMenu({
     const name = newCollectionName.trim();
     if (!name) return;
     const store = useLibraryStore.getState();
-    store.createCollection(name);
-    const collection = useLibraryStore.getState().collections.find((entry) => entry.name === name);
-    if (collection) useLibraryStore.getState().addToCollection(collection.id, item);
+    const collectionId = store.createCollection(name);
+    store.addToCollection(collectionId, item);
     setNewCollectionName('');
     close();
   };
@@ -165,6 +167,24 @@ export function MediaCardMenu({
                 <Download size={14} /> <span>{t('Download Content')}</span>
               </button>
             )}
+            <button
+              type="button"
+              className={styles.menuItem}
+              onClick={(event) =>
+                run(event, () => useLibraryStore.getState().toggleSavedItem(item))
+              }
+            >
+              <Bookmark size={14} fill={isSaved ? 'currentColor' : 'none'} />
+              <span>
+                {t(
+                  inFavorites
+                    ? 'Move to Saved'
+                    : isSaved
+                      ? 'Remove from Library'
+                      : 'Add to Library',
+                )}
+              </span>
+            </button>
             <button
               type="button"
               className={styles.menuItem}

@@ -6,14 +6,35 @@ import { usePlayerContextMenus } from '@/modules/playback/hooks/usePlayerContext
 import { useContextMenuStore } from '@/shared/ui/context-menu/useContextMenuStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 
+const navigate = vi.hoisted(() => vi.fn());
+
 vi.mock('react-router-dom', () => ({
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigate,
 }));
 
 beforeEach(() => {
   localStorage.clear();
   useSettingsStore.getState().resetSettings();
   useContextMenuStore.getState().closeContextMenu();
+});
+
+it('opens Library from the app backdrop menu', () => {
+  const { result } = renderHook(() => usePlayerContextMenus());
+  const event = {
+    preventDefault: vi.fn(),
+    clientX: 100,
+    clientY: 200,
+    target: document.createElement('div'),
+  } as unknown as React.MouseEvent;
+  result.current.handleAppBackdropContextMenu(event);
+
+  const { items } = useContextMenuStore.getState();
+  const library = items.find((item) => item.label === 'Library');
+  expect(items.some((item) => item.label === 'Favorites' || item.label === 'Collections')).toBe(
+    false,
+  );
+  library?.action?.();
+  expect(navigate).toHaveBeenCalledWith('/library');
 });
 
 describe('Player Context Menu Developer HUD option', () => {

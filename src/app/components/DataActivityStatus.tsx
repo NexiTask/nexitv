@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, CircleAlert, LoaderCircle } from 'lucide-react';
+import { normalizeDownloadProgress } from '@/modules/downloads/public/lib/downloads';
+import { useDownloadStore } from '@/modules/downloads/public/store/useDownloadStore';
 import { useI18n, type I18nApi } from '@/shared/i18n/i18n';
 import {
   useDataActivities,
@@ -134,6 +136,33 @@ function ActivityLabels({
   ));
 }
 
+function DownloadActivity({ compact }: { compact: boolean }) {
+  const { t, tn, number } = useI18n();
+  const jobs = useDownloadStore((state) => state.jobs);
+  const active = jobs.filter((job) => job.state === 'downloading');
+  if (!active.length) return null;
+
+  const totalBytes = active.every((job) => job.totalBytes !== null)
+    ? active.reduce((sum, job) => sum + (job.totalBytes ?? 0), 0)
+    : null;
+  const downloadedBytes = active.reduce((sum, job) => sum + job.downloadedBytes, 0);
+  const { percent } = normalizeDownloadProgress(downloadedBytes, totalBytes);
+  return (
+    <ActivityRow
+      label={t('Downloading…')}
+      compact={compact}
+      detail={
+        active.length === 1
+          ? active[0]?.fileName
+          : tn('{count} download', '{count} downloads', active.length, {
+              count: number(active.length),
+            })
+      }
+      percent={percent ?? undefined}
+    />
+  );
+}
+
 export function DataActivityStatus({ compact }: { compact: boolean }) {
   const { t, number } = useI18n();
   const counts = useDataActivities();
@@ -207,6 +236,7 @@ export function DataActivityStatus({ compact }: { compact: boolean }) {
       {active.length > 0 && (
         <ActivityLabels active={active} compact={compact} progress={progress} details={details} />
       )}
+      <DownloadActivity compact={compact} />
       {imdbImport && (
         <ActivityRow
           label={imdbLabels[imdbImport.phase]}

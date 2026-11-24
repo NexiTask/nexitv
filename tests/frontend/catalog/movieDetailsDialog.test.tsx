@@ -101,7 +101,7 @@ const defaultProps = {
 describe('<MovieDetailsDialog />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useLibraryStore.setState({ favorites: [], history: [] });
+    useLibraryStore.setState({ savedItems: [], favorites: [], history: [] });
     usePlayerStore.setState({ playStream: vi.fn(), activeStream: null });
     useSettingsStore.getState().resetSettings();
     useAuthStore.setState({ profiles: [], runtimes: {} });
@@ -265,7 +265,7 @@ describe('<MovieDetailsDialog />', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'The Dink' })).toBeTruthy();
   });
 
-  it('toggles favorite state when Add to Favorites button is clicked', async () => {
+  it('moves a saved movie to Favorites and back to Saved', async () => {
     const user = userEvent.setup();
 
     vi.spyOn(useDetailsModule, 'useVodInfo').mockReturnValue({
@@ -278,11 +278,23 @@ describe('<MovieDetailsDialog />', () => {
 
     renderWithRouter(<MovieDetailsDialog {...defaultProps} />);
 
+    const bookmark = screen.getByRole('button', { name: 'Add to Library' });
+    expect(bookmark.getAttribute('aria-pressed')).toBe('false');
+    await user.click(bookmark);
+    expect(bookmark.getAttribute('aria-pressed')).toBe('true');
+    expect(useLibraryStore.getState().savedItems).toMatchObject([{ id: 'movie-123' }]);
+    expect(useLibraryStore.getState().favorites).toEqual([]);
+
     const favBtn = screen.getByRole('button', { name: /Add to favorites/i });
     await user.click(favBtn);
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
+    expect(useLibraryStore.getState().favorites).toMatchObject([{ id: 'movie-123' }]);
 
-    expect(useLibraryStore.getState().favorites).toHaveLength(1);
-    expect(useLibraryStore.getState().favorites[0]!.id).toBe('movie-123');
+    await user.click(screen.getByRole('button', { name: 'Move to Saved' }));
+    expect(useLibraryStore.getState().favorites).toEqual([]);
+    expect(useLibraryStore.getState().savedItems).toMatchObject([{ id: 'movie-123' }]);
+    await user.click(screen.getByRole('button', { name: 'Remove from Library' }));
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
   });
 
   it('renders error state and retries fetch on Try Again click', async () => {

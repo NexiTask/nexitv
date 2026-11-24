@@ -5,6 +5,8 @@
 export const IT_MESSAGES: Record<string, string> = {
   Home: 'Pagina iniziale',
   Browse: 'Sfoglia',
+  'Show Coming Up in Library and announced episodes in the details of favorite series.':
+    'Mostra le prossime uscite nella raccolta e gli episodi annunciati nei dettagli delle serie preferite.',
   Library: 'Biblioteca',
   'Live TV': 'TV in diretta',
   'TV Guide': 'Guida televisiva',
@@ -187,7 +189,20 @@ export const IT_MESSAGES: Record<string, string> = {
   'No channels found.': 'Nessun canale trovato.',
   'No Downloads Yet': 'Nessun download ancora',
   'No Watch History': 'Nessuna cronologia visualizzazioni',
+  Saved: 'Salvati',
+  'Move to Saved': 'Sposta in Salvati',
+  'Moved to Saved': 'Spostato in Salvati',
+  'Add to Library': 'Aggiungi alla libreria',
+  'Remove from Library': 'Rimuovi dalla libreria',
+  'Added to Library': 'Aggiunto alla libreria',
+  'Removed from Library': 'Rimosso dalla libreria',
+  'No saved items': 'Nessun elemento salvato',
+  'Use Add to Library to save an item here.':
+    'Usa «Aggiungi alla libreria» per salvare un elemento qui.',
+  'Library data cleared.': 'Dati della libreria cancellati.',
   'Your Favorites Are Empty': 'I tuoi preferiti sono vuoti',
+  'Use the heart on a movie, series, or live channel to add it to Favorites.':
+    'Premi il cuore su un film, una serie o un canale in diretta per aggiungerlo ai preferiti.',
   'No Collections Found': 'Nessuna raccolta trovata',
   'Loading page': 'Caricamento pagina',
   'Loading movies': 'Caricamento di filmati',
@@ -1307,6 +1322,7 @@ export const IT_MESSAGES: Record<string, string> = {
     'Mostra gli aggiornamenti del ciclo di vita quando i download iniziano, finiscono o falliscono.',
   'Download Notifications': 'Notifiche di download',
   'Show download notifications': 'Mostra notifiche di download',
+  'Default download folder is {path}.': 'La cartella di download predefinita è {path}.',
   'Download Folder': 'Cartella di download',
   'Choose a destination from the desktop app.': "Scegli una destinazione dall'app desktop.",
   'Folder Could Not Be Selected': 'Impossibile selezionare la cartella',

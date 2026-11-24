@@ -5,6 +5,8 @@
 export const FR_MESSAGES: Record<string, string> = {
   Home: 'Accueil',
   Browse: 'Parcourir',
+  'Show Coming Up in Library and announced episodes in the details of favorite series.':
+    'Affiche les sorties à venir dans la bibliothèque et les épisodes annoncés dans les fiches des séries favorites.',
   Library: 'Bibliothèque',
   'Live TV': 'Télévision en direct',
   'TV Guide': 'Guide télé',
@@ -189,7 +191,20 @@ export const FR_MESSAGES: Record<string, string> = {
   'No channels found.': 'Aucune chaîne trouvée.',
   'No Downloads Yet': "Aucun téléchargement pour l'instant",
   'No Watch History': 'Aucun historique de visionnage',
+  Saved: 'Enregistrés',
+  'Move to Saved': 'Déplacer vers Enregistrés',
+  'Moved to Saved': 'Déplacé vers Enregistrés',
+  'Add to Library': 'Ajouter à la bibliothèque',
+  'Remove from Library': 'Retirer de la bibliothèque',
+  'Added to Library': 'Ajouté à la bibliothèque',
+  'Removed from Library': 'Retiré de la bibliothèque',
+  'No saved items': 'Aucun élément enregistré',
+  'Use Add to Library to save an item here.':
+    'Utilisez « Ajouter à la bibliothèque » pour enregistrer un élément ici.',
+  'Library data cleared.': 'Données de la bibliothèque effacées.',
   'Your Favorites Are Empty': 'Vos favoris sont vides',
+  'Use the heart on a movie, series, or live channel to add it to Favorites.':
+    'Cliquez sur le cœur d’un film, d’une série ou d’une chaîne en direct pour l’ajouter aux favoris.',
   'No Collections Found': 'Aucune collection trouvée',
   'Loading page': 'Chargement de la page',
   'Loading movies': 'Chargement de films',
@@ -1318,6 +1333,7 @@ export const FR_MESSAGES: Record<string, string> = {
     'Affichez les mises à jour du cycle de vie lorsque les téléchargements démarrent, se terminent ou échouent.',
   'Download Notifications': 'Notifications de téléchargement',
   'Show download notifications': 'Afficher les notifications de téléchargement',
+  'Default download folder is {path}.': 'Le dossier de téléchargement par défaut est {path}.',
   'Download Folder': 'Dossier de téléchargement',
   'Choose a destination from the desktop app.':
     "Choisissez une destination dans l'application de bureau.",
