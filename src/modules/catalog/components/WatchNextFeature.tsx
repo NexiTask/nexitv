@@ -14,7 +14,7 @@ import { parseMediaDisplayTitle } from '../lib/titleParser';
 import type { MediaItem } from '../model/media';
 import styles from './WatchNextFeature.module.css';
 
-const ROTATION_INTERVAL_MS = 4_000;
+const ROTATION_INTERVAL_MS = 12_000;
 
 interface WatchNextFeatureProps {
   items: HistoryItem[];

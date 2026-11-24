@@ -212,9 +212,9 @@ describe('saved next episodes', () => {
         }),
       ),
     );
-    const tick = () =>
+    const tick = (ms = 12_000) =>
       act(() => {
-        vi.advanceTimersByTime(4_000);
+        vi.advanceTimersByTime(ms);
       });
     try {
       const banner = screen.getByRole('region', { name: 'Watch Next' });
@@ -222,7 +222,9 @@ describe('saved next episodes', () => {
       tick();
       expect(heading()).toBe('First Show');
       setVisible(true);
-      tick();
+      tick(11_999);
+      expect(heading()).toBe('First Show');
+      tick(1);
       expect(heading()).toBe('Second Show');
       fireEvent.mouseEnter(banner);
       tick();
