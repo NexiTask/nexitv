@@ -244,6 +244,7 @@ export function HomePage() {
           <WatchNextFeature
             key={id}
             items={watchNextItems}
+            suspended={playing || Boolean(selectedMovie || selectedSeries)}
             onOpen={handleItemClick}
             onSeeAll={() => navigate('/library/watch-next')}
             onDismiss={dismissWatchNext}

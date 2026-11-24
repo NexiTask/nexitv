@@ -1,9 +1,11 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Play, X } from 'lucide-react';
+import { useReducedMotion } from 'framer-motion';
+import { ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react';
 import type { HistoryItem } from '@/modules/library/public/store/useLibraryStore';
 import { useTmdbDetailEnrichment } from '@/modules/metadata/public/hooks/useTmdbDetailsEnrichment';
 import { normalizeTmdbId } from '@/modules/metadata/public/model/tmdb';
+import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import { useI18n } from '@/shared/i18n/i18n';
 import { Button, IconButton } from '@/shared/ui/Button';
 import { useSeriesInfo } from '../data/useDetails';
@@ -12,24 +14,79 @@ import { parseMediaDisplayTitle } from '../lib/titleParser';
 import type { MediaItem } from '../model/media';
 import styles from './WatchNextFeature.module.css';
 
+const ROTATION_INTERVAL_MS = 4_000;
+
 interface WatchNextFeatureProps {
   items: HistoryItem[];
+  suspended?: boolean | undefined;
   onOpen: (item: MediaItem) => void;
   onDismiss: (item: MediaItem) => void;
   onSeeAll: () => void;
 }
 
-export function WatchNextFeature({ items, onOpen, onDismiss, onSeeAll }: WatchNextFeatureProps) {
+export function WatchNextFeature({
+  items,
+  suspended,
+  onOpen,
+  onDismiss,
+  onSeeAll,
+}: WatchNextFeatureProps) {
   const { t, number } = useI18n();
   const queryClient = useQueryClient();
   const headingId = useId();
   const [selectedId, setSelectedId] = useState<string>();
   const [starting, setStarting] = useState(false);
+  const [rotationChoice, setRotationChoice] = useState<boolean>();
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [inView, setInView] = useState(false);
+  const [pageVisible, setPageVisible] = useState(() => !document.hidden);
+  const feature = useRef<HTMLElement>(null);
+  const systemReducedMotion = useReducedMotion();
+  const motion = useSettingsStore((state) => state.motionPreference);
+  const reducedMotion = motion === 'reduced' || (motion === 'system' && systemReducedMotion);
+  const rotationEnabled = rotationChoice ?? !reducedMotion;
   const index = Math.max(
     0,
     items.findIndex((item) => item.id === selectedId),
   );
   const item = items[index];
+  const hasItem = Boolean(item);
+  const nextId = (items[index + 1] ?? items[0])?.id;
+  const rotating = Boolean(
+    items.length > 1 &&
+    rotationEnabled &&
+    inView &&
+    pageVisible &&
+    !suspended &&
+    !starting &&
+    !hovered &&
+    !focused,
+  );
+
+  useEffect(() => {
+    const node = feature.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setInView(Boolean(entry?.isIntersecting && entry.intersectionRatio >= 0.5)),
+      { threshold: 0.5 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasItem]);
+
+  useEffect(() => {
+    const update = () => setPageVisible(!document.hidden);
+    document.addEventListener('visibilitychange', update);
+    return () => document.removeEventListener('visibilitychange', update);
+  }, []);
+
+  useEffect(() => {
+    if (!rotating || !nextId) return;
+    const timer = window.setTimeout(() => setSelectedId(nextId), ROTATION_INTERVAL_MS);
+    return () => window.clearTimeout(timer);
+  }, [rotating, item?.id, nextId]);
+
   if (!item) return null;
 
   const { cleanTitle } = parseMediaDisplayTitle(item.seriesTitle || item.title, item.year);
@@ -50,7 +107,17 @@ export function WatchNextFeature({ items, onOpen, onDismiss, onSeeAll }: WatchNe
   };
 
   return (
-    <section className={styles.feature} aria-labelledby={headingId}>
+    <section
+      ref={feature}
+      className={styles.feature}
+      aria-labelledby={headingId}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
+    >
       <EpisodeArtwork key={item.id} item={item} title={title} />
       <div className={styles.scrim} aria-hidden="true" />
       <div className={styles.content}>
@@ -68,7 +135,7 @@ export function WatchNextFeature({ items, onOpen, onDismiss, onSeeAll }: WatchNe
             See all
           </Button>
         </div>
-        <div className={styles.episode} aria-live="polite">
+        <div className={styles.episode} aria-live={rotationEnabled ? 'off' : 'polite'}>
           <h3 className={styles.title}>{title}</h3>
           {episodeLabel && <p className={styles.label}>{episodeLabel}</p>}
         </div>
@@ -109,9 +176,25 @@ export function WatchNextFeature({ items, onOpen, onDismiss, onSeeAll }: WatchNe
       )}
       <div className={styles.footer}>
         {items.length > 1 && (
-          <span>
-            {number(index + 1)} / {number(items.length)}
-          </span>
+          <>
+            <span>
+              {number(index + 1)} / {number(items.length)}
+            </span>
+            <IconButton
+              className={styles.quiet}
+              size="sm"
+              aria-label={t(
+                rotationEnabled ? 'Pause Watch Next rotation' : 'Start Watch Next rotation',
+              )}
+              onClick={() => setRotationChoice(!rotationEnabled)}
+            >
+              {rotationEnabled ? (
+                <Pause size={16} aria-hidden="true" />
+              ) : (
+                <Play size={16} aria-hidden="true" />
+              )}
+            </IconButton>
+          </>
         )}
         <IconButton
           className={styles.quiet}
@@ -127,6 +210,14 @@ export function WatchNextFeature({ items, onOpen, onDismiss, onSeeAll }: WatchNe
           <X size={16} aria-hidden="true" />
         </IconButton>
       </div>
+      {rotating && !reducedMotion && (
+        <div
+          key={item.id}
+          className={styles.rotationProgress}
+          style={{ animationDuration: `${ROTATION_INTERVAL_MS}ms` }}
+          aria-hidden="true"
+        />
+      )}
     </section>
   );
 }

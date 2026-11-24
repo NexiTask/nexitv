@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -10,6 +10,7 @@ import { useWatchNext } from '@/modules/catalog/data/useWatchNext';
 import { seriesInfoQuery } from '@/modules/catalog/data/useDetails';
 import { readWatchNextEpisodes } from '@/modules/catalog/data/watchNextCache';
 import { HomePage } from '@/modules/catalog/pages/HomePage';
+import { WatchNextFeature } from '@/modules/catalog/components/WatchNextFeature';
 import { pickWatchNext, regularEpisodeCount } from '@/modules/catalog/lib/watchNext';
 import {
   isQueuedEpisode,
@@ -161,6 +162,93 @@ describe('saved next episodes', () => {
     act(() => useLibraryStore.getState().dismissWatchNext(queued.id));
     expect(result.current.items).toEqual([second]);
     expect(useLibraryStore.getState().history).toEqual([queued, resumed, second]);
+  });
+
+  it('rotates while visible, wraps, and pauses for interaction or the pause button', () => {
+    vi.useFakeTimers();
+    let setVisible: (visible: boolean) => void = () => {};
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(notify: IntersectionObserverCallback) {
+          setVisible = (visible) =>
+            act(() => {
+              notify(
+                [
+                  {
+                    isIntersecting: visible,
+                    intersectionRatio: visible ? 1 : 0,
+                  } as IntersectionObserverEntry,
+                ],
+                this as unknown as IntersectionObserver,
+              );
+            });
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const items: HistoryItem[] = ['First Show', 'Second Show'].map((title) => ({
+      id: title,
+      title,
+      type: 'series',
+      posterUrl: '',
+      progressPercentage: 0,
+      currentTime: 0,
+      lastWatchedAt: 1,
+      episodeId: 'episode-1',
+      seasonNum: 1,
+      episodeNum: 1,
+    }));
+    const home = render(
+      createElement(
+        QueryClientProvider,
+        { client: new QueryClient() },
+        createElement(WatchNextFeature, {
+          items,
+          onOpen: vi.fn(),
+          onDismiss: vi.fn(),
+          onSeeAll: vi.fn(),
+        }),
+      ),
+    );
+    const tick = () =>
+      act(() => {
+        vi.advanceTimersByTime(4_000);
+      });
+    try {
+      const banner = screen.getByRole('region', { name: 'Watch Next' });
+      const heading = () => screen.getByRole('heading', { level: 3 }).textContent;
+      tick();
+      expect(heading()).toBe('First Show');
+      setVisible(true);
+      tick();
+      expect(heading()).toBe('Second Show');
+      fireEvent.mouseEnter(banner);
+      tick();
+      expect(heading()).toBe('Second Show');
+      fireEvent.mouseLeave(banner);
+      tick();
+      expect(heading()).toBe('First Show');
+      const next = screen.getByRole('button', { name: 'Next episode' });
+      fireEvent.focus(next);
+      tick();
+      expect(heading()).toBe('First Show');
+      fireEvent.blur(next);
+      fireEvent.click(screen.getByRole('button', { name: 'Pause Watch Next rotation' }));
+      tick();
+      expect(heading()).toBe('First Show');
+      fireEvent.click(screen.getByRole('button', { name: 'Start Watch Next rotation' }));
+      tick();
+      expect(heading()).toBe('Second Show');
+      setVisible(false);
+      tick();
+      expect(heading()).toBe('Second Show');
+    } finally {
+      home.unmount();
+      vi.unstubAllGlobals();
+      vi.useRealTimers();
+    }
   });
 
   it('updates the queue when a tracked series source becomes available', () => {
