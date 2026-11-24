@@ -1,4 +1,5 @@
 use super::store::{Account, Session};
+use crate::loopback::read_request;
 use aws_lc_rs::{digest, rand};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use jsonwebtoken::{decode, decode_header, jwk::JwkSet, Algorithm, DecodingKey, Validation};
@@ -6,7 +7,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
     sync::watch,
     time::{sleep, timeout},
@@ -291,34 +292,6 @@ fn parse_callback(target: &str, expected_state: &str) -> Option<Callback> {
         }
     }
     (state.as_deref() == Some(expected_state)).then_some(callback)
-}
-
-async fn read_request(stream: &mut TcpStream, authority: &str) -> Option<String> {
-    let mut buffer = [0; 8192];
-    let mut used = 0;
-    while used < buffer.len() {
-        let count = stream.read(&mut buffer[used..]).await.ok()?;
-        if count == 0 {
-            return None;
-        }
-        used += count;
-        let mut headers = [httparse::EMPTY_HEADER; 48];
-        let mut request = httparse::Request::new(&mut headers);
-        if request.parse(&buffer[..used]).ok()?.is_complete() {
-            let mut hosts = request
-                .headers
-                .iter()
-                .filter(|header| header.name.eq_ignore_ascii_case("host"));
-            if request.method == Some("GET")
-                && hosts.next().map(|header| header.value) == Some(authority.as_bytes())
-                && hosts.next().is_none()
-            {
-                return request.path.map(str::to_owned);
-            }
-            return None;
-        }
-    }
-    None
 }
 
 async fn reply(stream: &mut TcpStream, status: &str, message: &str) -> std::io::Result<()> {

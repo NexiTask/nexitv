@@ -319,6 +319,8 @@ export const tauriApi = {
   recommendationsGenerate: (clientId: string, request: SeriesRecommendationRequest) =>
     invoke<SeriesRecommendationSnapshot>('recommendations_generate', { clientId, request }),
 
+  recommendationTrailerEndpoint: () => invoke<string>('recommendation_trailer_endpoint'),
+
   /** Spawn or re-initialize native mpv player instance */
   mpvStart: (options: MpvStartOptions) => invoke<void>('mpv_start', { options }),
 

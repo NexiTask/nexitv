@@ -73,6 +73,8 @@ interface MediaCardProps {
   removeLabel?: string | undefined;
   /** Context to show over a poster on hover or focus. */
   posterDetails?: MediaCardPosterDetails | undefined;
+  /** Present when this poster selects the featured trailer. */
+  previewSelected?: boolean | undefined;
 }
 
 function formatChannelNumber(value: string | number | undefined): string {
@@ -162,6 +164,7 @@ function MediaCardComponent({
   onRemove,
   removeLabel = 'Remove',
   posterDetails,
+  previewSelected,
 }: MediaCardProps) {
   const { t, tn, language, number } = useI18n();
   const { handleMediaCardContextMenu } = useMediaContextMenus();
@@ -351,7 +354,14 @@ function MediaCardComponent({
       className={`${styles.cardContainer} ${viewMode === 'list' ? styles.listView : ''} ${isLiveTvGrid ? styles.cardContainerLiveTvGrid : ''}`}
       style={style}
       role="group"
-      aria-label={onClick ? t('Open {title}', { title: displayTitle }) : displayTitle}
+      aria-label={
+        previewSelected !== undefined
+          ? t('Preview {title}', { title: displayTitle })
+          : onClick
+            ? t('Open {title}', { title: displayTitle })
+            : displayTitle
+      }
+      aria-current={previewSelected}
       aria-describedby={details ? descriptionId : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={() => onClick?.(item)}

@@ -6,6 +6,7 @@ import { isQueuedEpisode, useLibraryStore } from '@/modules/library/public/store
 import { useSeriesRecommendations } from '@/modules/library/public/data/useSeriesRecommendations';
 import { useAutomatedRecommendations } from '@/modules/library/public/data/useAutomatedRecommendations';
 import { mixSeriesRecommendations } from '@/modules/library/public/data/seriesRecommendations';
+import { RecommendationTrailers } from '@/modules/library/public/components/RecommendationTrailers';
 import {
   useSettingsStore,
   type HomeSectionId,
@@ -81,6 +82,7 @@ export function HomePage() {
     0,
     recommendationsHomeLimit,
   );
+  const recommendedItems = recommendations.map(({ card }) => card.item);
   const recommendationDetails = new Map(
     recommendations.map(({ source, card }) => [
       card.item.id,
@@ -256,14 +258,25 @@ export function HomePage() {
         );
       case 'recommendations':
         return (
-          <HorizontalCarousel
+          <RecommendationTrailers
             key={id}
-            title="Recommendations"
-            items={recommendations.map(({ card }) => card.item)}
-            getPosterDetails={(item) => recommendationDetails.get(item.id)}
-            onItemClick={handleItemClick}
-            onSeeAll={() => navigate('/library/recommendations')}
-          />
+            items={recommendedItems}
+            onOpen={handleItemClick}
+            suspended={Boolean(selectedMovie || selectedSeries)}
+          >
+            {(preview, selectedId, select) => (
+              <HorizontalCarousel
+                title="Recommendations"
+                items={recommendedItems}
+                featuredPreview={preview}
+                previewItemId={selectedId}
+                getPosterDetails={(item) => recommendationDetails.get(item.id)}
+                onItemClick={select}
+                onViewDetails={handleItemClick}
+                onSeeAll={() => navigate('/library/recommendations')}
+              />
+            )}
+          </RecommendationTrailers>
         );
       case 'recentMovies':
         return loading ? (

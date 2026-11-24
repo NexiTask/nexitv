@@ -53,14 +53,14 @@ it('shows both sources together and keeps cached picks when a manual refresh fai
     );
   try {
     const first = open();
-    const smartCard = await screen.findByRole('group', { name: 'Open The Fixture' });
+    const smartCard = await screen.findByRole('group', { name: 'Preview The Fixture' });
     const smart = within(smartCard);
     expect(await smart.findByText('IMDb')).toBeTruthy();
     expect(smart.getByText('8.5')).toBeTruthy();
     expect(smart.getByTitle('IMDb rating 8.5 out of 10 from 12,500 votes')).toBeTruthy();
     expect(
       screen.getByRole('group', {
-        name: 'Open Saved Series',
+        name: 'Preview Saved Series',
         description: 'Recommended from your Library',
       }),
     ).toBeTruthy();
@@ -68,17 +68,20 @@ it('shows both sources together and keeps cached picks when a manual refresh fai
     first.unmount();
     open();
     const poster = await screen.findByRole('group', {
-      name: 'Open The Fixture',
+      name: 'Preview The Fixture',
       description: 'Recommended using your ChatGPT account Discover a series',
     });
     fireEvent.keyDown(poster, { key: 'Enter' });
+    expect(poster.getAttribute('aria-current')).toBe('true');
+    expect(openSeries).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Series details' }));
     expect(openSeries).toHaveBeenCalledWith(expect.objectContaining({ id: 'test-series' }));
     expect(read).toHaveBeenCalledTimes(2);
     expect(rank).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Refresh recommendations' }));
     expect((await screen.findByRole('alert')).textContent).toContain('Test refresh failed.');
     await waitFor(() => expect(rank).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole('group', { name: 'Open The Fixture' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Preview The Fixture' })).toBeTruthy();
   } finally {
     useLibraryStore.setState({ savedItems: previousSaved });
     status.mockRestore();

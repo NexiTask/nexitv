@@ -3,9 +3,7 @@ import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-quer
 import { Sparkles } from 'lucide-react';
 import { CatalogPageHeader } from '@/modules/catalog/public/components/CatalogPageHeader';
 import { MediaCard } from '@/modules/catalog/public/components/MediaCard';
-import { parseMediaDisplayTitle } from '@/modules/catalog/public/lib/titleParser';
 import type { MediaItem } from '@/modules/catalog/public/model/media';
-import { useTmdbDetailEnrichment } from '@/modules/metadata/public/hooks/useTmdbDetailsEnrichment';
 import { desktopApi } from '@/platform/desktop';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import { tauriApi, type SeriesRecommendationKind } from '@/platform/tauri';
@@ -13,6 +11,7 @@ import { useI18n } from '@/shared/i18n/i18n';
 import { getErrorMessage } from '@/shared/lib/error';
 import { Button } from '@/shared/ui/Button';
 import { EmptyState } from '@/shared/ui/EmptyState';
+import { RecommendationTrailers } from '../components/RecommendationTrailers';
 import type { HistoryItem } from '../store/useLibraryStore';
 import { useAutomatedRecommendations } from '../data/useAutomatedRecommendations';
 import { mixSeriesRecommendations } from '../data/seriesRecommendations';
@@ -29,42 +28,14 @@ const labels: Record<SeriesRecommendationKind, string> = {
   new: 'Recent in your catalogue',
 };
 
-function Teaser({ item }: { item: MediaItem }) {
-  const { t, date } = useI18n();
-  const parsed = parseMediaDisplayTitle(item.title, item.year);
-  const { details } = useTmdbDetailEnrichment('tv', {
-    title: parsed?.cleanTitle ?? item.title,
-    year: parsed.releaseYear ? Number(parsed.releaseYear) : null,
-  });
-  const video = details?.videos
-    .filter(({ type, official }) => official && /^(teaser|trailer)$/i.test(type ?? ''))
-    .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))[0];
-  if (!video) return null;
-  const published = video.publishedAt ? new Date(video.publishedAt) : null;
-  return (
-    <>
-      <Button
-        size="sm"
-        onClick={(event) => {
-          event.stopPropagation();
-          void desktopApi.openUrl(video.url).catch(() => {});
-        }}
-      >
-        {video.type?.toLowerCase() === 'teaser'
-          ? t('Watch series teaser')
-          : t('Watch series trailer')}
-      </Button>
-      {published && !Number.isNaN(published.valueOf()) && <small>{date(published)}</small>}
-    </>
-  );
-}
-
 export function RecommendationsList({
   next,
   onOpen,
+  suspended,
 }: {
   next: HistoryItem[];
   onOpen: (item: MediaItem) => void;
+  suspended?: boolean | undefined;
 }) {
   const { t, date } = useI18n();
   const navigate = useNavigate();
@@ -160,30 +131,39 @@ export function RecommendationsList({
             </p>
           )}
         {recommendations.length > 0 ? (
-          <ul className={styles.results}>
-            {recommendations.map(({ source, card }) => (
-              <li key={card.item.id}>
-                <MediaCard
-                  item={card.item}
-                  onClick={onOpen}
-                  posterDetails={{
-                    source,
-                    description:
-                      source === 'chatgpt' ? (
-                        <>
-                          {card.reason && <p>{card.reason}</p>}
-                          <p>{t(labels[card.kind])}</p>
-                        </>
-                      ) : undefined,
-                    action:
-                      source === 'chatgpt' && card.kind === 'new' ? (
-                        <Teaser item={card.item} />
-                      ) : undefined,
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
+          <RecommendationTrailers
+            items={recommendations.map(({ card }) => card.item)}
+            onOpen={onOpen}
+            suspended={suspended}
+          >
+            {(preview, selectedId, select) => (
+              <>
+                {preview}
+                <ul className={styles.results}>
+                  {recommendations.map(({ source, card }) => (
+                    <li key={card.item.id}>
+                      <MediaCard
+                        item={card.item}
+                        onClick={select}
+                        onViewDetails={onOpen}
+                        previewSelected={selectedId === card.item.id}
+                        posterDetails={{
+                          source,
+                          description:
+                            source === 'chatgpt' ? (
+                              <>
+                                {card.reason && <p>{card.reason}</p>}
+                                <p>{t(labels[card.kind])}</p>
+                              </>
+                            ) : undefined,
+                        }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </RecommendationTrailers>
         ) : (
           <EmptyState
             icon={Sparkles}

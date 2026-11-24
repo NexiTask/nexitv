@@ -2,12 +2,14 @@ mod app_data;
 mod chatgpt;
 mod credentials;
 mod downloads;
+mod loopback;
 mod metadata;
 mod perf;
 mod platform;
 mod player;
 mod posters;
 mod sources;
+mod trailer_embed;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -42,6 +44,7 @@ pub fn run() {
             chatgpt::chatgpt_disconnect,
             chatgpt::recommendations::recommendations_cached,
             chatgpt::recommendations::recommendations_generate,
+            trailer_embed::recommendation_trailer_endpoint,
             perf::perf_log,
             platform::commands::player_set_fullscreen,
             platform::commands::player_set_cursor_hidden,

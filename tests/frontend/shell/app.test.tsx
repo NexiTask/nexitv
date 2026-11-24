@@ -101,7 +101,7 @@ describe('application shell', () => {
     expect(screen.queryByRole('button', { name: 'Get recommendations' })).toBeNull();
     expect(
       screen.getByRole('group', {
-        name: 'Open Saved Show',
+        name: 'Preview Saved Show',
         description: 'Recommended from your Library',
       }),
     ).toBeTruthy();

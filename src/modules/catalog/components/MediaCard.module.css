@@ -941,3 +941,11 @@
   letter-spacing: 0.2px;
   text-transform: uppercase;
 }
+.cardContainer[aria-current='true'] {
+  outline: 2px solid var(--accent-foreground);
+  outline-offset: 2px;
+}
+
+.cardContainer[aria-current='true']:focus-visible {
+  outline-color: var(--text-primary);
+}

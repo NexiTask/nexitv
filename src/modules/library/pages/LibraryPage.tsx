@@ -247,7 +247,11 @@ export function LibraryPage() {
           ) : listId === 'upcoming' ? (
             <UpcomingSchedule onOpen={handleItemClick} />
           ) : listId === 'recommendations' ? (
-            <RecommendationsList next={watchNext.items} onOpen={handleItemClick} />
+            <RecommendationsList
+              next={watchNext.items}
+              onOpen={handleItemClick}
+              suspended={Boolean(selectedMovie || selectedSeries)}
+            />
           ) : listId === 'downloads' ? (
             <DownloadsPanel />
           ) : (
