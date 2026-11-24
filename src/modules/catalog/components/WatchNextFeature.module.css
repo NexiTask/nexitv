@@ -4,7 +4,6 @@
   display: grid;
   align-items: center;
   min-height: clamp(232px, 29vh, 384px);
-  max-width: 1440px;
   margin-bottom: var(--space-5);
   overflow: hidden;
   border: 1px solid var(--border-subtle);

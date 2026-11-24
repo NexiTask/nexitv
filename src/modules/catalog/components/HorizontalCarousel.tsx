@@ -83,13 +83,7 @@ export function HorizontalCarousel({
   if (!items || items.length === 0) return null;
 
   return (
-    <div
-      className={
-        featuredPreview
-          ? `${styles.carouselContainer} ${styles.featuredCarousel}`
-          : styles.carouselContainer
-      }
-    >
+    <div className={styles.carouselContainer}>
       <div className={styles.header}>
         <div className={styles.titleGroup}>
           <h2 className={styles.title}>{t(title)}</h2>

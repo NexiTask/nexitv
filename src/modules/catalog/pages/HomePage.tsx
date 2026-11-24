@@ -253,6 +253,7 @@ export function HomePage() {
         return (
           <RecommendationTrailers
             key={id}
+            fullWidth
             items={recommendedItems}
             onOpen={handleItemClick}
             suspended={playing || Boolean(selectedMovie || selectedSeries)}

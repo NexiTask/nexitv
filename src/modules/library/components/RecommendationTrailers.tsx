@@ -17,6 +17,7 @@ interface RecommendationTrailersProps {
   items: MediaItem[];
   onOpen: (item: MediaItem) => void;
   suspended?: boolean | undefined;
+  fullWidth?: boolean | undefined;
   children: (
     preview: ReactNode,
     selectedId: string,
@@ -28,6 +29,7 @@ export function RecommendationTrailers({
   items,
   onOpen,
   suspended,
+  fullWidth,
   children,
 }: RecommendationTrailersProps) {
   const [selectedId, setSelectedId] = useState<string>();
@@ -57,6 +59,7 @@ export function RecommendationTrailers({
       autoplay={autoplay}
       stage={stage}
       suspended={suspended}
+      fullWidth={fullWidth}
       onAutoplayChange={setAutoplayChoice}
       onOpen={onOpen}
     />,
@@ -73,6 +76,7 @@ function TrailerFeature({
   autoplay,
   stage,
   suspended,
+  fullWidth,
   onAutoplayChange,
   onOpen,
 }: {
@@ -80,6 +84,7 @@ function TrailerFeature({
   autoplay: boolean;
   stage: RefObject<HTMLDivElement | null>;
   suspended?: boolean | undefined;
+  fullWidth?: boolean | undefined;
   onAutoplayChange: (enabled: boolean) => void;
   onOpen: (item: MediaItem) => void;
 }) {
@@ -186,9 +191,20 @@ function TrailerFeature({
   };
 
   return (
-    <section className={styles.panel} aria-label={t('Recommendation preview')}>
+    <section
+      className={fullWidth ? `${styles.panel} ${styles.fullWidth}` : styles.panel}
+      aria-label={t('Recommendation preview')}
+    >
       <div className={styles.feature}>
         <div className={styles.details}>
+          {fullWidth && details?.backdropUrl && (
+            <img
+              className={styles.detailsBackdrop}
+              src={details.backdropUrl}
+              alt=""
+              loading="lazy"
+            />
+          )}
           <h3>{title}</h3>
           {metadata && <p className={styles.metadata}>{metadata}</p>}
           {summary && <p className={styles.summary}>{summary}</p>}
