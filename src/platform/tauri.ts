@@ -1,4 +1,5 @@
-import { invoke } from '@tauri-apps/api/core';
+import { Channel, invoke } from '@tauri-apps/api/core';
+import type { RecommendationStage } from '@/shared/lib/dataActivity';
 
 interface ChatGptConnectionStatus {
   activeClient: string | null;
@@ -316,8 +317,16 @@ export const tauriApi = {
     invoke<{ status: ChatGptConnectionStatus; revocationConfirmed: boolean }>('chatgpt_disconnect'),
   recommendationsCached: (clientId: string) =>
     invoke<SeriesRecommendationSnapshot | null>('recommendations_cached', { clientId }),
-  recommendationsGenerate: (clientId: string, request: SeriesRecommendationRequest) =>
-    invoke<SeriesRecommendationSnapshot>('recommendations_generate', { clientId, request }),
+  recommendationsGenerate: (
+    clientId: string,
+    request: SeriesRecommendationRequest,
+    reportStage: (stage: Exclude<RecommendationStage, 'preparing'>) => void,
+  ) =>
+    invoke<SeriesRecommendationSnapshot>('recommendations_generate', {
+      clientId,
+      request,
+      onStage: new Channel(reportStage),
+    }),
 
   recommendationTrailerEndpoint: () => invoke<string>('recommendation_trailer_endpoint'),
 

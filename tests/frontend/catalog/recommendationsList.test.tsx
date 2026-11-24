@@ -1,13 +1,23 @@
 // @vitest-environment happy-dom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
+import { DataActivityStatus } from '@/app/components/DataActivityStatus';
 import { RecommendationsList } from '@/modules/library/pages/RecommendationsList';
 import { useSeriesRecommendations } from '@/modules/library/public/data/useSeriesRecommendations';
 import { useLibraryStore, type HistoryItem } from '@/modules/library/public/store/useLibraryStore';
 import { tauriApi } from '@/platform/tauri';
+import { useDataActivities } from '@/shared/lib/dataActivity';
 
 vi.mock('@/platform/desktop', () => ({ desktopApi: { isDesktop: () => true } }));
 vi.mock('@/modules/catalog/public/data/useCategories', () => ({
@@ -36,9 +46,16 @@ it('shows both sources together and keeps cached picks when a manual refresh fai
     generatedAt: 1780000000,
     picks: [{ key: JSON.stringify(['series', 'test-series']), genreMatch: false }],
   });
+  let reportStage: Parameters<typeof tauriApi.recommendationsGenerate>[2] = () => {};
+  let rejectGeneration: (reason: string) => void = () => {};
   const rank = vi
     .spyOn(tauriApi, 'recommendationsGenerate')
-    .mockRejectedValue('Test refresh failed.');
+    .mockImplementation((_clientId, _request, report) => {
+      reportStage = report;
+      return new Promise((_, reject) => {
+        rejectGeneration = reject;
+      });
+    });
   const imdb = vi
     .spyOn(tauriApi, 'catalogIndexImdb')
     .mockResolvedValue({ id: 'tt1234567', rating: 8.5, votes: 12500 });
@@ -47,6 +64,7 @@ it('shows both sources together and keeps cached picks when a manual refresh fai
     render(
       <MemoryRouter>
         <QueryClientProvider client={new QueryClient()}>
+          <DataActivityStatus compact={false} />
           <RecommendationsList next={[]} onOpen={openSeries} />
         </QueryClientProvider>
       </MemoryRouter>,
@@ -79,7 +97,28 @@ it('shows both sources together and keeps cached picks when a manual refresh fai
     expect(read).toHaveBeenCalledTimes(2);
     expect(rank).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Refresh recommendations' }));
+    const sidebar = within(screen.getByRole('status'));
+    expect(await sidebar.findByText('Generating recommendations…')).toBeTruthy();
+    expect(sidebar.getByText('Preparing viewing history and available series')).toBeTruthy();
+    for (const [stage, label] of [
+      ['connecting', 'Connecting to ChatGPT'],
+      ['ranking', 'Finding series that fit your taste'],
+      ['checking', 'Checking which titles are available'],
+      ['searching', 'Searching more of your catalogue'],
+      ['saving', 'Saving your recommendations'],
+    ] as const) {
+      act(() => reportStage(stage));
+      expect(sidebar.getByText(label)).toBeTruthy();
+    }
+    act(() => rejectGeneration('Test refresh failed.'));
     expect((await screen.findByRole('alert')).textContent).toContain('Test refresh failed.');
+    expect(sidebar.queryByText('Generating recommendations…')).toBeNull();
+    act(() => reportStage('saving'));
+    expect(
+      [...useDataActivities.getState().details.values()].some(
+        ({ activity }) => activity === 'recommendations',
+      ),
+    ).toBe(false);
     await waitFor(() => expect(rank).toHaveBeenCalledTimes(1));
     expect(screen.getByRole('group', { name: 'Preview The Fixture' })).toBeTruthy();
   } finally {

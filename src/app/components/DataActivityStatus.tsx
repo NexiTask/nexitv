@@ -10,7 +10,7 @@ import {
 } from '@/shared/lib/dataActivity';
 import styles from './DataActivityStatus.module.css';
 
-const ACTIVITIES = ['catalog', 'index', 'playlist', 'guide'] as const;
+const ACTIVITIES = ['catalog', 'index', 'playlist', 'guide', 'recommendations'] as const;
 const SHOW_DELAY_MS = 400;
 
 function catalogName(kind: 'live' | 'vod' | 'series', t: I18nApi['t']) {
@@ -44,6 +44,17 @@ function describeActivity(detail: ActivityDetail, { t, number }: I18nApi): strin
       return t('Opening a saved playlist');
     case 'parse-playlist':
       return t('Reading channels and groups');
+    case 'generate-recommendations': {
+      const labels = {
+        preparing: t('Preparing viewing history and available series'),
+        connecting: t('Connecting to ChatGPT'),
+        ranking: t('Finding series that fit your taste'),
+        checking: t('Checking which titles are available'),
+        searching: t('Searching more of your catalogue'),
+        saving: t('Saving your recommendations'),
+      };
+      return labels[detail.stage];
+    }
   }
 }
 
@@ -118,6 +129,7 @@ function ActivityLabels({
     index: progress.has('index') ? t('Indexing titles…') : t('Preparing the library index…'),
     playlist: t('Loading playlists…'),
     guide: t('Loading the TV guide…'),
+    recommendations: t('Generating recommendations…'),
   };
   return active.map((activity) => (
     <ActivityRow

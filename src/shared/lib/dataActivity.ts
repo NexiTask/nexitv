@@ -1,12 +1,15 @@
 import { create } from 'zustand';
 
-export type DataActivity = 'catalog' | 'index' | 'playlist' | 'guide';
+export type DataActivity = 'catalog' | 'index' | 'playlist' | 'guide' | 'recommendations';
 type CatalogKind = 'live' | 'vod' | 'series';
+export type RecommendationStage =
+  'preparing' | 'connecting' | 'ranking' | 'checking' | 'searching' | 'saving';
 
 export type ActivityDetail =
   | { phase: 'fetch-catalog' | 'check-index' | 'save-index' | 'sort-titles'; kind: CatalogKind }
   | { phase: 'index-titles'; kind: CatalogKind; completed?: number; total?: number }
-  | { phase: 'download-playlist' | 'read-playlist' | 'restore-playlist' | 'parse-playlist' };
+  | { phase: 'download-playlist' | 'read-playlist' | 'restore-playlist' | 'parse-playlist' }
+  | { phase: 'generate-recommendations'; stage: RecommendationStage };
 
 type SourceRefreshResult = 'complete' | 'incomplete' | 'failed';
 type RefreshSummary = { updated: number; failed: number; kept: number };
@@ -40,6 +43,7 @@ export const useDataActivities = create<DataActivities>(() => ({
   index: 0,
   playlist: 0,
   guide: 0,
+  recommendations: 0,
   sourceRefresh: null,
   imdbImport: null,
   progress: new Map(),
@@ -88,7 +92,9 @@ export async function trackDataActivity<T>(
   detail?: ActivityDetail,
 ): Promise<T> {
   const id = Symbol();
+  let active = true;
   const reportProgress: ReportDataProgress = (percent) => {
+    if (!active) return;
     useDataActivities.setState((state) => {
       if (state.progress.get(id)?.percent === (percent ?? undefined)) return state;
       const progress = new Map(state.progress);
@@ -98,6 +104,7 @@ export async function trackDataActivity<T>(
     });
   };
   const reportDetail: ReportActivityDetail = (detail) => {
+    if (!active) return;
     useDataActivities.setState((state) => ({
       details: new Map(state.details).set(id, { activity, detail }),
     }));
@@ -109,6 +116,7 @@ export async function trackDataActivity<T>(
   try {
     return await task(reportProgress, reportDetail);
   } finally {
+    active = false;
     useDataActivities.setState((state) => {
       const progress = new Map(state.progress);
       progress.delete(id);

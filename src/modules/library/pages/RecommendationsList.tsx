@@ -9,6 +9,7 @@ import { useSettingsStore } from '@/modules/settings/public/store/useSettingsSto
 import { tauriApi, type SeriesRecommendationKind } from '@/platform/tauri';
 import { useI18n } from '@/shared/i18n/i18n';
 import { getErrorMessage } from '@/shared/lib/error';
+import { trackDataActivity } from '@/shared/lib/dataActivity';
 import { Button } from '@/shared/ui/Button';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { RecommendationTrailers } from '../components/RecommendationTrailers';
@@ -48,7 +49,15 @@ export function RecommendationsList({
   const { createRequest, matchingGenres, hasCandidates } = data;
   const generate = useMutation({
     mutationKey: generateKey,
-    mutationFn: (clientId: string) => tauriApi.recommendationsGenerate(clientId, createRequest()),
+    mutationFn: (clientId: string) =>
+      trackDataActivity(
+        'recommendations',
+        (_progress, reportDetail) =>
+          tauriApi.recommendationsGenerate(clientId, createRequest(), (stage) =>
+            reportDetail({ phase: 'generate-recommendations', stage }),
+          ),
+        { phase: 'generate-recommendations', stage: 'preparing' },
+      ),
     onSuccess: (result, clientId) =>
       queryClient.setQueryData(seriesRecommendationQueryKey(clientId), result),
     onError: () => void queryClient.invalidateQueries({ queryKey: chatGptAccountQueryKey }),
