@@ -40,6 +40,8 @@ pub fn run() {
             chatgpt::chatgpt_connect,
             chatgpt::chatgpt_cancel,
             chatgpt::chatgpt_disconnect,
+            chatgpt::recommendations::recommendations_cached,
+            chatgpt::recommendations::recommendations_generate,
             perf::perf_log,
             platform::commands::player_set_fullscreen,
             platform::commands::player_set_cursor_hidden,

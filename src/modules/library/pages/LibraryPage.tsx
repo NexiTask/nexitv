@@ -11,6 +11,7 @@ import {
   FolderHeart,
   History,
   ListVideo,
+  Sparkles,
   Plus,
   Edit2,
   Trash2,
@@ -34,6 +35,7 @@ import { UpcomingSchedule } from '@/modules/guide/public/components/UpcomingSche
 import { useWatchNext } from '@/modules/catalog/public/data/useWatchNext';
 import { ContinueWatchingList } from './ContinueWatchingList';
 import { WatchNextList } from './WatchNextList';
+import { RecommendationsList } from './RecommendationsList';
 import { useI18n } from '@/shared/i18n/i18n';
 
 export function LibraryPage() {
@@ -71,6 +73,11 @@ export function LibraryPage() {
       id: 'upcoming',
       name: 'Coming Up',
       icon: CalendarClock,
+    },
+    {
+      id: 'recommendations',
+      name: 'Recommendations',
+      icon: Sparkles,
     },
     {
       id: 'saved',
@@ -113,7 +120,9 @@ export function LibraryPage() {
   }, [selectedCollectionId, lastCollectionId, updateSetting]);
 
   const { selectedMovie, selectedSeries, handleCloseMovie, handleCloseSeries, handleItemClick } =
-    useMediaDetailState({ enableSourceOnOpen: listId !== 'upcoming' });
+    useMediaDetailState({
+      enableSourceOnOpen: listId !== 'upcoming' && listId !== 'recommendations',
+    });
 
   // Modal states for Create, Rename, Delete
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -234,6 +243,8 @@ export function LibraryPage() {
             <WatchNextList queue={watchNext} onItemClick={handleItemClick} />
           ) : listId === 'upcoming' ? (
             <UpcomingSchedule onOpen={handleItemClick} />
+          ) : listId === 'recommendations' ? (
+            <RecommendationsList next={watchNext.items} onOpen={handleItemClick} />
           ) : listId === 'downloads' ? (
             <DownloadsPanel />
           ) : (

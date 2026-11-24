@@ -22,6 +22,8 @@ pub(super) struct Account {
     #[serde(default)]
     pub plan_permission_seen: bool,
     pub session: Option<Session>,
+    #[serde(default)]
+    pub recommendations: Option<super::recommendations::Snapshot>,
 }
 
 #[derive(Deserialize, Serialize)]

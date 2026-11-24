@@ -198,6 +198,7 @@ impl Attempt {
             email: identity.email,
             name: identity.name,
             plan_permission_seen: false,
+            recommendations: None,
             session: Some(Session {
                 id_token: tokens.id_token,
                 access_token: tokens.access_token.filter(|token| {

@@ -1,4 +1,5 @@
 mod oauth;
+pub(crate) mod recommendations;
 mod store;
 
 use serde::Serialize;
@@ -131,7 +132,10 @@ pub(crate) async fn chatgpt_connect(
             .is_some_and(|saved| saved.plan_permission_seen);
     profiles.active_client = Some(account.client_id.clone());
     match previous {
-        Some(saved) => *saved = account,
+        Some(saved) => {
+            account.recommendations = saved.recommendations.take();
+            *saved = account;
+        }
         None => profiles.accounts.push(account),
     }
     store.save(&profiles)?;

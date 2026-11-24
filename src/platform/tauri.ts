@@ -5,6 +5,19 @@ interface ChatGptConnectionStatus {
   accounts: { clientId: string; label: string; planPermission: boolean }[];
 }
 
+export type SeriesRecommendationKind = 'resume' | 'next' | 'discover' | 'new' | 'upcoming';
+
+export interface SeriesRecommendationRequest {
+  favorites: readonly string[];
+  watching: readonly string[];
+  candidates: { localKey: string; kind: SeriesRecommendationKind; genres: readonly string[] }[];
+}
+
+interface SeriesRecommendationSnapshot {
+  generatedAt: number;
+  picks: { key: string; genreMatch: boolean }[];
+}
+
 export interface ImdbRefreshEvent {
   stage: string;
   dataset?: 'ratings' | 'titles' | null;
@@ -292,6 +305,10 @@ export const tauriApi = {
   chatGptCancel: () => invoke<void>('chatgpt_cancel'),
   chatGptDisconnect: () =>
     invoke<{ status: ChatGptConnectionStatus; revocationConfirmed: boolean }>('chatgpt_disconnect'),
+  recommendationsCached: (clientId: string) =>
+    invoke<SeriesRecommendationSnapshot | null>('recommendations_cached', { clientId }),
+  recommendationsGenerate: (clientId: string, request: SeriesRecommendationRequest) =>
+    invoke<SeriesRecommendationSnapshot>('recommendations_generate', { clientId, request }),
 
   /** Spawn or re-initialize native mpv player instance */
   mpvStart: (options: MpvStartOptions) => invoke<void>('mpv_start', { options }),

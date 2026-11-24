@@ -112,6 +112,7 @@ describe('application shell', () => {
     expect(library.getAllByRole('link')).toEqual([
       library.getByRole('link', { name: 'Continue Watching' }),
       library.getByRole('link', { name: 'Watch Next' }),
+      library.getByRole('link', { name: 'Recommendations' }),
       saved,
       favorites,
       library.getByRole('link', { name: 'Downloads' }),
@@ -270,6 +271,7 @@ describe('application shell', () => {
       'Continue Watching',
       'Watch Next',
       'Coming Up',
+      'Recommendations',
       'Saved',
       'Favorites',
       'Downloads',
