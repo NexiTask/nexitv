@@ -127,6 +127,57 @@ describe('Sidebar', () => {
     }
   });
 
+  it('shows download progress above Settings and clears it after the transfer ends', () => {
+    useSettingsStore.setState({ sidebarCollapsed: false });
+    renderSidebar();
+    const activity = within(screen.getByRole('status'));
+    const settings = screen.getByRole('link', { name: 'Settings' });
+    expect(activity.queryByText('Downloading…')).toBeNull();
+
+    act(() =>
+      useDownloadStore.getState().sync({
+        id: 'download',
+        state: 'downloading',
+        downloadedBytes: 25,
+        totalBytes: 100,
+      }),
+    );
+    const progress = activity.getByRole('progressbar', { name: 'Downloading…' });
+    expect(progress.getAttribute('aria-valuenow')).toBe('25');
+    expect(activity.getByText('25%')).toBeTruthy();
+    expect(
+      progress.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    act(() => {
+      const store = useDownloadStore.getState();
+      store.enqueue({ id: 'second', sourceUrl: 'https://media.test/second.mp4' });
+      store.sync({ id: 'second', state: 'downloading', downloadedBytes: 0 });
+    });
+    expect(activity.getByText('2 downloads')).toBeTruthy();
+    expect(activity.queryByRole('progressbar')).toBeNull();
+
+    act(() =>
+      useDownloadStore.getState().sync({
+        id: 'second',
+        state: 'downloading',
+        downloadedBytes: 175,
+        totalBytes: 300,
+      }),
+    );
+    expect(
+      activity.getByRole('progressbar', { name: 'Downloading…' }).getAttribute('aria-valuenow'),
+    ).toBe('50');
+
+    act(() => {
+      const store = useDownloadStore.getState();
+      store.sync({ id: 'second', state: 'completed', downloadedBytes: 300, totalBytes: 300 });
+      store.sync({ id: 'download', state: 'paused', downloadedBytes: 25, totalBytes: 100 });
+    });
+    expect(activity.queryByText('Downloading…')).toBeNull();
+    expect(activity.queryByRole('progressbar')).toBeNull();
+  });
+
   it('shows a collapsed library count while announcing its full label', () => {
     useSettingsStore.setState({ sidebarCollapsed: true, showCollapsedSidebarBadges: true });
 
