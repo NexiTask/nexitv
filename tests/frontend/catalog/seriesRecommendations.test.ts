@@ -34,15 +34,61 @@ describe('series recommendation inputs', () => {
       categories: new Map(),
       today: '2026-11-24',
     });
-    expect(input.request.favorites).toEqual([]);
-    expect(input.request.watching).toEqual(['Drama', 'Crime']);
-    expect(input.request.candidates.map(({ kind }) => kind)).toEqual([
-      'resume',
-      'next',
-      'discover',
-    ]);
+    const request = input.createRequest();
+    expect(request.favorites).toEqual([]);
+    expect(request.watching).toEqual(['Crime', 'Drama']);
+    expect(request.candidates.map(({ kind }) => kind)).toEqual(['resume', 'next', 'discover']);
     expect(
-      input.request.candidates.map(({ localKey }) => input.candidates.get(localKey)?.item.id),
+      request.candidates.map(({ localKey }) => input.candidates.get(localKey)?.item.id),
     ).toEqual(['started show', 'finished show', 'new show']);
+  });
+
+  it('prioritizes specific similarities to completed shows over unrelated recent entries', () => {
+    const watched = {
+      ...series('watched', 'Crime'),
+      categoryId: 'crime',
+      description:
+        'Detectives investigate corruption inside a police precinct. A retired investigator returns to uncover the facts.',
+    };
+    const alias = {
+      ...watched,
+      id: 'alternate-copy',
+      title: 'Another catalogue title',
+      rating: 10,
+    };
+    const favorite = series('favorite', 'Comedy');
+    const related = {
+      ...series('related', 'Crime'),
+      categoryId: 'crime',
+      description: 'Detectives in a local precinct uncover police corruption.',
+    };
+    const otherCrime = {
+      ...series('other-crime', 'Crime'),
+      categoryId: 'crime',
+      rating: 10,
+      description: 'Smugglers take over a seaside vacation town.',
+    };
+    const recent = { ...series('recent-comedy', 'Comedy', '1795478400'), rating: 10 };
+    const generic = {
+      ...series('generic', 'Drama'),
+      description: 'Comedy and crime are words in the listing.',
+    };
+    const input = collectSeriesRecommendations({
+      catalogue: [watched, alias, favorite, otherCrime, recent, generic, related],
+      favorites: [favorite],
+      history: [],
+      trackedSeries: { watched: { item: watched, lastWatchedAt: 1 } },
+      started: ['watched'],
+      next: [],
+      upcoming: [],
+      categories: new Map(),
+      today: '2026-11-24',
+    });
+    const picks = input.createRequest().candidates;
+    expect(picks.map(({ localKey }) => input.candidates.get(localKey)?.item.id)).toEqual([
+      'related',
+      'other-crime',
+      'recent-comedy',
+    ]);
   });
 });

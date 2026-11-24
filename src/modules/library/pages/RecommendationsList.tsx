@@ -85,7 +85,7 @@ export function RecommendationsList({
   const upcoming = useUpcomingReleases({ favoriteIds });
   const today = new Date().toLocaleDateString('sv-SE');
 
-  const { candidates, request } = useMemo(
+  const { candidates, createRequest, matchingGenres, hasCandidates } = useMemo(
     () =>
       collectSeriesRecommendations({
         catalogue: catalogue.data.filter((item) => !hideAdult || !item.adult),
@@ -133,22 +133,30 @@ export function RecommendationsList({
   });
   const generate = useMutation({
     mutationKey: generateKey,
-    mutationFn: (clientId: string) => tauriApi.recommendationsGenerate(clientId, request),
+    mutationFn: (clientId: string) => tauriApi.recommendationsGenerate(clientId, createRequest()),
     onSuccess: (result, clientId) =>
       queryClient.setQueryData(['chatgpt', 'series-recommendations', clientId], result),
     onError: () => void queryClient.invalidateQueries({ queryKey: accountKey }),
   });
   const generating = useIsMutating({ mutationKey: generateKey }) > 0;
   const canGenerate = Boolean(
-    permission &&
-    !generating &&
-    !snapshot.isFetching &&
-    !catalogue.isLoading &&
-    request.candidates.length > 0,
+    permission && !generating && !snapshot.isFetching && !catalogue.isLoading && hasCandidates,
   );
   const results = (snapshot.data?.picks ?? []).flatMap((pick) => {
     const candidate = candidates.get(pick.key);
-    return candidate ? [{ ...candidate, genreMatch: pick.genreMatch }] : [];
+    if (!candidate) return [];
+    const match = pick.genreMatch ? matchingGenres(candidate.item) : undefined;
+    const reason = match?.genres.length
+      ? t(
+          match.watched
+            ? 'Matches what you watch in {genres}'
+            : 'Matches your favorites in {genres}',
+          {
+            genres: match.genres.map((genre) => t(genre)).join(', '),
+          },
+        )
+      : undefined;
+    return [{ ...candidate, reason }];
   });
 
   return (
@@ -205,7 +213,7 @@ export function RecommendationsList({
         )}
         {results.length > 0 ? (
           <ul className={styles.results}>
-            {results.map(({ key, kind, item, release, genreMatch }) => (
+            {results.map(({ key, kind, item, release, reason }) => (
               <li className={styles.card} key={key}>
                 {item.posterUrl && (
                   <img
@@ -223,7 +231,7 @@ export function RecommendationsList({
                   <h2>{getDisplayTitle(item.title, 'series')}</h2>
                   <p>
                     {t(labels[kind])}
-                    {genreMatch && <> · {t('Matches genres you watch or favorite')}</>}
+                    {reason && <> · {reason}</>}
                   </p>
                   {release && (
                     <p>

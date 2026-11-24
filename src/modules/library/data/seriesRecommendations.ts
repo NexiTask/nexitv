@@ -1,15 +1,15 @@
 import { CATALOG_GENRES, catalogGenreMask } from '@/modules/catalog/public/lib/catalogGenres';
-import { getDisplayTitle } from '@/modules/catalog/public/lib/titleParser';
+import { parseMediaDisplayTitle } from '@/modules/catalog/public/lib/titleParser';
 import type { MediaItem } from '@/modules/catalog/public/model/media';
 import type { UpcomingRelease } from '@/modules/guide/public/data/useUpcomingReleases';
 import type { SeriesRecommendationKind, SeriesRecommendationRequest } from '@/platform/tauri';
 import { isQueuedEpisode, type HistoryItem, type TrackedSeries } from '../store/useLibraryStore';
+import { rankDiscoveries } from './seriesDiscovery';
 
 interface Candidate {
   key: string;
   kind: SeriesRecommendationKind;
   item: MediaItem;
-  genres: readonly string[];
   release?: UpcomingRelease | undefined;
 }
 
@@ -26,15 +26,27 @@ interface Inputs {
 }
 
 function seriesKey(item: MediaItem) {
+  const title = parseMediaDisplayTitle(item.title, item.year);
   return JSON.stringify([
-    getDisplayTitle(item.title, 'series').normalize('NFKC').toLowerCase(),
-    item.year ?? '',
+    title.cleanTitle.normalize('NFKC').toLowerCase(),
+    title.releaseYear ?? '',
   ]);
 }
 
 function genres(item: MediaItem, categories: Map<string, string>): readonly string[] {
-  const mask = catalogGenreMask(item, categories);
+  const metadata = { ...item, title: '', description: undefined };
+  const mask = catalogGenreMask(metadata) || catalogGenreMask(metadata, categories);
   return CATALOG_GENRES.filter((_, bit) => (mask & (1 << bit)) !== 0);
+}
+
+function uniqueSeries(items: MediaItem[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = seriesKey(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function summarize(items: MediaItem[], categories: Map<string, string>): string[] {
@@ -67,12 +79,15 @@ export function collectSeriesRecommendations(input: Inputs) {
   const tracked = Object.values(input.trackedSeries).sort(
     (a, b) => b.lastWatchedAt - a.lastWatchedAt,
   );
-  const recentlyViewed = [...watching, ...tracked.map(({ item }) => item)].map(
-    (item) => current(item) ?? item,
-  );
+  const recentlyViewed = [
+    ...tracked,
+    ...watching.map((item) => ({ item, lastWatchedAt: item.lastWatchedAt })),
+  ]
+    .sort((a, b) => b.lastWatchedAt - a.lastWatchedAt)
+    .map(({ item }) => current(item) ?? item);
   const favoriteGenres = summarize(favoriteSeries, input.categories);
-  const watchingGenres = summarize(recentlyViewed.slice(0, 40), input.categories);
-  const preferences = new Set([...favoriteGenres, ...watchingGenres]);
+  const watchAnchors = uniqueSeries(recentlyViewed).slice(0, 32);
+  const watchingGenres = summarize(watchAnchors, input.categories);
   const seen = new Set(
     [
       ...favoriteSeries,
@@ -98,9 +113,9 @@ export function collectSeriesRecommendations(input: Inputs) {
         episodeTitle: entry.episodeTitle,
         progress: kind === 'resume' ? entry.progressPercentage / 100 : undefined,
       };
-      const candidate = { key, kind, item, genres: genres(series, input.categories) };
+      const candidate = { key, kind, item };
       add(candidate);
-      if (result.length < 8) result.push(candidate);
+      if (result.length < 4) result.push(candidate);
     }
     return result;
   };
@@ -122,12 +137,11 @@ export function collectSeriesRecommendations(input: Inputs) {
       key,
       kind: 'upcoming',
       item: series,
-      genres: genres(series, input.categories),
       release,
     };
     add(candidate);
     const title = seriesKey(series);
-    if (upcoming.length < 8 && !upcomingTitles.has(title)) {
+    if (upcoming.length < 4 && !upcomingTitles.has(title)) {
       upcomingTitles.add(title);
       upcoming.push(candidate);
     }
@@ -141,41 +155,53 @@ export function collectSeriesRecommendations(input: Inputs) {
   });
   ranked.sort((a, b) => b.added - a.added);
   const recentCutoff = new Date(`${input.today}T00:00:00`).getTime() / 1000 - 30 * 86_400;
-  const newItems: Candidate[] = [];
-  const discoveries: { candidate: Candidate; matches: number; rating: number }[] = [];
+  const discoveries: Candidate[] = [];
   for (const { item, title, added } of ranked) {
     const first = !titles.has(title);
     titles.add(title);
     const key = JSON.stringify(['series', item.id]);
-    const isNew = first && added >= recentCutoff && newItems.length < 12;
-    const itemGenres = genres(item, input.categories);
     const candidate: Candidate = {
       key,
       item,
-      kind: isNew ? 'new' : 'discover',
-      genres: itemGenres,
+      kind: added >= recentCutoff ? 'new' : 'discover',
     };
     add(candidate);
-    if (isNew) newItems.push(candidate);
-    else if (first)
-      discoveries.push({
-        candidate,
-        matches: itemGenres.filter((genre) => preferences.has(genre)).length,
-        rating: item.rating ?? 0,
-      });
+    if (first) discoveries.push(candidate);
   }
-  discoveries.sort((a, b) => b.matches - a.matches || b.rating - a.rating);
 
-  const request: SeriesRecommendationRequest = {
-    favorites: favoriteGenres,
-    watching: watchingGenres,
-    candidates: [
-      ...resume,
-      ...next,
-      ...upcoming,
-      ...newItems,
-      ...discoveries.slice(0, 12).map(({ candidate }) => candidate),
-    ].map(({ key, kind, genres }) => ({ localKey: key, kind, genres })),
+  const related = [...resume, ...next, ...upcoming];
+  function createRequest(): SeriesRecommendationRequest {
+    const signals = <T extends { item: MediaItem }>(candidate: T) => ({
+      ...candidate,
+      genres: genres(candidate.item, input.categories),
+    });
+    const rankedDiscoveries = rankDiscoveries(
+      discoveries.map(signals),
+      watchAnchors.map((item) => signals({ item })),
+      uniqueSeries(favoriteSeries)
+        .slice(0, 32)
+        .map((item) => signals({ item })),
+      input.categories,
+    );
+    return {
+      favorites: favoriteGenres,
+      watching: watchingGenres,
+      candidates: [...related.map(signals), ...rankedDiscoveries.slice(0, 16)].map(
+        ({ key, kind, genres }) => ({ localKey: key, kind, genres }),
+      ),
+    };
+  }
+  function matchingGenres(item: MediaItem) {
+    const available = genres(item, input.categories);
+    const watched = watchingGenres.filter((genre) => available.includes(genre));
+    if (watched.length > 0) return { watched: true, genres: watched };
+    return { watched: false, genres: favoriteGenres.filter((genre) => available.includes(genre)) };
+  }
+
+  return {
+    candidates,
+    createRequest,
+    matchingGenres,
+    hasCandidates: related.length + discoveries.length > 0,
   };
-  return { candidates, request };
 }
