@@ -86,6 +86,19 @@ beforeEach(() => {
 });
 
 describe('application shell', () => {
+  it('hides the Recommendations list and redirects its route when disabled', async () => {
+    await preloadRouteModule('/library');
+    useSettingsStore.setState({
+      recommendationsEnabled: false,
+      lastCollectionId: 'recommendations',
+    });
+    window.history.replaceState({}, '', '/library/recommendations');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Saved', level: 1 })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Recommendations' })).toBeNull();
+    expect(window.location.pathname).toBe('/library/saved');
+  });
+
   it('moves the existing Favorites page into Library and keeps the list permanent', async () => {
     await preloadRouteModule('/library');
     const movie = {

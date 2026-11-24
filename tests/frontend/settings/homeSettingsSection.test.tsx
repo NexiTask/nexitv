@@ -13,6 +13,27 @@ beforeEach(() => {
 });
 
 describe('Home layout settings', () => {
+  it('changes recommendation visibility and the Home card limit independently', async () => {
+    const user = userEvent.setup();
+    render(<HomeSettingsSection />);
+    await user.click(screen.getByRole('button', { name: 'Maximum recommendations on Home' }));
+    await user.click(screen.getByRole('option', { name: '12' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Show Recommendations' }));
+    expect(useSettingsStore.getState().recommendationsHomeLimit).toBe(12);
+    expect(useSettingsStore.getState().recommendationsEnabled).toBe(true);
+    expect(
+      useSettingsStore.getState().homeSections.find((section) => section.id === 'recommendations')
+        ?.enabled,
+    ).toBe(false);
+    await user.click(screen.getByRole('checkbox', { name: 'Enable recommendations' }));
+    expect(useSettingsStore.getState().recommendationsEnabled).toBe(false);
+    expect(
+      screen
+        .getByRole('button', { name: 'Maximum recommendations on Home' })
+        .hasAttribute('disabled'),
+    ).toBe(true);
+  });
+
   it('toggles a row off and back on', async () => {
     const user = userEvent.setup();
     render(<HomeSettingsSection />);
@@ -45,6 +66,7 @@ describe('Home layout settings', () => {
       'continueWatching',
       'upcoming',
       'watchNext',
+      'recommendations',
       'recentMovies',
       'recentSeries',
       'popularMovies',

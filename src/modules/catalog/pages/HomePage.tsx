@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { PageTransition } from '@/app/shell/PageTransition';
 import { HorizontalCarousel } from '@/modules/catalog/components/HorizontalCarousel';
 import { isQueuedEpisode, useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
+import { useSeriesRecommendations } from '@/modules/library/public/data/useSeriesRecommendations';
 import {
   useSettingsStore,
   type HomeSectionId,
@@ -52,6 +53,8 @@ export function HomePage() {
   const upcomingEnabled = useSettingsStore((state) => state.upcomingEnabled);
   const upcomingHomeEnabled = useSettingsStore((state) => state.upcomingHomeEnabled);
   const homeSections = useSettingsStore((state) => state.homeSections);
+  const recommendationsEnabled = useSettingsStore((state) => state.recommendationsEnabled);
+  const recommendationsHomeLimit = useSettingsStore((state) => state.recommendationsHomeLimit);
   const navigate = useNavigate();
   const hasSource = sources.isAvailable;
   const showUpcomingOnHome = upcomingEnabled && upcomingHomeEnabled;
@@ -60,6 +63,13 @@ export function HomePage() {
     useMediaDetailState();
 
   const { items: watchNext } = useWatchNext();
+  const showRecommendations =
+    recommendationsEnabled &&
+    homeSections.some((section) => section.id === 'recommendations' && section.enabled);
+  const { cards: recommendationCards } = useSeriesRecommendations(watchNext, showRecommendations);
+  const recommendationItems = recommendationCards
+    .slice(0, recommendationsHomeLimit)
+    .map(({ item }) => item);
   const dismissWatchNextById = useLibraryStore((state) => state.dismissWatchNext);
   const watchNextItems = useMemo(
     () =>
@@ -171,7 +181,7 @@ export function HomePage() {
     void Promise.all(failedCatalogQueries.map((query) => query.refetch()));
   };
 
-  // Sections beyond Continue Watching and Coming Up always render once
+  // Catalogue rows always render once
   // enabled — they never had an item-count gate before this became
   // reorderable/toggleable, and users who bother to disable a row expect it
   // to actually be gone, not conditionally back the moment it has content.
@@ -179,6 +189,7 @@ export function HomePage() {
     upcoming: showUpcomingOnHome,
     continueWatching: continueWatchingItems.length > 0,
     watchNext: watchNextItems.length > 0,
+    recommendations: recommendationItems.length > 0,
     recentMovies: true,
     recentSeries: true,
     popularMovies: true,
@@ -224,6 +235,16 @@ export function HomePage() {
             onSeeAll={() => navigate('/library/watch-next')}
             onRemoveItem={dismissWatchNext}
             removeLabel="Remove from Watch Next"
+          />
+        );
+      case 'recommendations':
+        return (
+          <HorizontalCarousel
+            key={id}
+            title="Recommendations"
+            items={recommendationItems}
+            onItemClick={handleItemClick}
+            onSeeAll={() => navigate('/library/recommendations')}
           />
         );
       case 'recentMovies':

@@ -53,6 +53,7 @@ export function LibraryPage() {
   const renameCollection = useLibraryStore((state) => state.renameCollection);
   const deleteCollection = useLibraryStore((state) => state.deleteCollection);
   const upcomingEnabled = useSettingsStore((state) => state.upcomingEnabled);
+  const recommendationsEnabled = useSettingsStore((state) => state.recommendationsEnabled);
   const sidebarWidth = useSettingsStore((state) => state.sidebarWidth);
   const lastCollectionId = useSettingsStore((state) => state.lastCollectionId);
   const updateSetting = useSettingsStore((state) => state.updateSetting);
@@ -103,9 +104,13 @@ export function LibraryPage() {
     },
   ];
   const visibleBuiltInLists = builtInLists.filter(
-    (list) => upcomingEnabled || list.id !== 'upcoming',
+    (list) =>
+      (upcomingEnabled || list.id !== 'upcoming') &&
+      (recommendationsEnabled || list.id !== 'recommendations'),
   );
-  const builtInList = builtInLists.find((list) => list.id === listId);
+  const builtInList = (listId === 'recommendations' ? visibleBuiltInLists : builtInLists).find(
+    (list) => list.id === listId,
+  );
   const activeCollection = builtInList
     ? undefined
     : collections.find((collection) => collection.id === listId);

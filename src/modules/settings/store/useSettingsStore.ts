@@ -259,6 +259,8 @@ const DEFAULT_SETTINGS = {
   upcomingCalendarEnabled: false,
   upcomingExactTimesEnabled: false,
   homeSections: sanitizeHomeSections(undefined),
+  recommendationsEnabled: true,
+  recommendationsHomeLimit: 8 as const,
   upcomingHistoryDays: 7 as UpcomingHistoryDays,
 
   streamFoldingEnabled: true,
@@ -542,6 +544,11 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
         ? state.upcomingHistoryDays
         : 7,
     homeSections: sanitizeHomeSections(state.homeSections),
+    recommendationsEnabled: state.recommendationsEnabled !== false,
+    recommendationsHomeLimit:
+      state.recommendationsHomeLimit === 6 || state.recommendationsHomeLimit === 12
+        ? state.recommendationsHomeLimit
+        : 8,
     streamFoldingEnabled:
       typeof state.streamFoldingEnabled === 'boolean' ? state.streamFoldingEnabled : true,
     customTitleRules: normalizeCustomTitleRules(state.customTitleRules),

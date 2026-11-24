@@ -1,9 +1,11 @@
 // @vitest-environment happy-dom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
 import { RecommendationsList } from '@/modules/library/pages/RecommendationsList';
+import { useSeriesRecommendations } from '@/modules/library/public/data/useSeriesRecommendations';
 import { tauriApi } from '@/platform/tauri';
 
 vi.mock('@/platform/desktop', () => ({ desktopApi: { isDesktop: () => true } }));
@@ -56,5 +58,39 @@ it('reopens saved picks locally and keeps them when a manual refresh fails', asy
     status.mockRestore();
     read.mockRestore();
     rank.mockRestore();
+  }
+});
+
+it('loads saved Home cards only when the row is enabled', async () => {
+  const status = vi.spyOn(tauriApi, 'chatGptStatus').mockResolvedValue({
+    activeClient: 'client',
+    accounts: [{ clientId: 'client', label: 'Test', planPermission: true }],
+  });
+  const read = vi.spyOn(tauriApi, 'recommendationsCached').mockResolvedValue({
+    generatedAt: 1780000000,
+    picks: [{ key: JSON.stringify(['series', 'test-series']), genreMatch: false }],
+  });
+  const generate = vi.spyOn(tauriApi, 'recommendationsGenerate');
+  const client = new QueryClient();
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  try {
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useSeriesRecommendations([], enabled),
+      { initialProps: { enabled: false }, wrapper },
+    );
+    expect(status).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+    rerender({ enabled: true });
+    await waitFor(() => expect(result.current.cards[0]?.item.id).toBe('test-series'));
+    expect(read).toHaveBeenCalledOnce();
+    expect(generate).not.toHaveBeenCalled();
+    rerender({ enabled: false });
+    expect(result.current.cards).toEqual([]);
+  } finally {
+    status.mockRestore();
+    read.mockRestore();
+    generate.mockRestore();
   }
 });

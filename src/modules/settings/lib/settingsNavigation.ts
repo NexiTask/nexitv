@@ -192,6 +192,7 @@ export const SETTINGS_NAV_GROUPS = [
           'continue watching',
           'recently added',
           'popular',
+          'recommendations',
           'live tv',
         ],
       },

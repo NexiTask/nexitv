@@ -1,14 +1,10 @@
-import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
 import { CatalogPageHeader } from '@/modules/catalog/public/components/CatalogPageHeader';
-import { useCategories, useVisibleCatalog } from '@/modules/catalog/public/data/useCategories';
 import { getDisplayTitle, parseMediaDisplayTitle } from '@/modules/catalog/public/lib/titleParser';
 import type { MediaItem, MediaOpenContext } from '@/modules/catalog/public/model/media';
-import { useUpcomingReleases } from '@/modules/guide/public/data/useUpcomingReleases';
 import { useTmdbDetailEnrichment } from '@/modules/metadata/public/hooks/useTmdbDetailsEnrichment';
-import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import { desktopApi } from '@/platform/desktop';
 import { canThumbPoster, posterThumbUrl } from '@/platform/posterThumb';
 import { tauriApi, type SeriesRecommendationKind } from '@/platform/tauri';
@@ -16,11 +12,14 @@ import { useI18n } from '@/shared/i18n/i18n';
 import { getErrorMessage } from '@/shared/lib/error';
 import { Button } from '@/shared/ui/Button';
 import { EmptyState } from '@/shared/ui/EmptyState';
-import { collectSeriesRecommendations } from '../data/seriesRecommendations';
-import { useLibraryStore, type HistoryItem } from '../store/useLibraryStore';
+import type { HistoryItem } from '../store/useLibraryStore';
+import {
+  chatGptAccountQueryKey,
+  seriesRecommendationQueryKey,
+  useSeriesRecommendations,
+} from '../data/useSeriesRecommendations';
 import styles from './RecommendationsList.module.css';
 
-const accountKey = ['chatgpt', 'accounts'] as const;
 const generateKey = ['chatgpt', 'series-recommendations-generate'] as const;
 const labels: Record<SeriesRecommendationKind, string> = {
   resume: 'Continue watching',
@@ -71,78 +70,21 @@ export function RecommendationsList({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const desktop = desktopApi.isDesktop();
-  const favorites = useLibraryStore((state) => state.favorites);
-  const history = useLibraryStore((state) => state.history);
-  const trackedSeries = useLibraryStore((state) => state.trackedSeries);
-  const started = useLibraryStore((state) => state.startedSeries);
-  const hideAdult = useSettingsStore((state) => state.catalogHideAdult);
-  const catalogue = useVisibleCatalog('series');
-  const categoryList = useCategories('series');
-  const favoriteIds = useMemo(
-    () => favorites.filter(({ type }) => type === 'series').map(({ id }) => id),
-    [favorites],
-  );
-  const upcoming = useUpcomingReleases({ favoriteIds });
-  const today = new Date().toLocaleDateString('sv-SE');
-
-  const { groupPicks, createRequest, matchingGenres, hasCandidates } = useMemo(
-    () =>
-      collectSeriesRecommendations({
-        catalogue: catalogue.data.filter((item) => !hideAdult || !item.adult),
-        favorites,
-        history,
-        trackedSeries,
-        started,
-        next,
-        upcoming: upcoming.data ?? [],
-        categories: new Map(
-          categoryList.data?.map(({ category_id, category_name }) => [category_id, category_name]),
-        ),
-        today,
-      }),
-    [
-      catalogue.data,
-      hideAdult,
-      favorites,
-      history,
-      trackedSeries,
-      started,
-      next,
-      upcoming.data,
-      categoryList.data,
-      today,
-    ],
-  );
-
-  const accounts = useQuery({
-    queryKey: accountKey,
-    queryFn: tauriApi.chatGptStatus,
-    enabled: desktop,
-    retry: false,
-  });
-  const activeId = accounts.data?.activeClient ?? null;
-  const permission = accounts.data?.accounts.some(
-    ({ clientId, planPermission }) => clientId === activeId && planPermission,
-  );
-  const cacheKey = ['chatgpt', 'series-recommendations', activeId] as const;
-  const snapshot = useQuery({
-    queryKey: cacheKey,
-    queryFn: () => tauriApi.recommendationsCached(activeId!),
-    enabled: desktop && activeId !== null,
-    retry: false,
-  });
+  const { accounts, activeId, permission, snapshot, catalogue, data, cards } =
+    useSeriesRecommendations(next, true, true);
+  const { createRequest, matchingGenres, hasCandidates } = data;
   const generate = useMutation({
     mutationKey: generateKey,
     mutationFn: (clientId: string) => tauriApi.recommendationsGenerate(clientId, createRequest()),
     onSuccess: (result, clientId) =>
-      queryClient.setQueryData(['chatgpt', 'series-recommendations', clientId], result),
-    onError: () => void queryClient.invalidateQueries({ queryKey: accountKey }),
+      queryClient.setQueryData(seriesRecommendationQueryKey(clientId), result),
+    onError: () => void queryClient.invalidateQueries({ queryKey: chatGptAccountQueryKey }),
   });
   const generating = useIsMutating({ mutationKey: generateKey }) > 0;
   const canGenerate = Boolean(
     permission && !generating && !snapshot.isFetching && !catalogue.isLoading && hasCandidates,
   );
-  const results = groupPicks(snapshot.data?.picks ?? []).map((card) => {
+  const results = cards.map((card) => {
     const match = card.genreMatch ? matchingGenres(card.item) : undefined;
     const reason = match?.genres.length
       ? t(
