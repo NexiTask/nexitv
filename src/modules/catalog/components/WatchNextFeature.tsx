@@ -107,118 +107,120 @@ export function WatchNextFeature({
   };
 
   return (
-    <section
-      ref={feature}
-      className={styles.feature}
-      aria-labelledby={headingId}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onFocus={() => setFocused(true)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
-      }}
-    >
-      <EpisodeArtwork key={item.id} item={item} title={title} />
-      <div className={styles.scrim} aria-hidden="true" />
-      <div className={styles.content}>
-        <div className={styles.headingRow}>
-          <h2 className={styles.heading} id={headingId}>
-            {t('Watch Next')}
-          </h2>
-          <Button
-            className={styles.quiet}
-            variant="ghost"
-            size="sm"
-            onClick={onSeeAll}
-            aria-label={t('See all for Watch Next')}
-          >
-            See all
-          </Button>
-        </div>
-        <div className={styles.episode} aria-live={rotationEnabled ? 'off' : 'polite'}>
-          <h3 className={styles.title}>{title}</h3>
-          {episodeLabel && <p className={styles.label}>{episodeLabel}</p>}
-        </div>
-        <div className={styles.actions}>
-          <Button
-            className={styles.play}
-            variant="primary"
-            disabled={starting}
-            onClick={() => void play()}
-          >
-            <Play size={18} fill="currentColor" aria-hidden="true" />
-            {t('Play episode')}
-          </Button>
-          <Button className={styles.quiet} variant="ghost" onClick={() => onOpen(item)}>
-            Series details
-          </Button>
-        </div>
-      </div>
-      {items.length > 1 && (
-        <div className={styles.controls} role="group" aria-label={t('Watch Next navigation')}>
-          <IconButton
-            className={styles.arrow}
-            aria-label={t('Previous episode')}
-            disabled={starting || index === 0}
-            onClick={() => setSelectedId(items[index - 1]?.id)}
-          >
-            <ChevronLeft size={22} aria-hidden="true" />
-          </IconButton>
-          <IconButton
-            className={styles.arrow}
-            aria-label={t('Next episode')}
-            disabled={starting || index === items.length - 1}
-            onClick={() => setSelectedId(items[index + 1]?.id)}
-          >
-            <ChevronRight size={22} aria-hidden="true" />
-          </IconButton>
-        </div>
-      )}
-      <div className={styles.footer}>
-        {items.length > 1 && (
-          <>
-            <span>
-              {number(index + 1)} / {number(items.length)}
-            </span>
-            <IconButton
-              className={styles.quiet}
-              size="sm"
-              aria-label={t(
-                rotationEnabled ? 'Pause Watch Next rotation' : 'Start Watch Next rotation',
-              )}
-              onClick={() => setRotationChoice(!rotationEnabled)}
-            >
-              {rotationEnabled ? (
-                <Pause size={16} aria-hidden="true" />
-              ) : (
-                <Play size={16} aria-hidden="true" />
-              )}
-            </IconButton>
-          </>
-        )}
-        <IconButton
-          className={styles.quiet}
+    <>
+      <div className={styles.sectionHeader}>
+        <h2 className={styles.sectionTitle} id={headingId}>
+          {t('Watch Next')}
+        </h2>
+        <Button
+          variant="ghost"
           size="sm"
-          aria-label={t('Remove from Watch Next')}
-          title={t('Remove from Watch Next')}
-          disabled={starting}
-          onClick={() => {
-            setSelectedId((items[index + 1] ?? items[index - 1])?.id);
-            onDismiss(item);
-          }}
+          onClick={onSeeAll}
+          aria-label={t('See all for Watch Next')}
         >
-          <X size={16} aria-hidden="true" />
-        </IconButton>
+          {t('See all')}
+          <ChevronRight size={16} aria-hidden="true" />
+        </Button>
       </div>
-      {rotating && !reducedMotion && (
-        <div
-          key={item.id}
-          className={styles.rotationProgress}
-          style={{ animationDuration: `${ROTATION_INTERVAL_MS}ms` }}
-          aria-hidden="true"
-        />
-      )}
-    </section>
+      <section
+        ref={feature}
+        className={styles.feature}
+        aria-labelledby={headingId}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onFocus={() => setFocused(true)}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+        }}
+      >
+        <EpisodeArtwork key={item.id} item={item} title={title} />
+        <div className={styles.scrim} aria-hidden="true" />
+        <div className={styles.content}>
+          <div className={styles.episode} aria-live={rotationEnabled ? 'off' : 'polite'}>
+            <h3 className={styles.title}>{title}</h3>
+            {episodeLabel && <p className={styles.label}>{episodeLabel}</p>}
+          </div>
+          <div className={styles.actions}>
+            <Button
+              className={styles.play}
+              variant="primary"
+              disabled={starting}
+              onClick={() => void play()}
+            >
+              <Play size={18} fill="currentColor" aria-hidden="true" />
+              {t('Play episode')}
+            </Button>
+            <Button className={styles.quiet} variant="ghost" onClick={() => onOpen(item)}>
+              Series details
+            </Button>
+          </div>
+        </div>
+        {items.length > 1 && (
+          <div className={styles.controls} role="group" aria-label={t('Watch Next navigation')}>
+            <IconButton
+              className={styles.arrow}
+              aria-label={t('Previous episode')}
+              disabled={starting || index === 0}
+              onClick={() => setSelectedId(items[index - 1]?.id)}
+            >
+              <ChevronLeft size={22} aria-hidden="true" />
+            </IconButton>
+            <IconButton
+              className={styles.arrow}
+              aria-label={t('Next episode')}
+              disabled={starting || index === items.length - 1}
+              onClick={() => setSelectedId(items[index + 1]?.id)}
+            >
+              <ChevronRight size={22} aria-hidden="true" />
+            </IconButton>
+          </div>
+        )}
+        <div className={styles.footer}>
+          {items.length > 1 && (
+            <>
+              <span>
+                {number(index + 1)} / {number(items.length)}
+              </span>
+              <IconButton
+                className={styles.quiet}
+                size="sm"
+                aria-label={t(
+                  rotationEnabled ? 'Pause Watch Next rotation' : 'Start Watch Next rotation',
+                )}
+                onClick={() => setRotationChoice(!rotationEnabled)}
+              >
+                {rotationEnabled ? (
+                  <Pause size={16} aria-hidden="true" />
+                ) : (
+                  <Play size={16} aria-hidden="true" />
+                )}
+              </IconButton>
+            </>
+          )}
+          <IconButton
+            className={styles.quiet}
+            size="sm"
+            aria-label={t('Remove from Watch Next')}
+            title={t('Remove from Watch Next')}
+            disabled={starting}
+            onClick={() => {
+              setSelectedId((items[index + 1] ?? items[index - 1])?.id);
+              onDismiss(item);
+            }}
+          >
+            <X size={16} aria-hidden="true" />
+          </IconButton>
+        </div>
+        {rotating && !reducedMotion && (
+          <div
+            key={item.id}
+            className={styles.rotationProgress}
+            style={{ animationDuration: `${ROTATION_INTERVAL_MS}ms` }}
+            aria-hidden="true"
+          />
+        )}
+      </section>
+    </>
   );
 }
 

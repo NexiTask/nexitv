@@ -200,6 +200,7 @@ describe('saved next episodes', () => {
       seasonNum: 1,
       episodeNum: 1,
     }));
+    const onSeeAll = vi.fn();
     const home = render(
       createElement(
         QueryClientProvider,
@@ -208,7 +209,7 @@ describe('saved next episodes', () => {
           items,
           onOpen: vi.fn(),
           onDismiss: vi.fn(),
-          onSeeAll: vi.fn(),
+          onSeeAll,
         }),
       ),
     );
@@ -218,6 +219,15 @@ describe('saved next episodes', () => {
       });
     try {
       const banner = screen.getByRole('region', { name: 'Watch Next' });
+      const sectionHeading = screen.getByRole('heading', { name: 'Watch Next', level: 2 });
+      const seeAll = screen.getByRole('button', { name: 'See all for Watch Next' });
+      expect(banner.contains(sectionHeading)).toBe(false);
+      expect(
+        sectionHeading.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(banner.contains(seeAll)).toBe(false);
+      fireEvent.click(seeAll);
+      expect(onSeeAll).toHaveBeenCalledOnce();
       const heading = () => screen.getByRole('heading', { level: 3 }).textContent;
       tick();
       expect(heading()).toBe('First Show');
