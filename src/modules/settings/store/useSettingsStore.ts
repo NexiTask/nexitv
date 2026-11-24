@@ -763,7 +763,8 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'iptv-settings-storage',
-      version: 15,
+      // Repair saved Home layouts that predate Recommendations.
+      version: 16,
       migrate: migrateSettingsState,
       partialize: ({ tmdbApiKey: _tmdbApiKey, ...persistedState }) => persistedState,
     },

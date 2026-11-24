@@ -15,6 +15,31 @@ beforeEach(() => {
 });
 
 describe('settings store', () => {
+  it('adds Recommendations when restoring a Home layout saved with version 15', async () => {
+    const savedLayout = [
+      { id: 'upcoming', enabled: true },
+      { id: 'watchNext', enabled: true },
+      { id: 'continueWatching', enabled: false },
+      { id: 'recentMovies', enabled: false },
+      { id: 'recentSeries', enabled: false },
+      { id: 'popularMovies', enabled: false },
+      { id: 'popularSeries', enabled: false },
+      { id: 'liveChannels', enabled: false },
+    ];
+    localStorage.setItem(
+      'iptv-settings-storage',
+      JSON.stringify({ version: 15, state: { homeSections: savedLayout } }),
+    );
+
+    await useSettingsStore.persist.rehydrate();
+
+    expect(useSettingsStore.getState().homeSections).toEqual([
+      ...savedLayout.slice(0, 2),
+      { id: 'recommendations', enabled: true },
+      ...savedLayout.slice(2),
+    ]);
+  });
+
   it('defaults and resets the interface theme to dark', () => {
     expect(useSettingsStore.getState().themePreference).toBe('dark');
     useSettingsStore.getState().updateSetting('themePreference', 'light');
