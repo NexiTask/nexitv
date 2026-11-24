@@ -131,6 +131,8 @@ fn open(path: &PathBuf) -> rusqlite::Result<Connection> {
          CREATE INDEX IF NOT EXISTS items_rating ON items (source_id, kind, rating DESC, ord);
          CREATE INDEX IF NOT EXISTS items_imdb ON items (source_id, kind, imdb_rating DESC, ord)
             WHERE imdb_rating IS NOT NULL;
+         CREATE INDEX IF NOT EXISTS items_facet_id ON items (kind, f_id)
+            WHERE f_id IS NOT NULL;
          CREATE INDEX IF NOT EXISTS items_unranked ON items (source_id, kind, ord)
             WHERE f_rank IS NULL;",
     )?;

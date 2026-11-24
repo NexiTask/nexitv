@@ -442,30 +442,29 @@ function MediaCardComponent({
               </h3>
             </div>
 
-            {isResumeItem && !isLive ? (
+            {imdbRating && (
+              <div
+                className={styles.posterMeta}
+                title={tn(
+                  'IMDb rating {rating} out of 10 from {count} vote',
+                  'IMDb rating {rating} out of 10 from {count} votes',
+                  item.imdbVotes ?? 0,
+                  { rating: imdbRating, count: number(item.imdbVotes ?? 0) },
+                )}
+              >
+                <span className={styles.imdbBadge}>IMDb</span>
+                <span className={styles.imdbRating}>{imdbRating}</span>
+                {item.imdbVotes ? (
+                  <span className={styles.imdbVotes}>
+                    {number(item.imdbVotes, { notation: 'compact' })}
+                  </span>
+                ) : null}
+              </div>
+            )}
+            {isResumeItem && !isLive && (
               <div className={styles.posterMeta}>
                 <span className={styles.posterContext}>{cardContext}</span>
               </div>
-            ) : (
-              imdbRating && (
-                <div
-                  className={styles.posterMeta}
-                  title={tn(
-                    'IMDb rating {rating} out of 10 from {count} vote',
-                    'IMDb rating {rating} out of 10 from {count} votes',
-                    item.imdbVotes ?? 0,
-                    { rating: imdbRating, count: number(item.imdbVotes ?? 0) },
-                  )}
-                >
-                  <span className={styles.imdbBadge}>IMDb</span>
-                  <span className={styles.imdbRating}>{imdbRating}</span>
-                  {item.imdbVotes ? (
-                    <span className={styles.imdbVotes}>
-                      {number(item.imdbVotes, { notation: 'compact' })}
-                    </span>
-                  ) : null}
-                </div>
-              )
             )}
           </div>
         )}

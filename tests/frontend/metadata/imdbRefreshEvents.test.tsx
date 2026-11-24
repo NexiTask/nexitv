@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { act, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const events = vi.hoisted(() => ({ listen: vi.fn() }));
@@ -14,6 +15,7 @@ vi.mock('@tauri-apps/api/event', () => ({ listen: events.listen }));
 vi.mock('@/shared/notifications/useNotificationStore', () => notifications);
 
 import { useImdbRefreshEvents } from '@/modules/metadata/hooks/useImdbRefreshEvents';
+import { imdbFactsQueryOptions } from '@/modules/catalog/public/data/useImdbFacts';
 import { DataActivityStatus } from '@/app/components/DataActivityStatus';
 import type { ImdbRefreshEvent } from '@/platform/tauri';
 
@@ -24,6 +26,16 @@ const send = (stage: string, details: Omit<ImdbRefreshEvent, 'stage'> = {}) =>
 function Activity() {
   useImdbRefreshEvents();
   return <DataActivityStatus compact={false} />;
+}
+
+function renderActivity() {
+  const client = new QueryClient();
+  render(
+    <QueryClientProvider client={client}>
+      <Activity />
+    </QueryClientProvider>,
+  );
+  return client;
 }
 
 beforeEach(() => {
@@ -38,7 +50,7 @@ beforeEach(() => {
 
 describe('IMDb import activity', () => {
   it('shows download percentages and keeps importing visible until the run ends', async () => {
-    render(<Activity />);
+    renderActivity();
     await waitFor(() => expect(handler).not.toBeNull());
 
     send('checking');
@@ -70,14 +82,16 @@ describe('IMDb import activity', () => {
     core.invoke.mockResolvedValueOnce({
       importProgress: { stage: 'downloading', dataset: 'titles', percent: 42 },
     });
-    render(<Activity />);
+    renderActivity();
 
     const progress = await screen.findByRole('progressbar', { name: 'Downloading IMDb titles…' });
     expect(progress.getAttribute('aria-valuenow')).toBe('42');
   });
 
   it('keeps the quiet daily backfill quiet', async () => {
-    render(<Activity />);
+    const client = renderActivity();
+    const { queryKey } = imdbFactsQueryOptions('series', 'test-series');
+    client.setQueryData(queryKey, null);
     await waitFor(() => expect(handler).not.toBeNull());
 
     send('done');
@@ -85,10 +99,11 @@ describe('IMDb import activity', () => {
     expect(screen.getByRole('status').textContent).toBe('');
     expect(notifications.notify.info).not.toHaveBeenCalled();
     expect(notifications.notify.success).not.toHaveBeenCalled();
+    expect(client.getQueryState(queryKey)?.isInvalidated).toBe(true);
   });
 
   it('clears a failed run and shows the next one', async () => {
-    render(<Activity />);
+    renderActivity();
     await waitFor(() => expect(handler).not.toBeNull());
 
     send('checking');

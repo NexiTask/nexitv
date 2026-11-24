@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { useCategories, useVisibleCatalog } from '@/modules/catalog/public/data/useCategories';
+import { imdbFactsQueryOptions, withImdbFacts } from '@/modules/catalog/public/data/useImdbFacts';
 import { useUpcomingReleases } from '@/modules/guide/public/data/useUpcomingReleases';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import { desktopApi } from '@/platform/desktop';
@@ -107,5 +108,12 @@ export function useSeriesRecommendations(
     () => (enabled ? data.groupPicks(snapshot.data?.picks ?? []) : []),
     [enabled, data, snapshot.data],
   );
-  return { accounts, activeId, permission, snapshot, catalogue, data, cards };
+  const imdb = useQueries({
+    queries: cards.map(({ item }) => imdbFactsQueryOptions('series', item.id)),
+  });
+  const ratedCards = cards.map((card, index) => {
+    const facts = imdb[index]?.data;
+    return facts ? { ...card, item: withImdbFacts(card.item, facts) } : card;
+  });
+  return { accounts, activeId, permission, snapshot, catalogue, data, cards: ratedCards };
 }

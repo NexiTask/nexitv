@@ -34,6 +34,9 @@ it('reopens saved picks locally and keeps them when a manual refresh fails', asy
   const rank = vi
     .spyOn(tauriApi, 'recommendationsGenerate')
     .mockRejectedValue('Test refresh failed.');
+  const imdb = vi
+    .spyOn(tauriApi, 'catalogIndexImdb')
+    .mockResolvedValue({ id: 'tt1234567', rating: 8.5, votes: 12500 });
   const openSeries = vi.fn();
   const open = () =>
     render(
@@ -46,6 +49,10 @@ it('reopens saved picks locally and keeps them when a manual refresh fails', asy
   try {
     const first = open();
     expect(await screen.findByRole('group', { name: 'Open The Fixture' })).toBeTruthy();
+    expect(await screen.findByText('IMDb')).toBeTruthy();
+    expect(screen.getByText('8.5')).toBeTruthy();
+    expect(screen.getByTitle('IMDb rating 8.5 out of 10 from 12,500 votes')).toBeTruthy();
+    expect(imdb).toHaveBeenCalledWith('series', 'test-series');
     first.unmount();
     open();
     const poster = await screen.findByRole('group', {
@@ -67,6 +74,7 @@ it('reopens saved picks locally and keeps them when a manual refresh fails', asy
     status.mockRestore();
     read.mockRestore();
     rank.mockRestore();
+    imdb.mockRestore();
   }
 });
 
@@ -80,6 +88,9 @@ it('loads saved Home cards only when the row is enabled', async () => {
     picks: [{ key: JSON.stringify(['series', 'test-series']), genreMatch: false }],
   });
   const generate = vi.spyOn(tauriApi, 'recommendationsGenerate');
+  const imdb = vi
+    .spyOn(tauriApi, 'catalogIndexImdb')
+    .mockResolvedValue({ id: 'tt1234567', rating: 8.5, votes: 12500 });
   const client = new QueryClient();
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -91,8 +102,15 @@ it('loads saved Home cards only when the row is enabled', async () => {
     );
     expect(status).not.toHaveBeenCalled();
     expect(read).not.toHaveBeenCalled();
+    expect(imdb).not.toHaveBeenCalled();
     rerender({ enabled: true });
-    await waitFor(() => expect(result.current.cards[0]?.item.id).toBe('test-series'));
+    await waitFor(() =>
+      expect(result.current.cards[0]?.item).toMatchObject({
+        id: 'test-series',
+        imdbRating: 8.5,
+        imdbVotes: 12500,
+      }),
+    );
     expect(read).toHaveBeenCalledOnce();
     expect(generate).not.toHaveBeenCalled();
     rerender({ enabled: false });
@@ -101,5 +119,6 @@ it('loads saved Home cards only when the row is enabled', async () => {
     status.mockRestore();
     read.mockRestore();
     generate.mockRestore();
+    imdb.mockRestore();
   }
 });

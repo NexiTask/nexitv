@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { IMDB_FACTS_QUERY_KEY } from '@/modules/catalog/public/data/useImdbFacts';
 import { desktopApi } from '@/platform/desktop';
 import { tauriApi, type ImdbRefreshEvent } from '@/platform/tauri';
 import { notify } from '@/shared/notifications/useNotificationStore';
@@ -23,6 +25,8 @@ function showImport({ stage, dataset, percent }: ImdbRefreshEvent) {
 
 /** Follows the import in the sidebar, including runs started by the schedule. */
 export function useImdbRefreshEvents() {
+  const queryClient = useQueryClient();
+
   useEffect(() => {
     if (!desktopApi.isDesktop()) return;
     let disposed = false;
@@ -35,6 +39,9 @@ export function useImdbRefreshEvents() {
         if (stage !== 'done' && stage !== 'failed') {
           showImport(event);
           return;
+        }
+        if (stage === 'done') {
+          void queryClient.invalidateQueries({ queryKey: IMDB_FACTS_QUERY_KEY });
         }
         const completedImport = stage === 'done' && useDataActivities.getState().imdbImport;
         useDataActivities.setState({ imdbImport: null });
@@ -66,5 +73,5 @@ export function useImdbRefreshEvents() {
       stop?.();
       useDataActivities.setState({ imdbImport: null });
     };
-  }, []);
+  }, [queryClient]);
 }

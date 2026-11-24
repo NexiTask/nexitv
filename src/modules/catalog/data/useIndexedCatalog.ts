@@ -11,7 +11,6 @@ import {
   type CatalogPageSource,
   type CatalogPageStats,
   type CatalogSearchResult,
-  type ImdbFacts,
 } from '@/platform/tauri';
 import { perfAsync, perfSync } from '@/platform/perf';
 import { useHiddenOriginCategoryIds } from './useCategories';
@@ -30,6 +29,7 @@ import {
 } from '../lib/catalogPageQuery';
 import type { RatingLookups } from '../lib/smartCatalogFilter';
 import { mapXtreamList } from './useCatalog';
+import { withImdbFacts } from './useImdbFacts';
 import { foldLiveChannels } from '../lib/streamFolding';
 import { buildCatalogFacets, onCatalogFacetsBuilt } from './catalogFacetBuilder';
 import { INDEX_ROWS_ROOT } from './useHomeRows';
@@ -195,15 +195,6 @@ function keyOrd(key: number): number {
  * its provider-list position. A folded channel arrives with all its variants
  * and is folded here with `foldLiveChannels`, exactly as the full catalogue is.
  */
-function withImdb(item: CatalogItem, imdb: ImdbFacts): CatalogItem {
-  return {
-    ...item,
-    imdbId: imdb.id,
-    ...(imdb.rating !== null ? { imdbRating: imdb.rating } : {}),
-    ...(imdb.votes !== null ? { imdbVotes: imdb.votes } : {}),
-  };
-}
-
 export function mapKeyRows(
   type: CatalogPageKind,
   sources: readonly EnabledXtreamSource[],
@@ -229,7 +220,7 @@ export function mapKeyRows(
     );
     list.forEach((row, index) => {
       const item = mapped[index]!;
-      mappedByKey.set(row.key, row.imdb ? withImdb(item, row.imdb) : item);
+      mappedByKey.set(row.key, row.imdb ? withImdbFacts(item, row.imdb) : item);
     });
   }
   const items = new Map<number, CatalogItem>();
