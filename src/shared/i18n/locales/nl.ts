@@ -1319,6 +1319,7 @@ export const NL_MESSAGES: Record<string, string> = {
     'Toon levenscyclusupdates wanneer downloads starten, eindigen of mislukken.',
   'Download Notifications': 'Downloadmeldingen',
   'Show download notifications': 'Downloadmeldingen weergeven',
+  'Default download folder is {path}.': 'De standaard downloadmap is {path}.',
   'Download Folder': 'Downloadmap',
   'Choose a destination from the desktop app.': 'Kies een bestemming in de desktop-app.',
   'Folder Could Not Be Selected': 'Map kon niet worden geselecteerd',

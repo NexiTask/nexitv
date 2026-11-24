@@ -51,6 +51,7 @@ pub fn run() {
             metadata::imdb::imdb_refresh_status,
             metadata::imdb::imdb_refresh_start,
             metadata::imdb::imdb_refresh_set_enabled,
+            downloads::download_default_directory,
             downloads::download_media_start,
             downloads::download_media_pause,
             downloads::download_media_resume,

@@ -1324,6 +1324,7 @@ export const ES_MESSAGES: Record<string, string> = {
     'Muestra actualizaciones del ciclo de vida cuando las descargas comienzan, finalizan o fallan.',
   'Download Notifications': 'Notificaciones de descarga',
   'Show download notifications': 'Mostrar notificaciones de descarga',
+  'Default download folder is {path}.': 'La carpeta de descarga predeterminada es {path}.',
   'Download Folder': 'Carpeta de descargas',
   'Choose a destination from the desktop app.':
     'Elija un destino desde la aplicación de escritorio.',

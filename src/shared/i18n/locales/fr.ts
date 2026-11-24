@@ -1333,6 +1333,7 @@ export const FR_MESSAGES: Record<string, string> = {
     'Affichez les mises à jour du cycle de vie lorsque les téléchargements démarrent, se terminent ou échouent.',
   'Download Notifications': 'Notifications de téléchargement',
   'Show download notifications': 'Afficher les notifications de téléchargement',
+  'Default download folder is {path}.': 'Le dossier de téléchargement par défaut est {path}.',
   'Download Folder': 'Dossier de téléchargement',
   'Choose a destination from the desktop app.':
     "Choisissez une destination dans l'application de bureau.",

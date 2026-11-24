@@ -1312,6 +1312,7 @@ export const PL_MESSAGES: Record<string, string> = {
     'Pokazuj aktualizacje cyklu życia po rozpoczęciu, zakończeniu lub niepowodzeniu pobierania.',
   'Download Notifications': 'Powiadomienia o pobieraniu',
   'Show download notifications': 'Pokaż powiadomienia o pobieraniu',
+  'Default download folder is {path}.': 'Domyślny folder pobierania to {path}.',
   'Download Folder': 'Folder pobierania',
   'Choose a destination from the desktop app.':
     'Wybierz miejsce docelowe w aplikacji komputerowej.',

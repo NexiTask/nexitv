@@ -55,19 +55,42 @@ fn emit_download_event(app: &tauri::AppHandle, event: DownloadStatusEvent) {
     let _ = app.emit("download-event", event);
 }
 
+fn select_download_directory(
+    configured: Option<&str>,
+    system_downloads: impl FnOnce() -> Option<PathBuf>,
+    home: impl FnOnce() -> Option<PathBuf>,
+) -> Result<PathBuf, String> {
+    if let Some(path) = configured.map(str::trim).filter(|value| !value.is_empty()) {
+        return Ok(PathBuf::from(path));
+    }
+    system_downloads()
+        .or_else(|| home().map(|path| path.join("Downloads")))
+        .ok_or_else(|| {
+            "Could not find a default Downloads folder. Choose a folder in Storage settings."
+                .to_string()
+        })
+}
+
+fn download_directory(app: &tauri::AppHandle, configured: Option<&str>) -> Result<PathBuf, String> {
+    select_download_directory(
+        configured,
+        || app.path().download_dir().ok(),
+        || app.path().home_dir().ok(),
+    )
+}
+
+#[tauri::command]
+pub(crate) fn download_default_directory(app: tauri::AppHandle) -> Result<String, String> {
+    download_directory(&app, None).map(|path| path.to_string_lossy().into_owned())
+}
+
 fn download_target(
     app: &tauri::AppHandle,
     manager: &DownloadManager,
     directory: Option<&str>,
     file_name: &str,
 ) -> Result<PathBuf, String> {
-    let downloads = match directory.map(str::trim).filter(|value| !value.is_empty()) {
-        Some(value) => PathBuf::from(value),
-        None => app
-            .path()
-            .download_dir()
-            .map_err(|error| error.to_string())?,
-    };
+    let downloads = download_directory(app, directory)?;
     std::fs::create_dir_all(&downloads).map_err(|error| error.to_string())?;
     let base_name = safe_media_file_name(file_name);
     let mut target = downloads.join(&base_name);
@@ -380,18 +403,7 @@ pub(crate) async fn download_media_delete(
     app: tauri::AppHandle,
     options: DeleteDownloadOptions,
 ) -> Result<(), String> {
-    let downloads_dir = match options
-        .directory
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
-        Some(value) => PathBuf::from(value),
-        None => app
-            .path()
-            .download_dir()
-            .map_err(|error| error.to_string())?,
-    };
+    let downloads_dir = download_directory(&app, options.directory.as_deref())?;
     let target = resolve_delete_target(&downloads_dir, &PathBuf::from(&options.path))?;
     std::fs::remove_file(&target).map_err(|error| error.to_string())?;
     Ok(())
@@ -399,10 +411,36 @@ pub(crate) async fn download_media_delete(
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_delete_target, valid_download_id};
+    use super::{resolve_delete_target, select_download_directory, valid_download_id};
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn uses_the_configured_or_system_downloads_folder_before_the_home_fallback() {
+        let home = PathBuf::from("home");
+        assert_eq!(
+            select_download_directory(Some("  custom folder  "), || None, || Some(home.clone()))
+                .unwrap(),
+            PathBuf::from("custom folder"),
+        );
+        assert_eq!(
+            select_download_directory(
+                Some("  "),
+                || Some(PathBuf::from("system folder")),
+                || Some(home.clone()),
+            )
+            .unwrap(),
+            PathBuf::from("system folder"),
+        );
+        assert_eq!(
+            select_download_directory(None, || None, || Some(home.clone())).unwrap(),
+            home.join("Downloads"),
+        );
+        assert!(select_download_directory(None, || None, || None)
+            .unwrap_err()
+            .contains("Choose a folder in Storage settings"));
+    }
 
     #[test]
     fn accepts_opaque_download_ids_at_the_documented_boundary() {

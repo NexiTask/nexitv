@@ -1324,6 +1324,7 @@ export const PT_BR_MESSAGES: Record<string, string> = {
     'Mostre atualizações do ciclo de vida quando os downloads iniciam, terminam ou falham.',
   'Download Notifications': 'Notificações de download',
   'Show download notifications': 'Mostrar notificações de download',
+  'Default download folder is {path}.': 'A pasta padrão de downloads é {path}.',
   'Download Folder': 'Pasta de downloads',
   'Choose a destination from the desktop app.': 'Escolha um destino no aplicativo de desktop.',
   'Folder Could Not Be Selected': 'A pasta não pôde ser selecionada',

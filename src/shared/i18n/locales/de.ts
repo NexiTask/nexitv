@@ -1361,6 +1361,7 @@ export const DE_MESSAGES: Record<string, string> = {
     'Statusmeldungen anzeigen, wenn Downloads starten, abgeschlossen werden oder fehlschlagen.',
   'Download Notifications': 'Download-Benachrichtigungen',
   'Show download notifications': 'Download-Benachrichtigungen anzeigen',
+  'Default download folder is {path}.': 'Der Standard-Downloadordner ist {path}.',
   'Download Folder': 'Download-Ordner',
   'Choose a destination from the desktop app.': 'Wählen Sie in der Desktop-App einen Zielordner.',
   'Folder Could Not Be Selected': 'Ordner konnte nicht ausgewählt werden',

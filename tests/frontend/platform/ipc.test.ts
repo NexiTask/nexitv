@@ -203,6 +203,7 @@ describe('typed Tauri IPC wrapper', () => {
     ['mpvPlayPause', 'mpv_play_pause'],
     ['credentialLoad', 'credential_load'],
     ['credentialDelete', 'credential_delete'],
+    ['downloadDefaultDirectory', 'download_default_directory'],
   ] as const)('%s invokes without an accidental payload', async (method, command) => {
     await tauriApi[method]();
     expect(invokeMock).toHaveBeenCalledWith(command);

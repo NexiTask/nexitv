@@ -1322,6 +1322,7 @@ export const IT_MESSAGES: Record<string, string> = {
     'Mostra gli aggiornamenti del ciclo di vita quando i download iniziano, finiscono o falliscono.',
   'Download Notifications': 'Notifiche di download',
   'Show download notifications': 'Mostra notifiche di download',
+  'Default download folder is {path}.': 'La cartella di download predefinita è {path}.',
   'Download Folder': 'Cartella di download',
   'Choose a destination from the desktop app.': "Scegli una destinazione dall'app desktop.",
   'Folder Could Not Be Selected': 'Impossibile selezionare la cartella',

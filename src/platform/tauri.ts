@@ -370,6 +370,8 @@ export const tauriApi = {
   imdbRefreshSetEnabled: (enabled: boolean) =>
     invoke<void>('imdb_refresh_set_enabled', { enabled }),
 
+  downloadDefaultDirectory: () => invoke<string>('download_default_directory'),
+
   /** Start a managed media download; progress and lifecycle arrive on download-event. */
   downloadMediaStart: (options: DownloadMediaOptions & { id: string }) =>
     invoke<void>('download_media_start', { options }),
