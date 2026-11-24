@@ -1,6 +1,6 @@
 import { Play, Heart, Check, Film, Clapperboard, Radio, HardDriveDownload, X } from 'lucide-react';
 import styles from './MediaCard.module.css';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import { useDownloadStore } from '@/modules/downloads/public/store/useDownloadStore';
 import { useMediaContextMenus } from '../hooks/useMediaContextMenus';
@@ -54,6 +54,8 @@ interface MediaCardProps {
   /** A quick X in the card's corner (Continue Watching), with its label. */
   onRemove?: ((item: MediaItem) => void) | undefined;
   removeLabel?: string | undefined;
+  /** Context to show over a poster on hover or focus. */
+  posterDetails?: { description: ReactNode; action?: ReactNode } | undefined;
 }
 
 function formatChannelNumber(value: string | number | undefined): string {
@@ -142,10 +144,13 @@ function MediaCardComponent({
   showTypeInList = true,
   onRemove,
   removeLabel = 'Remove',
+  posterDetails,
 }: MediaCardProps) {
   const { t, tn, language, number } = useI18n();
   const { handleMediaCardContextMenu } = useMediaContextMenus();
   const queryClient = useQueryClient();
+  const descriptionId = useId();
+  const details = viewMode === 'grid' ? posterDetails : undefined;
   const [imgError, setImgError] = useState(() => isPosterHostDead(item.posterUrl));
   const [imgLoaded, setImgLoaded] = useState(false);
   // The hover overlay (play, favourite, menu, badges) is built on first hover or
@@ -329,6 +334,7 @@ function MediaCardComponent({
       style={style}
       role="group"
       aria-label={onClick ? t('Open {title}', { title: displayTitle }) : displayTitle}
+      aria-describedby={details ? descriptionId : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={() => onClick?.(item)}
       onKeyDown={handleCardKeyDown}
@@ -464,7 +470,16 @@ function MediaCardComponent({
           </div>
         )}
 
-        {viewMode !== 'list' && (
+        {details && (
+          <div className={`${styles.overlay} ${styles.posterDetails}`}>
+            <div id={descriptionId} className={styles.posterDescription}>
+              {details.description}
+            </div>
+            {hot && details.action}
+          </div>
+        )}
+
+        {viewMode !== 'list' && !details && (
           <div className={styles.overlay}>
             {hot && (
               <>

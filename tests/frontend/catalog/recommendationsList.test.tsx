@@ -34,26 +34,35 @@ it('reopens saved picks locally and keeps them when a manual refresh fails', asy
   const rank = vi
     .spyOn(tauriApi, 'recommendationsGenerate')
     .mockRejectedValue('Test refresh failed.');
+  const openSeries = vi.fn();
   const open = () =>
     render(
       <MemoryRouter>
         <QueryClientProvider client={new QueryClient()}>
-          <RecommendationsList next={[]} onOpen={vi.fn()} />
+          <RecommendationsList next={[]} onOpen={openSeries} />
         </QueryClientProvider>
       </MemoryRouter>,
     );
   try {
     const first = open();
-    expect(await screen.findByRole('heading', { name: 'The Fixture' })).toBeTruthy();
+    expect(await screen.findByRole('group', { name: 'Open The Fixture' })).toBeTruthy();
     first.unmount();
     open();
-    expect(await screen.findByRole('heading', { name: 'The Fixture' })).toBeTruthy();
+    const poster = await screen.findByRole('group', {
+      name: 'Open The Fixture',
+      description: 'Discover a series',
+    });
+    fireEvent.keyDown(poster, { key: 'Enter' });
+    expect(openSeries).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'test-series' }),
+      undefined,
+    );
     expect(read).toHaveBeenCalledTimes(2);
     expect(rank).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Refresh recommendations' }));
     expect((await screen.findByRole('alert')).textContent).toContain('Test refresh failed.');
     await waitFor(() => expect(rank).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole('heading', { name: 'The Fixture' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Open The Fixture' })).toBeTruthy();
   } finally {
     status.mockRestore();
     read.mockRestore();

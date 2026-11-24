@@ -2,11 +2,11 @@ import { useNavigate } from 'react-router-dom';
 import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Sparkles } from 'lucide-react';
 import { CatalogPageHeader } from '@/modules/catalog/public/components/CatalogPageHeader';
-import { getDisplayTitle, parseMediaDisplayTitle } from '@/modules/catalog/public/lib/titleParser';
+import { MediaCard } from '@/modules/catalog/public/components/MediaCard';
+import { parseMediaDisplayTitle } from '@/modules/catalog/public/lib/titleParser';
 import type { MediaItem, MediaOpenContext } from '@/modules/catalog/public/model/media';
 import { useTmdbDetailEnrichment } from '@/modules/metadata/public/hooks/useTmdbDetailsEnrichment';
 import { desktopApi } from '@/platform/desktop';
-import { canThumbPoster, posterThumbUrl } from '@/platform/posterThumb';
 import { tauriApi, type SeriesRecommendationKind } from '@/platform/tauri';
 import { useI18n } from '@/shared/i18n/i18n';
 import { getErrorMessage } from '@/shared/lib/error';
@@ -46,7 +46,8 @@ function Teaser({ item, tmdbId }: { item: MediaItem; tmdbId?: number | undefined
     <>
       <Button
         size="sm"
-        onClick={() => {
+        onClick={(event) => {
+          event.stopPropagation();
           void desktopApi.openUrl(video.url).catch(() => {});
         }}
       >
@@ -154,64 +155,51 @@ export function RecommendationsList({
         {results.length > 0 ? (
           <ul className={styles.results}>
             {results.map(({ key, item, signals, reason }) => (
-              <li className={styles.card} key={key}>
-                {item.posterUrl && (
-                  <img
-                    src={
-                      canThumbPoster(item.posterUrl)
-                        ? posterThumbUrl(item.posterUrl)
-                        : item.posterUrl
-                    }
-                    alt=""
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                )}
-                <div className={styles.details}>
-                  <h2>{getDisplayTitle(item.title, 'series')}</h2>
-                  {signals.map(({ kind, item: signalItem, release }) => (
-                    <p key={kind}>
-                      {t(labels[kind])}
-                      {release ? (
-                        <>
-                          {' '}
-                          · {release.title} ·{' '}
-                          <time dateTime={release.airDate}>
-                            {date(new Date(`${release.airDate}T12:00:00`))}
-                          </time>
-                        </>
-                      ) : signalItem.episodeTitle ? (
-                        <> · {signalItem.episodeTitle}</>
-                      ) : null}
-                    </p>
-                  ))}
-                  {reason && <p>{reason}</p>}
-                  <div className={styles.actions}>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        const release = signals[0]?.release;
-                        onOpen(
-                          item,
-                          release
-                            ? {
-                                seasonNumber: release.seasonNumber ?? undefined,
-                                episodeNumber: release.episodeNumber ?? undefined,
-                              }
-                            : undefined,
-                        );
-                      }}
-                    >
-                      {t('Open series')}
-                    </Button>
-                    {signals.some(({ kind }) => kind === 'upcoming' || kind === 'new') && (
+              <li key={key}>
+                <MediaCard
+                  item={item}
+                  onClick={() => {
+                    const release = signals[0]?.release;
+                    onOpen(
+                      item,
+                      release
+                        ? {
+                            seasonNumber: release.seasonNumber ?? undefined,
+                            episodeNumber: release.episodeNumber ?? undefined,
+                          }
+                        : undefined,
+                    );
+                  }}
+                  posterDetails={{
+                    description: (
+                      <>
+                        {reason && <p>{reason}</p>}
+                        {signals.map(({ kind, item: signalItem, release }) => (
+                          <p key={kind}>
+                            {t(labels[kind])}
+                            {release ? (
+                              <>
+                                {' '}
+                                · {release.title} ·{' '}
+                                <time dateTime={release.airDate}>
+                                  {date(new Date(`${release.airDate}T12:00:00`))}
+                                </time>
+                              </>
+                            ) : signalItem.episodeTitle ? (
+                              <> · {signalItem.episodeTitle}</>
+                            ) : null}
+                          </p>
+                        ))}
+                      </>
+                    ),
+                    action: signals.some(({ kind }) => kind === 'upcoming' || kind === 'new') ? (
                       <Teaser
                         item={item}
                         tmdbId={signals.find(({ release }) => release)?.release?.tmdbId}
                       />
-                    )}
-                  </div>
-                </div>
+                    ) : undefined,
+                  }}
+                />
               </li>
             ))}
           </ul>

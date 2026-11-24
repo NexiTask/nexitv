@@ -137,6 +137,27 @@
   visibility: visible;
 }
 
+.posterDetails {
+  background: rgba(var(--neutral-black-rgb), var(--alpha-90));
+  color: var(--text-media-primary);
+  justify-content: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  overflow: auto;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-control);
+}
+
+.posterDescription {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.posterDescription p {
+  margin: 0;
+}
+
 .topActions {
   display: flex;
   justify-content: flex-end;
