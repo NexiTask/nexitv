@@ -10,9 +10,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
 
-use crate::sources::remote::{
-    remote_headers, safe_media_file_name, same_origin_redirect_policy, validate_remote_url,
-};
+use crate::sources::remote::{remote_headers, safe_media_file_name, validate_remote_url};
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DownloadMediaOptions {
@@ -125,6 +123,49 @@ fn valid_download_id(value: &str) -> bool {
         })
 }
 
+async fn fetch_media_response(
+    client: &reqwest::Client,
+    mut url: url::Url,
+    mut headers: reqwest::header::HeaderMap,
+) -> Result<reqwest::Response, String> {
+    const MAX_REDIRECTS: usize = 8;
+    let mut redirects = 0;
+    loop {
+        let response = client
+            .get(url.clone())
+            .headers(headers.clone())
+            .send()
+            .await
+            .map_err(|_| "Could not download the media resource".to_string())?;
+        if !matches!(response.status().as_u16(), 301 | 302 | 303 | 307 | 308) {
+            return Ok(response);
+        }
+        if redirects == MAX_REDIRECTS {
+            return Err("The media resource returned too many redirects".to_string());
+        }
+
+        let next = response
+            .headers()
+            .get(reqwest::header::LOCATION)
+            .and_then(|location| location.to_str().ok())
+            .and_then(|location| url.join(location).ok())
+            .ok_or_else(|| "The media resource returned an invalid redirect".to_string())?;
+        if !matches!(next.scheme(), "http" | "https")
+            || (url.scheme() == "https" && next.scheme() != "https")
+            || !next.username().is_empty()
+            || next.password().is_some()
+        {
+            return Err("The media resource returned an unsafe redirect".to_string());
+        }
+        if next.origin() != url.origin() {
+            // Provider headers may contain credentials under any name.
+            headers = remote_headers(HashMap::new())?;
+        }
+        url = next;
+        redirects += 1;
+    }
+}
+
 async fn run_media_download(
     app: tauri::AppHandle,
     manager: DownloadManager,
@@ -140,15 +181,15 @@ async fn run_media_download(
         let url = validate_remote_url(&options.url)?;
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(300))
-            .redirect(same_origin_redirect_policy())
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|error| format!("Could not initialize downloader: {error}"))?;
-        let response = client
-            .get(url)
-            .headers(remote_headers(options.headers)?)
-            .send()
-            .await
-            .map_err(|_| "Could not download the media resource".to_string())?;
+        let response = tokio::time::timeout(
+            Duration::from_secs(300),
+            fetch_media_response(&client, url, remote_headers(options.headers)?),
+        )
+        .await
+        .map_err(|_| "The media server took too long to respond".to_string())??;
         if !response.status().is_success() {
             return Err(format!("The media URL answered {}", response.status().as_u16()));
         }
@@ -411,10 +452,83 @@ pub(crate) async fn download_media_delete(
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_delete_target, select_download_directory, valid_download_id};
+    use super::{
+        fetch_media_response, resolve_delete_target, select_download_directory, valid_download_id,
+    };
     use std::fs;
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
     use std::path::PathBuf;
+    use std::time::Duration;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[tokio::test]
+    async fn follows_media_redirects_without_forwarding_provider_headers_to_another_origin() {
+        let provider = TcpListener::bind("127.0.0.1:0").unwrap();
+        let delivery = TcpListener::bind("127.0.0.1:0").unwrap();
+        let provider_addr = provider.local_addr().unwrap();
+        let delivery_addr = delivery.local_addr().unwrap();
+        let fixture = std::thread::spawn(move || {
+            for (listener, expected_uri, location) in [
+                (&provider, "/media", Some("/redirect".to_string())),
+                (
+                    &provider,
+                    "/redirect",
+                    Some(format!("http://{delivery_addr}/file?signature=fixture")),
+                ),
+                (&delivery, "/file?signature=fixture", None),
+            ] {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(3)))
+                    .unwrap();
+                let request = BufReader::new(&stream)
+                    .lines()
+                    .map(Result::unwrap)
+                    .take_while(|line| !line.is_empty())
+                    .collect::<Vec<_>>();
+                assert_eq!(request[0], format!("GET {expected_uri} HTTP/1.1"));
+                for header in ["authorization:", "cookie:", "x-provider-token:", "referer:"] {
+                    assert_eq!(
+                        request
+                            .iter()
+                            .any(|line| line.to_ascii_lowercase().starts_with(header)),
+                        location.is_some(),
+                        "unexpected {header} on {expected_uri}",
+                    );
+                }
+                if let Some(location) = location {
+                    write!(stream, "HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+                } else {
+                    write!(
+                        stream,
+                        "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nvideo"
+                    )
+                    .unwrap();
+                }
+            }
+        });
+
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(3))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .unwrap();
+        let mut headers = reqwest::header::HeaderMap::new();
+        for name in ["authorization", "cookie", "x-provider-token", "referer"] {
+            headers.insert(name, reqwest::header::HeaderValue::from_static("fixture"));
+        }
+        let response = fetch_media_response(
+            &client,
+            format!("http://{provider_addr}/media").parse().unwrap(),
+            headers,
+        )
+        .await
+        .unwrap();
+        assert_eq!(response.bytes().await.unwrap().as_ref(), b"video");
+        fixture.join().unwrap();
+    }
 
     #[test]
     fn uses_the_configured_or_system_downloads_folder_before_the_home_fallback() {
