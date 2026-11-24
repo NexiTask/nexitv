@@ -5,6 +5,7 @@ import { HorizontalCarousel } from '@/modules/catalog/components/HorizontalCarou
 import { isQueuedEpisode, useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import { useSeriesRecommendations } from '@/modules/library/public/data/useSeriesRecommendations';
 import { useAutomatedRecommendations } from '@/modules/library/public/data/useAutomatedRecommendations';
+import { mixSeriesRecommendations } from '@/modules/library/public/data/seriesRecommendations';
 import {
   useSettingsStore,
   type HomeSectionId,
@@ -64,18 +65,28 @@ export function HomePage() {
     useMediaDetailState();
 
   const { items: watchNext } = useWatchNext();
+  const showRecommendations = homeSections.some(
+    ({ id, enabled }) => id === 'recommendations' && enabled,
+  );
   const automatedItems = useAutomatedRecommendations(
     watchNext,
-    homeSections.some(({ id, enabled }) => id === 'automatedRecommendations' && enabled),
+    showRecommendations,
     recommendationsHomeLimit,
   );
-  const showRecommendations =
-    recommendationsEnabled &&
-    homeSections.some((section) => section.id === 'recommendations' && section.enabled);
-  const { cards: recommendationCards } = useSeriesRecommendations(watchNext, showRecommendations);
-  const recommendationItems = recommendationCards
-    .slice(0, recommendationsHomeLimit)
-    .map(({ item }) => item);
+  const { cards: recommendationCards } = useSeriesRecommendations(
+    watchNext,
+    showRecommendations && recommendationsEnabled,
+  );
+  const recommendations = mixSeriesRecommendations(recommendationCards, automatedItems).slice(
+    0,
+    recommendationsHomeLimit,
+  );
+  const recommendationDetails = new Map(
+    recommendations.map(({ source, card }) => [
+      card.item.id,
+      { source, description: source === 'chatgpt' ? card.reason : undefined },
+    ]),
+  );
   const dismissWatchNextById = useLibraryStore((state) => state.dismissWatchNext);
   const watchNextItems = useMemo(
     () =>
@@ -195,8 +206,7 @@ export function HomePage() {
     upcoming: showUpcomingOnHome,
     continueWatching: continueWatchingItems.length > 0,
     watchNext: watchNextItems.length > 0,
-    automatedRecommendations: automatedItems.length > 0,
-    recommendations: recommendationItems.length > 0,
+    recommendations: recommendations.length > 0,
     recentMovies: true,
     recentSeries: true,
     popularMovies: true,
@@ -244,22 +254,13 @@ export function HomePage() {
             removeLabel="Remove from Watch Next"
           />
         );
-      case 'automatedRecommendations':
-        return (
-          <HorizontalCarousel
-            key={id}
-            title="Automated Recommendations"
-            items={automatedItems}
-            onItemClick={handleItemClick}
-            onSeeAll={() => navigate('/library/automated-recommendations')}
-          />
-        );
       case 'recommendations':
         return (
           <HorizontalCarousel
             key={id}
-            title="Smart Recommendations"
-            items={recommendationItems}
+            title="Recommendations"
+            items={recommendations.map(({ card }) => card.item)}
+            getPosterDetails={(item) => recommendationDetails.get(item.id)}
             onItemClick={handleItemClick}
             onSeeAll={() => navigate('/library/recommendations')}
           />

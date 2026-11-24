@@ -110,6 +110,22 @@ export function collectAutomatedRecommendations(
   );
 }
 
+export function mixSeriesRecommendations<T extends { item: MediaItem }>(
+  smart: T[],
+  library: MediaItem[],
+) {
+  const result: (
+    { source: 'chatgpt'; card: T } | { source: 'library'; card: { item: MediaItem } }
+  )[] = [];
+  for (let index = 0; index < Math.max(smart.length, library.length); index++) {
+    const card = smart[index];
+    const item = library[index];
+    if (card) result.push({ source: 'chatgpt', card });
+    if (item) result.push({ source: 'library', card: { item } });
+  }
+  return result;
+}
+
 function summarize(items: MediaItem[], categories: Map<string, string>): string[] {
   const counts = new Map<string, number>();
   for (const item of items) {

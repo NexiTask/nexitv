@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
 import { RecommendationsList } from '@/modules/library/pages/RecommendationsList';
 import { useSeriesRecommendations } from '@/modules/library/public/data/useSeriesRecommendations';
-import type { HistoryItem } from '@/modules/library/public/store/useLibraryStore';
+import { useLibraryStore, type HistoryItem } from '@/modules/library/public/store/useLibraryStore';
 import { tauriApi } from '@/platform/tauri';
 
 vi.mock('@/platform/desktop', () => ({ desktopApi: { isDesktop: () => true } }));
@@ -23,7 +23,11 @@ vi.mock('@/modules/guide/public/data/useUpcomingReleases', () => ({
   useUpcomingReleases: () => ({ data: [] }),
 }));
 
-it('reopens saved picks locally and keeps them when a manual refresh fails', async () => {
+it('shows both sources together and keeps cached picks when a manual refresh fails', async () => {
+  const previousSaved = useLibraryStore.getState().savedItems;
+  useLibraryStore.setState({
+    savedItems: [{ id: 'local-series', title: 'Saved Series', type: 'series', posterUrl: '' }],
+  });
   const status = vi.spyOn(tauriApi, 'chatGptStatus').mockResolvedValue({
     activeClient: 'client',
     accounts: [{ clientId: 'client', label: 'Test', planPermission: true }],
@@ -49,16 +53,23 @@ it('reopens saved picks locally and keeps them when a manual refresh fails', asy
     );
   try {
     const first = open();
-    expect(await screen.findByRole('group', { name: 'Open The Fixture' })).toBeTruthy();
-    expect(await screen.findByText('IMDb')).toBeTruthy();
-    expect(screen.getByText('8.5')).toBeTruthy();
-    expect(screen.getByTitle('IMDb rating 8.5 out of 10 from 12,500 votes')).toBeTruthy();
+    const smartCard = await screen.findByRole('group', { name: 'Open The Fixture' });
+    const smart = within(smartCard);
+    expect(await smart.findByText('IMDb')).toBeTruthy();
+    expect(smart.getByText('8.5')).toBeTruthy();
+    expect(smart.getByTitle('IMDb rating 8.5 out of 10 from 12,500 votes')).toBeTruthy();
+    expect(
+      screen.getByRole('group', {
+        name: 'Open Saved Series',
+        description: 'Recommended from your Library',
+      }),
+    ).toBeTruthy();
     expect(imdb).toHaveBeenCalledWith('series', 'test-series');
     first.unmount();
     open();
     const poster = await screen.findByRole('group', {
       name: 'Open The Fixture',
-      description: 'Discover a series',
+      description: 'Recommended using your ChatGPT account Discover a series',
     });
     fireEvent.keyDown(poster, { key: 'Enter' });
     expect(openSeries).toHaveBeenCalledWith(expect.objectContaining({ id: 'test-series' }));
@@ -69,6 +80,7 @@ it('reopens saved picks locally and keeps them when a manual refresh fails', asy
     await waitFor(() => expect(rank).toHaveBeenCalledTimes(1));
     expect(screen.getByRole('group', { name: 'Open The Fixture' })).toBeTruthy();
   } finally {
+    useLibraryStore.setState({ savedItems: previousSaved });
     status.mockRestore();
     read.mockRestore();
     rank.mockRestore();

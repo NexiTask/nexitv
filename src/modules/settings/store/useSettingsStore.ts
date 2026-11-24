@@ -607,7 +607,9 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
     catalogFilters: normalizeCatalogFilterSet(state.catalogFilters),
     lastCollectionId:
       typeof state.lastCollectionId === 'string' && state.lastCollectionId.length <= 512
-        ? state.lastCollectionId
+        ? state.lastCollectionId === 'automated-recommendations'
+          ? 'recommendations'
+          : state.lastCollectionId
         : null,
     epgZoomPercent: clampImageValue(state.epgZoomPercent, 50, 200, 100),
     m3uEditorDensity: state.m3uEditorDensity === 'compact' ? 'compact' : 'comfortable',
@@ -763,8 +765,8 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'iptv-settings-storage',
-      // Add the Automated Recommendations row to saved Home layouts.
-      version: 17,
+      // Merge existing automated and smart recommendation rows.
+      version: 18,
       migrate: migrateSettingsState,
       partialize: ({ tmdbApiKey: _tmdbApiKey, ...persistedState }) => persistedState,
     },

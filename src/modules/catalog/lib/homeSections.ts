@@ -4,7 +4,6 @@ export const HOME_SECTION_IDS = [
   'upcoming',
   'continueWatching',
   'watchNext',
-  'automatedRecommendations',
   'recommendations',
   'recentMovies',
   'recentSeries',
@@ -31,8 +30,7 @@ export const HOME_SECTION_LABELS: Record<HomeSectionId, string> = {
   upcoming: 'Coming Up',
   continueWatching: 'Continue Watching',
   watchNext: 'Watch Next',
-  automatedRecommendations: 'Automated Recommendations',
-  recommendations: 'Smart Recommendations',
+  recommendations: 'Recommendations',
   recentMovies: 'Recently Added Movies',
   recentSeries: 'Recently Added Series',
   popularMovies: 'Popular Movies',
@@ -55,12 +53,25 @@ export function sanitizeHomeSections(value: unknown): HomeSectionPref[] {
   const result: HomeSectionPref[] = [];
 
   if (Array.isArray(value)) {
-    for (const entry of value) {
-      if (!entry || typeof entry !== 'object') continue;
-      const id = (entry as { id?: unknown }).id;
+    const entries = value.filter(
+      (entry): entry is { id?: unknown; enabled?: unknown } =>
+        entry !== null && typeof entry === 'object',
+    );
+    const formerLibraryRow = entries.find(({ id }) => id === 'automatedRecommendations');
+    const hasRecommendations = entries.some(({ id }) => id === 'recommendations');
+    for (const entry of entries) {
+      if (entry.id === 'automatedRecommendations' && hasRecommendations) continue;
+      const id = entry.id === 'automatedRecommendations' ? 'recommendations' : entry.id;
       if (!isHomeSectionId(id) || seen.has(id)) continue;
       seen.add(id);
-      result.push({ id, enabled: (entry as { enabled?: unknown }).enabled !== false });
+      result.push({
+        id,
+        enabled:
+          entry.enabled !== false ||
+          (id === 'recommendations' &&
+            formerLibraryRow !== undefined &&
+            formerLibraryRow.enabled !== false),
+      });
     }
   }
 

@@ -158,6 +158,33 @@
   margin: 0;
 }
 
+.recommendationBadge {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  border-radius: var(--radius-md);
+  background: var(--surface-media-control);
+  color: var(--text-media-primary);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.recommendationBadge + .posterBadgesRight {
+  top: calc(var(--control-height-sm) + var(--space-3));
+}
+
+.recommendationBadge ~ .posterDetails {
+  padding-top: calc(var(--control-height-sm) + var(--space-3));
+}
+
+.recommendationSource {
+  font-weight: var(--font-weight-semibold);
+}
+
 .topActions {
   display: flex;
   justify-content: flex-end;

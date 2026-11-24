@@ -86,7 +86,7 @@ beforeEach(() => {
 });
 
 describe('application shell', () => {
-  it('keeps Automated Recommendations available when Smart Recommendations is disabled', async () => {
+  it('opens the unified list from the former Library route with Smart Recommendations disabled', async () => {
     await preloadRouteModule('/library');
     const show = { id: 'saved-show', title: 'Saved Show', posterUrl: '', type: 'series' as const };
     useLibraryStore.setState({ savedItems: [show] });
@@ -94,17 +94,19 @@ describe('application shell', () => {
       recommendationsEnabled: false,
       lastCollectionId: 'recommendations',
     });
-    window.history.replaceState({}, '', '/library/recommendations');
+    window.history.replaceState({}, '', '/library/automated-recommendations');
     render(<App />);
-    expect(await screen.findByRole('heading', { name: 'Saved', level: 1 })).toBeTruthy();
-    expect(screen.queryByRole('link', { name: 'Smart Recommendations' })).toBeNull();
-    expect(window.location.pathname).toBe('/library/saved');
-    const automated = screen.getByRole('link', { name: 'Automated Recommendations' });
-    await userEvent.click(automated);
-    expect(await screen.findByRole('heading', { name: 'Automated Recommendations' })).toBeTruthy();
-    expect(within(automated).getByText('1')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Recommendations', level: 1 })).toBeTruthy();
+    expect(window.location.pathname).toBe('/library/recommendations');
+    expect(screen.queryByRole('button', { name: 'Get recommendations' })).toBeNull();
+    expect(
+      screen.getByRole('group', {
+        name: 'Open Saved Show',
+        description: 'Recommended from your Library',
+      }),
+    ).toBeTruthy();
     act(() => useLibraryStore.getState().setSeriesStarted(show.id, true, show));
-    expect(screen.getByRole('heading', { name: 'No unstarted series' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'No recommendations to show' })).toBeTruthy();
   });
 
   it('moves the existing Favorites page into Library and keeps the list permanent', async () => {
@@ -133,8 +135,7 @@ describe('application shell', () => {
     expect(library.getAllByRole('link')).toEqual([
       library.getByRole('link', { name: 'Continue Watching' }),
       library.getByRole('link', { name: 'Watch Next' }),
-      library.getByRole('link', { name: 'Automated Recommendations' }),
-      library.getByRole('link', { name: 'Smart Recommendations' }),
+      library.getByRole('link', { name: 'Recommendations' }),
       saved,
       favorites,
       library.getByRole('link', { name: 'Downloads' }),
@@ -293,8 +294,7 @@ describe('application shell', () => {
       'Continue Watching',
       'Watch Next',
       'Coming Up',
-      'Automated Recommendations',
-      'Smart Recommendations',
+      'Recommendations',
       'Saved',
       'Favorites',
       'Downloads',

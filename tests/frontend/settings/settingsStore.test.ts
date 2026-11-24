@@ -35,10 +35,35 @@ describe('settings store', () => {
 
     expect(useSettingsStore.getState().homeSections).toEqual([
       ...savedLayout.slice(0, 2),
-      { id: 'automatedRecommendations', enabled: true },
       { id: 'recommendations', enabled: true },
       ...savedLayout.slice(2),
     ]);
+  });
+
+  it('merges saved recommendation rows and retains access from the last visited list', async () => {
+    localStorage.setItem(
+      'iptv-settings-storage',
+      JSON.stringify({
+        version: 17,
+        state: {
+          homeSections: [
+            { id: 'automatedRecommendations', enabled: true },
+            { id: 'recentSeries', enabled: true },
+            { id: 'recommendations', enabled: false },
+          ],
+          lastCollectionId: 'automated-recommendations',
+        },
+      }),
+    );
+    await useSettingsStore.persist.rehydrate();
+    const { homeSections, lastCollectionId } = useSettingsStore.getState();
+    expect(homeSections.filter(({ id }) => id.toLowerCase().includes('recommendations'))).toEqual([
+      { id: 'recommendations', enabled: true },
+    ]);
+    expect(homeSections.findIndex(({ id }) => id === 'recentSeries')).toBeLessThan(
+      homeSections.findIndex(({ id }) => id === 'recommendations'),
+    );
+    expect(lastCollectionId).toBe('recommendations');
   });
 
   it('defaults and resets the interface theme to dark', () => {

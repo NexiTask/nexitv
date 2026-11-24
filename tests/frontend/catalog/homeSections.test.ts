@@ -59,7 +59,6 @@ describe('moveHomeSection', () => {
       'continueWatching',
       'upcoming',
       'watchNext',
-      'automatedRecommendations',
       'recommendations',
       'recentMovies',
       'recentSeries',

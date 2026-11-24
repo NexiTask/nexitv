@@ -18,7 +18,7 @@ describe('Home layout settings', () => {
     render(<HomeSettingsSection />);
     await user.click(screen.getByRole('button', { name: 'Maximum recommendations on Home' }));
     await user.click(screen.getByRole('option', { name: '12' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Show Smart Recommendations' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Show Recommendations' }));
     expect(useSettingsStore.getState().recommendationsHomeLimit).toBe(12);
     expect(useSettingsStore.getState().recommendationsEnabled).toBe(true);
     expect(
@@ -66,7 +66,6 @@ describe('Home layout settings', () => {
       'continueWatching',
       'upcoming',
       'watchNext',
-      'automatedRecommendations',
       'recommendations',
       'recentMovies',
       'recentSeries',

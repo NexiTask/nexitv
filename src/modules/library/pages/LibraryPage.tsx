@@ -11,7 +11,6 @@ import {
   FolderHeart,
   History,
   ListVideo,
-  Clapperboard,
   Sparkles,
   Plus,
   Edit2,
@@ -37,7 +36,6 @@ import { useWatchNext } from '@/modules/catalog/public/data/useWatchNext';
 import { ContinueWatchingList } from './ContinueWatchingList';
 import { WatchNextList } from './WatchNextList';
 import { RecommendationsList } from './RecommendationsList';
-import { useAutomatedRecommendations } from '../data/useAutomatedRecommendations';
 import { useI18n } from '@/shared/i18n/i18n';
 
 export function LibraryPage() {
@@ -47,8 +45,6 @@ export function LibraryPage() {
   const history = useLibraryStore((state) => state.history);
   const resumeItems = history.filter((item) => !isQueuedEpisode(item));
   const watchNext = useWatchNext();
-  const showAutomated = listId === 'automated-recommendations';
-  const automatedItems = useAutomatedRecommendations(watchNext.items, showAutomated);
   const savedItems = useLibraryStore((state) => state.savedItems);
   const downloadCount = useDownloadStore((state) => state.jobs.length);
   const favorites = useLibraryStore((state) => state.favorites);
@@ -57,7 +53,6 @@ export function LibraryPage() {
   const renameCollection = useLibraryStore((state) => state.renameCollection);
   const deleteCollection = useLibraryStore((state) => state.deleteCollection);
   const upcomingEnabled = useSettingsStore((state) => state.upcomingEnabled);
-  const recommendationsEnabled = useSettingsStore((state) => state.recommendationsEnabled);
   const sidebarWidth = useSettingsStore((state) => state.sidebarWidth);
   const lastCollectionId = useSettingsStore((state) => state.lastCollectionId);
   const updateSetting = useSettingsStore((state) => state.updateSetting);
@@ -80,16 +75,8 @@ export function LibraryPage() {
       icon: CalendarClock,
     },
     {
-      id: 'automated-recommendations',
-      name: 'Automated Recommendations',
-      icon: Clapperboard,
-      items: showAutomated ? automatedItems : undefined,
-      emptyTitle: 'No unstarted series',
-      emptyDescription: 'Save a series to your library to see it here before you start watching.',
-    },
-    {
       id: 'recommendations',
-      name: 'Smart Recommendations',
+      name: 'Recommendations',
       icon: Sparkles,
     },
     {
@@ -116,13 +103,9 @@ export function LibraryPage() {
     },
   ];
   const visibleBuiltInLists = builtInLists.filter(
-    (list) =>
-      (upcomingEnabled || list.id !== 'upcoming') &&
-      (recommendationsEnabled || list.id !== 'recommendations'),
+    (list) => upcomingEnabled || list.id !== 'upcoming',
   );
-  const builtInList = (listId === 'recommendations' ? visibleBuiltInLists : builtInLists).find(
-    (list) => list.id === listId,
-  );
+  const builtInList = builtInLists.find((list) => list.id === listId);
   const activeCollection = builtInList
     ? undefined
     : collections.find((collection) => collection.id === listId);
@@ -138,7 +121,7 @@ export function LibraryPage() {
 
   const { selectedMovie, selectedSeries, handleCloseMovie, handleCloseSeries, handleItemClick } =
     useMediaDetailState({
-      enableSourceOnOpen: listId !== 'upcoming' && listId !== 'recommendations',
+      enableSourceOnOpen: listId !== 'upcoming',
     });
 
   // Modal states for Create, Rename, Delete
@@ -150,6 +133,9 @@ export function LibraryPage() {
   const closeCreateModal = useCallback(() => setIsCreateOpen(false), []);
   const closeRenameModal = useCallback(() => setIsRenameOpen(false), []);
 
+  if (listId === 'automated-recommendations') {
+    return <Navigate to="/library/recommendations" replace />;
+  }
   if (!selectedList) {
     const lastList =
       listId === undefined &&

@@ -99,7 +99,7 @@ export function HomeSettingsSection() {
       <SettingsGroup title="Recommendations">
         <SettingsRow
           title="Enable Smart Recommendations"
-          description="Show ChatGPT recommendations in Library and allow access to their Home row."
+          description="Include picks from ChatGPT in Recommendations."
         >
           <SettingsToggle
             label="Enable Smart Recommendations"
@@ -109,7 +109,7 @@ export function HomeSettingsSection() {
         </SettingsRow>
         <SettingsRow
           title="Recommendations on Home"
-          description="Maximum number of series shown in each recommendation row on Home."
+          description="Maximum number of series shown in Recommendations on Home."
         >
           <Select
             value={recommendationsHomeLimit}

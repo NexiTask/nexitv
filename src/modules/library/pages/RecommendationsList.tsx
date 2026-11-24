@@ -7,12 +7,15 @@ import { parseMediaDisplayTitle } from '@/modules/catalog/public/lib/titleParser
 import type { MediaItem } from '@/modules/catalog/public/model/media';
 import { useTmdbDetailEnrichment } from '@/modules/metadata/public/hooks/useTmdbDetailsEnrichment';
 import { desktopApi } from '@/platform/desktop';
+import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
 import { tauriApi, type SeriesRecommendationKind } from '@/platform/tauri';
 import { useI18n } from '@/shared/i18n/i18n';
 import { getErrorMessage } from '@/shared/lib/error';
 import { Button } from '@/shared/ui/Button';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import type { HistoryItem } from '../store/useLibraryStore';
+import { useAutomatedRecommendations } from '../data/useAutomatedRecommendations';
+import { mixSeriesRecommendations } from '../data/seriesRecommendations';
 import {
   chatGptAccountQueryKey,
   seriesRecommendationQueryKey,
@@ -67,8 +70,10 @@ export function RecommendationsList({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const desktop = desktopApi.isDesktop();
+  const smartEnabled = useSettingsStore((state) => state.recommendationsEnabled);
+  const automated = useAutomatedRecommendations(next, true);
   const { accounts, activeId, permission, snapshot, catalogue, data, cards } =
-    useSeriesRecommendations(next, true, true);
+    useSeriesRecommendations(next, smartEnabled, true);
   const { createRequest, matchingGenres, hasCandidates } = data;
   const generate = useMutation({
     mutationKey: generateKey,
@@ -95,13 +100,14 @@ export function RecommendationsList({
       : undefined;
     return { ...card, reason: card.reason ?? reason };
   });
+  const recommendations = mixSeriesRecommendations(results, automated);
 
   return (
     <>
       <CatalogPageHeader
-        title="Smart Recommendations"
+        title="Recommendations"
         meta={
-          snapshot.data
+          smartEnabled && snapshot.data
             ? t('Last generated {date}', {
                 date: date(snapshot.data.generatedAt * 1000, {
                   dateStyle: 'medium',
@@ -111,58 +117,68 @@ export function RecommendationsList({
             : t('TV series')
         }
         actions={
-          <>
-            {desktop && accounts.isSuccess && !permission && (
-              <Button onClick={() => void navigate('/settings?section=general')}>
-                Connect ChatGPT
+          smartEnabled && (
+            <>
+              {desktop && accounts.isSuccess && !permission && (
+                <Button onClick={() => void navigate('/settings?section=general')}>
+                  Connect ChatGPT
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                disabled={!canGenerate}
+                onClick={() => activeId && generate.mutate(activeId)}
+              >
+                <Sparkles size={16} aria-hidden="true" />
+                <span>
+                  {generating
+                    ? t('Generating…')
+                    : snapshot.data
+                      ? t('Refresh recommendations')
+                      : t('Get recommendations')}
+                </span>
               </Button>
-            )}
-            <Button
-              variant="primary"
-              disabled={!canGenerate}
-              onClick={() => activeId && generate.mutate(activeId)}
-            >
-              <Sparkles size={16} aria-hidden="true" />
-              <span>
-                {generating
-                  ? t('Generating…')
-                  : snapshot.data
-                    ? t('Refresh recommendations')
-                    : t('Get recommendations')}
-              </span>
-            </Button>
-          </>
+            </>
+          )
         }
       />
       <div className={styles.content}>
-        <p className={styles.notice}>
-          {t(
-            'Generating shares watched and saved series titles and catalogue metadata with OpenAI and uses your ChatGPT plan.',
-          )}
-        </p>
-        {(generate.isError || snapshot.isError || accounts.isError || catalogue.isError) && (
-          <p role="alert" className={styles.notice}>
-            {getErrorMessage(
-              generate.error ?? snapshot.error ?? accounts.error ?? catalogue.error,
-              t('Could not load recommendations.'),
+        {smartEnabled && (
+          <p className={styles.notice}>
+            {t(
+              'Generating shares watched and saved series titles and catalogue metadata with OpenAI and uses your ChatGPT plan.',
             )}
           </p>
         )}
-        {results.length > 0 ? (
+        {smartEnabled &&
+          (generate.isError || snapshot.isError || accounts.isError || catalogue.isError) && (
+            <p role="alert" className={styles.notice}>
+              {getErrorMessage(
+                generate.error ?? snapshot.error ?? accounts.error ?? catalogue.error,
+                t('Could not load recommendations.'),
+              )}
+            </p>
+          )}
+        {recommendations.length > 0 ? (
           <ul className={styles.results}>
-            {results.map(({ key, item, kind, reason }) => (
-              <li key={key}>
+            {recommendations.map(({ source, card }) => (
+              <li key={card.item.id}>
                 <MediaCard
-                  item={item}
+                  item={card.item}
                   onClick={onOpen}
                   posterDetails={{
-                    description: (
-                      <>
-                        {reason && <p>{reason}</p>}
-                        <p>{t(labels[kind])}</p>
-                      </>
-                    ),
-                    action: kind === 'new' ? <Teaser item={item} /> : undefined,
+                    source,
+                    description:
+                      source === 'chatgpt' ? (
+                        <>
+                          {card.reason && <p>{card.reason}</p>}
+                          <p>{t(labels[card.kind])}</p>
+                        </>
+                      ) : undefined,
+                    action:
+                      source === 'chatgpt' && card.kind === 'new' ? (
+                        <Teaser item={card.item} />
+                      ) : undefined,
                   }}
                 />
               </li>
@@ -173,11 +189,13 @@ export function RecommendationsList({
             icon={Sparkles}
             title={generating ? 'Finding series for you' : 'No recommendations to show'}
             description={
-              snapshot.isFetching || catalogue.isLoading
-                ? 'Loading series and saved recommendations…'
-                : snapshot.data
-                  ? 'Refresh to get picks from your current sources and viewing activity.'
-                  : 'Generate recommendations from your favorites, viewing activity, and available series.'
+              !smartEnabled
+                ? 'Save a series to your library to see it here before you start watching.'
+                : snapshot.isFetching || catalogue.isLoading
+                  ? 'Loading series and saved recommendations…'
+                  : snapshot.data
+                    ? 'Refresh to get picks from your current sources and viewing activity.'
+                    : 'Generate recommendations from your favorites, viewing activity, and available series.'
             }
           />
         )}
