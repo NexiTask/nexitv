@@ -127,7 +127,7 @@ async fn fetch_media_response(
     client: &reqwest::Client,
     mut url: url::Url,
     mut headers: reqwest::header::HeaderMap,
-) -> Result<reqwest::Response, String> {
+) -> Result<(reqwest::Response, reqwest::header::HeaderMap), String> {
     const MAX_REDIRECTS: usize = 8;
     let mut redirects = 0;
     loop {
@@ -138,7 +138,7 @@ async fn fetch_media_response(
             .await
             .map_err(|_| "Could not download the media resource".to_string())?;
         if !matches!(response.status().as_u16(), 301 | 302 | 303 | 307 | 308) {
-            return Ok(response);
+            return Ok((response, headers));
         }
         if redirects == MAX_REDIRECTS {
             return Err("The media resource returned too many redirects".to_string());
@@ -166,6 +166,46 @@ async fn fetch_media_response(
     }
 }
 
+async fn resume_media_response(
+    client: &reqwest::Client,
+    previous: &reqwest::Response,
+    headers: &reqwest::header::HeaderMap,
+    offset: u64,
+    total: u64,
+) -> Result<reqwest::Response, String> {
+    use reqwest::header::{CONTENT_RANGE, ETAG, IF_RANGE, RANGE};
+
+    let interrupted = || "The media download was interrupted and could not resume".to_string();
+    let validator = previous
+        .headers()
+        .get(ETAG)
+        .filter(|value| value.as_bytes().starts_with(b"\"") && value.as_bytes().ends_with(b"\""))
+        .ok_or_else(interrupted)?;
+    let mut resume_headers = headers.clone();
+    resume_headers.remove(RANGE);
+    resume_headers.remove(IF_RANGE);
+    let response = client
+        .get(previous.url().clone())
+        .headers(resume_headers)
+        .header(RANGE, format!("bytes={offset}-"))
+        .header(IF_RANGE, validator.clone())
+        .send()
+        .await
+        .map_err(|_| interrupted())?;
+    let expected_range = format!("bytes {offset}-{}/{total}", total - 1);
+    if response.status() != reqwest::StatusCode::PARTIAL_CONTENT
+        || response
+            .headers()
+            .get(CONTENT_RANGE)
+            .and_then(|value| value.to_str().ok())
+            != Some(expected_range.as_str())
+        || response.headers().get(ETAG) != Some(validator)
+    {
+        return Err(interrupted());
+    }
+    Ok(response)
+}
+
 async fn run_media_download(
     app: tauri::AppHandle,
     manager: DownloadManager,
@@ -180,22 +220,36 @@ async fn run_media_download(
     let result = async {
         let url = validate_remote_url(&options.url)?;
         let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(300))
+            .connect_timeout(Duration::from_secs(30))
+            .read_timeout(Duration::from_secs(60))
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|error| format!("Could not initialize downloader: {error}"))?;
-        let response = tokio::time::timeout(
+        let (response, headers) = tokio::time::timeout(
             Duration::from_secs(300),
             fetch_media_response(&client, url, remote_headers(options.headers)?),
         )
         .await
         .map_err(|_| "The media server took too long to respond".to_string())??;
         if !response.status().is_success() {
-            return Err(format!("The media URL answered {}", response.status().as_u16()));
+            return Err(format!(
+                "The media URL answered {}",
+                response.status().as_u16()
+            ));
+        }
+        if response.status() == reqwest::StatusCode::PARTIAL_CONTENT {
+            return Err(
+                "The media server returned a partial file without a resume request".to_string(),
+            );
         }
         const MAX_MEDIA_BYTES: u64 = 50 * 1024 * 1024 * 1024;
-        if response.content_length().is_some_and(|length| length > MAX_MEDIA_BYTES) {
-            return Err("The media resource is larger than NexiTV's 50 GiB safety limit".to_string());
+        if response
+            .content_length()
+            .is_some_and(|length| length > MAX_MEDIA_BYTES)
+        {
+            return Err(
+                "The media resource is larger than NexiTV's 50 GiB safety limit".to_string(),
+            );
         }
         let target = download_target(
             &app,
@@ -211,28 +265,88 @@ async fn run_media_download(
         total_for_event = total_bytes;
         let mut downloaded_bytes = 0_u64;
         let mut last_emit = Instant::now() - Duration::from_secs(1);
-        emit_download_event(&app, DownloadStatusEvent { id: id.clone(), state: "downloading".to_string(), downloaded_bytes, total_bytes, path: None, error: None });
+        emit_download_event(
+            &app,
+            DownloadStatusEvent {
+                id: id.clone(),
+                state: "downloading".to_string(),
+                downloaded_bytes,
+                total_bytes,
+                path: None,
+                error: None,
+            },
+        );
         let mut response = response;
+        let mut resume_attempts = 0;
         loop {
             if control.cancelled.load(Ordering::Acquire) {
                 let _ = std::fs::remove_file(&partial);
-                emit_download_event(&app, DownloadStatusEvent { id: id.clone(), state: "cancelled".to_string(), downloaded_bytes, total_bytes, path: None, error: None });
+                emit_download_event(
+                    &app,
+                    DownloadStatusEvent {
+                        id: id.clone(),
+                        state: "cancelled".to_string(),
+                        downloaded_bytes,
+                        total_bytes,
+                        path: None,
+                        error: None,
+                    },
+                );
                 return Ok::<(), String>(());
             }
             while control.paused.load(Ordering::Acquire) {
-                emit_download_event(&app, DownloadStatusEvent { id: id.clone(), state: "paused".to_string(), downloaded_bytes, total_bytes, path: None, error: None });
+                emit_download_event(
+                    &app,
+                    DownloadStatusEvent {
+                        id: id.clone(),
+                        state: "paused".to_string(),
+                        downloaded_bytes,
+                        total_bytes,
+                        path: None,
+                        error: None,
+                    },
+                );
                 if control.cancelled.load(Ordering::Acquire) {
                     let _ = std::fs::remove_file(&partial);
-                    emit_download_event(&app, DownloadStatusEvent { id: id.clone(), state: "cancelled".to_string(), downloaded_bytes, total_bytes, path: None, error: None });
+                    emit_download_event(
+                        &app,
+                        DownloadStatusEvent {
+                            id: id.clone(),
+                            state: "cancelled".to_string(),
+                            downloaded_bytes,
+                            total_bytes,
+                            path: None,
+                            error: None,
+                        },
+                    );
                     return Ok::<(), String>(());
                 }
                 tokio::time::sleep(Duration::from_millis(150)).await;
             }
             let chunk = tokio::select! {
                 _ = tokio::time::sleep(Duration::from_millis(100)) => continue,
-                result = response.chunk() => result.map_err(|_| "The media download was interrupted".to_string())?,
+                result = response.chunk() => result,
             };
-            let Some(chunk) = chunk else { break };
+            let chunk = match chunk {
+                Ok(Some(chunk)) => chunk,
+                Ok(None) if total_bytes.unwrap_or(downloaded_bytes) == downloaded_bytes => break,
+                _ => {
+                    let total = total_bytes
+                        .filter(|total| downloaded_bytes > 0 && downloaded_bytes < *total)
+                        .filter(|_| resume_attempts < 2)
+                        .ok_or_else(|| "The media download was interrupted".to_string())?;
+                    resume_attempts += 1;
+                    response = resume_media_response(
+                        &client,
+                        &response,
+                        &headers,
+                        downloaded_bytes,
+                        total,
+                    )
+                    .await?;
+                    continue;
+                }
+            };
             if downloaded_bytes.saturating_add(chunk.len() as u64) > MAX_MEDIA_BYTES {
                 return Err("The media resource exceeded NexiTV's 50 GiB safety limit".to_string());
             }
@@ -240,21 +354,52 @@ async fn run_media_download(
             downloaded_bytes = downloaded_bytes.saturating_add(chunk.len() as u64);
             downloaded_for_event = downloaded_bytes;
             if last_emit.elapsed() >= Duration::from_millis(250) {
-                emit_download_event(&app, DownloadStatusEvent { id: id.clone(), state: "downloading".to_string(), downloaded_bytes, total_bytes, path: None, error: None });
+                emit_download_event(
+                    &app,
+                    DownloadStatusEvent {
+                        id: id.clone(),
+                        state: "downloading".to_string(),
+                        downloaded_bytes,
+                        total_bytes,
+                        path: None,
+                        error: None,
+                    },
+                );
                 last_emit = Instant::now();
             }
         }
         if control.cancelled.load(Ordering::Acquire) {
             let _ = std::fs::remove_file(&partial);
-            emit_download_event(&app, DownloadStatusEvent { id: id.clone(), state: "cancelled".to_string(), downloaded_bytes, total_bytes, path: None, error: None });
+            emit_download_event(
+                &app,
+                DownloadStatusEvent {
+                    id: id.clone(),
+                    state: "cancelled".to_string(),
+                    downloaded_bytes,
+                    total_bytes,
+                    path: None,
+                    error: None,
+                },
+            );
             return Ok::<(), String>(());
         }
         file.flush().map_err(|error| error.to_string())?;
         std::fs::rename(&partial, &target).map_err(|error| error.to_string())?;
         partial_for_cleanup = None;
-        emit_download_event(&app, DownloadStatusEvent { id: id.clone(), state: "completed".to_string(), downloaded_bytes: total_bytes.unwrap_or(downloaded_bytes), total_bytes: total_bytes.or(Some(downloaded_bytes)), path: Some(target.to_string_lossy().into_owned()), error: None });
+        emit_download_event(
+            &app,
+            DownloadStatusEvent {
+                id: id.clone(),
+                state: "completed".to_string(),
+                downloaded_bytes: total_bytes.unwrap_or(downloaded_bytes),
+                total_bytes: total_bytes.or(Some(downloaded_bytes)),
+                path: Some(target.to_string_lossy().into_owned()),
+                error: None,
+            },
+        );
         Ok::<(), String>(())
-    }.await;
+    }
+    .await;
 
     if let Err(error) = result {
         if let Some(partial) = partial_for_cleanup.as_ref() {
@@ -453,7 +598,8 @@ pub(crate) async fn download_media_delete(
 #[cfg(test)]
 mod tests {
     use super::{
-        fetch_media_response, resolve_delete_target, select_download_directory, valid_download_id,
+        fetch_media_response, resolve_delete_target, resume_media_response,
+        select_download_directory, valid_download_id,
     };
     use std::fs;
     use std::io::{BufRead, BufReader, Write};
@@ -519,7 +665,7 @@ mod tests {
         for name in ["authorization", "cookie", "x-provider-token", "referer"] {
             headers.insert(name, reqwest::header::HeaderValue::from_static("fixture"));
         }
-        let response = fetch_media_response(
+        let (response, _) = fetch_media_response(
             &client,
             format!("http://{provider_addr}/media").parse().unwrap(),
             headers,
@@ -528,6 +674,76 @@ mod tests {
         .unwrap();
         assert_eq!(response.bytes().await.unwrap().as_ref(), b"video");
         fixture.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn resumes_a_truncated_file_only_if_the_delivery_server_confirms_the_range_and_version() {
+        for (status, range, etag, resumable) in [
+            ("206 Partial Content", "bytes 3-5/6", "\"movie-v1\"", true),
+            ("206 Partial Content", "bytes 0-2/6", "\"movie-v1\"", false),
+            ("206 Partial Content", "bytes 3-5/6", "\"movie-v2\"", false),
+            ("200 OK", "bytes 3-5/6", "\"movie-v1\"", false),
+        ] {
+            let server = TcpListener::bind("127.0.0.1:0").unwrap();
+            let address = server.local_addr().unwrap();
+            let fixture = std::thread::spawn(move || {
+                for is_resume in [false, true] {
+                    let (mut stream, _) = server.accept().unwrap();
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(3)))
+                        .unwrap();
+                    let request = BufReader::new(&stream)
+                        .lines()
+                        .map(Result::unwrap)
+                        .take_while(|line| !line.is_empty())
+                        .collect::<Vec<_>>();
+                    if is_resume {
+                        assert!(request
+                            .iter()
+                            .any(|line| line.eq_ignore_ascii_case("range: bytes=3-")));
+                        assert!(request
+                            .iter()
+                            .any(|line| line.eq_ignore_ascii_case("if-range: \"movie-v1\"")));
+                        write!(stream, "HTTP/1.1 {status}\r\nContent-Range: {range}\r\nETag: {etag}\r\nContent-Length: 3\r\nConnection: close\r\n\r\ndef").unwrap();
+                    } else {
+                        write!(stream, "HTTP/1.1 200 OK\r\nETag: \"movie-v1\"\r\nContent-Length: 6\r\nConnection: close\r\n\r\nabc").unwrap();
+                    }
+                }
+            });
+
+            let client = reqwest::Client::builder()
+                .no_proxy()
+                .read_timeout(Duration::from_secs(3))
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .unwrap();
+            let (mut response, headers) = fetch_media_response(
+                &client,
+                format!("http://{address}/movie").parse().unwrap(),
+                reqwest::header::HeaderMap::new(),
+            )
+            .await
+            .unwrap();
+            let mut media = Vec::new();
+            let interrupted = loop {
+                match response.chunk().await {
+                    Ok(Some(chunk)) => media.extend_from_slice(&chunk),
+                    Ok(None) => break false,
+                    Err(_) => break true,
+                }
+            };
+            assert!(interrupted);
+            assert_eq!(media, b"abc");
+            let resume =
+                resume_media_response(&client, &response, &headers, media.len() as u64, 6).await;
+            if resumable {
+                media.extend_from_slice(&resume.unwrap().bytes().await.unwrap());
+                assert_eq!(media, b"abcdef");
+            } else {
+                assert!(resume.is_err());
+            }
+            fixture.join().unwrap();
+        }
     }
 
     #[test]
