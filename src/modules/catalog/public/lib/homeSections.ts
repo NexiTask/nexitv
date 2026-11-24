@@ -5,4 +5,5 @@ export { HOME_SECTION_LABELS } from '../../lib/homeSections';
 export type { HomeSectionId } from '../../lib/homeSections';
 export type { HomeSectionPref } from '../../lib/homeSections';
 export { moveHomeSection } from '../../lib/homeSections';
+export { migrateLegacyHomeOrder } from '../../lib/homeSections';
 export { sanitizeHomeSections } from '../../lib/homeSections';

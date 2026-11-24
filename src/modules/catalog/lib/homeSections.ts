@@ -19,8 +19,15 @@ export interface HomeSectionPref {
   enabled: boolean;
 }
 
-/** Display order matches NexiTV's original fixed Discover layout. */
-export const DEFAULT_HOME_SECTIONS: HomeSectionPref[] = HOME_SECTION_IDS.map((id) => ({
+const DEFAULT_HOME_ORDER: readonly HomeSectionId[] = [
+  'watchNext',
+  'upcoming',
+  'recommendations',
+  'continueWatching',
+  ...HOME_SECTION_IDS.slice(4),
+];
+
+export const DEFAULT_HOME_SECTIONS: HomeSectionPref[] = DEFAULT_HOME_ORDER.map((id) => ({
   id,
   enabled: true,
 }));
@@ -75,6 +82,8 @@ export function sanitizeHomeSections(value: unknown): HomeSectionPref[] {
     }
   }
 
+  if (result.length === 0) return DEFAULT_HOME_SECTIONS.map((section) => ({ ...section }));
+
   // A section the save predates goes right after the one that precedes it in
   // the default layout (Watch Next lands under Continue Watching), else last.
   HOME_SECTION_IDS.forEach((id, index) => {
@@ -84,6 +93,12 @@ export function sanitizeHomeSections(value: unknown): HomeSectionPref[] {
   });
 
   return result;
+}
+
+export function migrateLegacyHomeOrder(sections: HomeSectionPref[]): HomeSectionPref[] {
+  if (!HOME_SECTION_IDS.every((id, index) => sections[index]?.id === id)) return sections;
+  const byId = new Map(sections.map((section) => [section.id, section]));
+  return DEFAULT_HOME_ORDER.map((id) => byId.get(id) ?? { id, enabled: true });
 }
 
 export function moveHomeSection(

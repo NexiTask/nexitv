@@ -338,7 +338,6 @@ export function UpcomingReleaseCard({
             <h2 className={styles.sectionTitle} id="coming-up-heading">
               {t('Coming Up')}
             </h2>
-            <p className={styles.sectionSubtitle}>{t('The next release from each favorite')}</p>
           </div>
           <div className={styles.headerActions}>
             {displayedReleases.length > 1 && (

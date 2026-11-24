@@ -103,6 +103,7 @@ describe('saved next episodes', () => {
       currentTime: 0,
       lastWatchedAt: 2,
     };
+    const second: HistoryItem = { ...queued, id: 'show-c', title: 'Show C', lastWatchedAt: 1 };
     const resumed: HistoryItem = {
       ...queued,
       id: 'show-b',
@@ -110,13 +111,17 @@ describe('saved next episodes', () => {
       currentTime: 90,
       progressPercentage: 3,
     };
-    useLibraryStore.setState({ history: [queued, resumed], trackedSeries: {}, watched: [] });
+    useLibraryStore.setState({
+      history: [queued, resumed, second],
+      trackedSeries: {},
+      watched: [],
+    });
     const client = new QueryClient();
     const wrapper = ({ children }: { children: ReactNode }) =>
       createElement(QueryClientProvider, { client }, children);
     const { result } = renderHook(useWatchNext, { wrapper });
 
-    expect(result.current.items).toEqual([queued]);
+    expect(result.current.items).toEqual([queued, second]);
     expect(useLibraryStore.getState().history.filter((item) => !isQueuedEpisode(item))).toEqual([
       resumed,
     ]);
@@ -136,6 +141,17 @@ describe('saved next episodes', () => {
         ),
       ),
     );
+    expect(screen.getByRole('heading', { name: 'Show A' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Previous episode' }).hasAttribute('disabled')).toBe(
+      true,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Next episode' }));
+    expect(screen.getByRole('heading', { name: 'Show C' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Next episode' }).hasAttribute('disabled')).toBe(
+      true,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Previous episode' }));
+    expect(screen.getByRole('heading', { name: 'Show A' })).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'See all for Watch Next' }));
     expect(screen.getByRole('status', { name: 'Current path' }).textContent).toBe(
       '/library/watch-next',
@@ -143,8 +159,8 @@ describe('saved next episodes', () => {
     home.unmount();
 
     act(() => useLibraryStore.getState().dismissWatchNext(queued.id));
-    expect(result.current.items).toEqual([]);
-    expect(useLibraryStore.getState().history).toEqual([queued, resumed]);
+    expect(result.current.items).toEqual([second]);
+    expect(useLibraryStore.getState().history).toEqual([queued, resumed, second]);
   });
 
   it('updates the queue when a tracked series source becomes available', () => {

@@ -147,14 +147,6 @@
   margin-bottom: var(--space-2);
 }
 
-.pageSubtitle {
-  font-size: var(--font-size-subtitle);
-  font-weight: var(--font-weight-regular);
-  line-height: var(--line-height-normal);
-  color: var(--text-muted);
-  margin-bottom: var(--space-2);
-}
-
 .pageHeader {
   position: relative;
   z-index: var(--z-sidebar);
@@ -180,13 +172,8 @@
   min-width: 0;
 }
 
-.homeTitleGroup .pageTitle,
-.homeTitleGroup .pageSubtitle {
+.homeTitleGroup .pageTitle {
   margin-bottom: 0;
-}
-
-.homeTitleGroup .pageSubtitle {
-  color: var(--text-secondary);
 }
 
 .homeSearch {
@@ -307,10 +294,6 @@
 
   .pageTitle {
     font-size: var(--font-size-section);
-  }
-
-  .pageSubtitle {
-    font-size: var(--font-size-body);
   }
 }
 

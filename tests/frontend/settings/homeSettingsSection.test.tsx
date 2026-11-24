@@ -63,10 +63,10 @@ describe('Home layout settings', () => {
     await user.click(screen.getByRole('button', { name: 'Move Coming Up down' }));
 
     expect(useSettingsStore.getState().homeSections.map((s) => s.id)).toEqual([
-      'continueWatching',
-      'upcoming',
       'watchNext',
       'recommendations',
+      'upcoming',
+      'continueWatching',
       'recentMovies',
       'recentSeries',
       'popularMovies',
@@ -78,9 +78,9 @@ describe('Home layout settings', () => {
   it('disables the up arrow for the first row and the down arrow for the last row', () => {
     render(<HomeSettingsSection />);
 
-    expect(screen.getByRole('button', { name: 'Move Coming Up up' }).hasAttribute('disabled')).toBe(
-      true,
-    );
+    expect(
+      screen.getByRole('button', { name: 'Move Watch Next up' }).hasAttribute('disabled'),
+    ).toBe(true);
     expect(
       screen.getByRole('button', { name: 'Move Live TV Channels down' }).hasAttribute('disabled'),
     ).toBe(true);

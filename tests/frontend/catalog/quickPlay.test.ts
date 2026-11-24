@@ -142,6 +142,18 @@ describe('quick play from a card', () => {
     );
   });
 
+  it('does not substitute a different episode when a queued episode disappears', async () => {
+    expect(
+      await quickPlay(client(), {
+        ...series,
+        progressPercentage: 0,
+        seasonNum: 2,
+        episodeNum: 99,
+      }),
+    ).toBe(false);
+    expect(playStream).not.toHaveBeenCalled();
+  });
+
   it('hands M3U titles and provider failures back to the details sheet', async () => {
     expect(await quickPlay(client(), { ...movie, sourceId: 'm3u-1' })).toBe(false);
     xc.getVodInfo.mockRejectedValueOnce(new Error('timeout'));

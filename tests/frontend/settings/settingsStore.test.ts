@@ -182,7 +182,7 @@ describe('settings store', () => {
     });
   });
 
-  it('resets metadata and release schedule preferences to false by default', () => {
+  it('resets metadata and release schedule preferences to their defaults', () => {
     useSettingsStore.setState({
       tmdbEnabled: true,
       upcomingEnabled: true,
@@ -198,7 +198,7 @@ describe('settings store', () => {
     expect(useSettingsStore.getState()).toMatchObject({
       tmdbEnabled: false,
       upcomingEnabled: false,
-      upcomingHomeEnabled: false,
+      upcomingHomeEnabled: true,
       upcomingCountdownEnabled: false,
       upcomingCalendarEnabled: false,
       upcomingExactTimesEnabled: false,

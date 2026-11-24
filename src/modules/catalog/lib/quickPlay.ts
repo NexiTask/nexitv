@@ -111,14 +111,16 @@ async function playSeries(client: QueryClient, item: MediaItem): Promise<boolean
           String(episode.episode_num) === String(saved.episodeNum),
       ))
     : undefined;
-  const watchNextEpisode =
-    item.progressPercentage === 0 && item.seasonNum != null && item.episodeNum != null
-      ? ordered.find(
-          ({ season, episode }) =>
-            String(season) === String(item.seasonNum) &&
-            String(episode.episode_num) === String(item.episodeNum),
-        )
-      : undefined;
+  const isQueued =
+    item.progressPercentage === 0 && item.seasonNum != null && item.episodeNum != null;
+  const watchNextEpisode = isQueued
+    ? ordered.find(
+        ({ season, episode }) =>
+          String(season) === String(item.seasonNum) &&
+          String(episode.episode_num) === String(item.episodeNum),
+      )
+    : undefined;
+  if (isQueued && !watchNextEpisode) return false;
   const watchedIds = new Set(watched ?? []);
   const target =
     watchNextEpisode ??
