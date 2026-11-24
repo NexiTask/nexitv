@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Play } from 'lucide-react';
 import { parseMediaDisplayTitle } from '@/modules/catalog/public/lib/titleParser';
 import type { MediaItem } from '@/modules/catalog/public/model/media';
@@ -34,7 +34,6 @@ export function RecommendationTrailers({
 }: RecommendationTrailersProps) {
   const [selectedId, setSelectedId] = useState<string>();
   const [autoplayChoice, setAutoplayChoice] = useState<boolean>();
-  const stage = useRef<HTMLDivElement>(null);
   const motionPreference = useSettingsStore((state) => state.motionPreference);
   const [systemReducedMotion, setSystemReducedMotion] = useState(
     () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
@@ -57,24 +56,19 @@ export function RecommendationTrailers({
       key={selected.id}
       item={selected}
       autoplay={autoplay}
-      stage={stage}
       suspended={suspended}
       fullWidth={fullWidth}
       onAutoplayChange={setAutoplayChoice}
       onOpen={onOpen}
     />,
     selected.id,
-    (item) => {
-      setSelectedId(item.id);
-      stage.current?.scrollIntoView?.({ block: 'nearest' });
-    },
+    (item) => setSelectedId(item.id),
   );
 }
 
 function TrailerFeature({
   item,
   autoplay,
-  stage,
   suspended,
   fullWidth,
   onAutoplayChange,
@@ -82,13 +76,13 @@ function TrailerFeature({
 }: {
   item: MediaItem;
   autoplay: boolean;
-  stage: RefObject<HTMLDivElement | null>;
   suspended?: boolean | undefined;
   fullWidth?: boolean | undefined;
   onAutoplayChange: (enabled: boolean) => void;
   onOpen: (item: MediaItem) => void;
 }) {
   const { t } = useI18n();
+  const stage = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [documentVisible, setDocumentVisible] = useState(() => !document.hidden);
@@ -128,7 +122,7 @@ function TrailerFeature({
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [stage]);
+  }, []);
 
   useEffect(() => {
     const update = () => setDocumentVisible(!document.hidden);

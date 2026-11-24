@@ -69,12 +69,13 @@ it('plays one muted trailer in view, switches series and stops outside the viewp
   const endpoint = vi
     .spyOn(tauriApi, 'recommendationTrailerEndpoint')
     .mockResolvedValue('http://127.0.0.1:12345/trailers/fixture/');
+  const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
   const frame = () => document.querySelector('iframe');
   const open = vi.fn();
   render(
     <RecommendationTrailers items={items} onOpen={open}>
       {(preview, selectedId, select) => (
-        <>
+        <div data-testid="recommendations-page">
           {preview}
           {items.map((item) => (
             <button
@@ -86,7 +87,7 @@ it('plays one muted trailer in view, switches series and stops outside the viewp
               {item.title}
             </button>
           ))}
-        </>
+        </div>
       )}
     </RecommendationTrailers>,
   );
@@ -97,7 +98,15 @@ it('plays one muted trailer in view, switches series and stops outside the viewp
   setVisible(0.75);
   await waitFor(() => expect(frame()?.getAttribute('src')).toContain(ids.Dark));
 
-  fireEvent.click(screen.getByRole('button', { name: 'Fargo' }));
+  const page = screen.getByTestId('recommendations-page');
+  const poster = screen.getByRole('button', { name: 'Fargo' });
+  page.scrollTop = 180;
+  poster.focus();
+  fireEvent.click(poster);
+  expect(scrollIntoView).not.toHaveBeenCalled();
+  expect(screen.getByTestId('recommendations-page')).toBe(page);
+  expect(page.scrollTop).toBe(180);
+  expect(document.activeElement).toBe(poster);
   expect(frame()).toBeNull();
   setVisible(0.75);
   await waitFor(() => expect(frame()?.getAttribute('src')).toContain(ids.Fargo));
