@@ -148,7 +148,7 @@ export function useMediaContextMenus() {
       }
 
       if (!options?.isEpisode) {
-        const isSaved = state.savedItems.some((entry) => entry.id === item.id);
+        const isSaved = state.isSavedItem(item);
         items.push({
           id: 'save-library',
           label: t(

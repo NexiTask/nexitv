@@ -197,6 +197,47 @@ describe('application shell', () => {
     expect(window.location.pathname).toBe('/library/saved');
   });
 
+  it('shows saved provider versions as one title and removes them together', async () => {
+    await preloadRouteModule('/library');
+    const standard = {
+      id: 'dutton-standard',
+      type: 'series' as const,
+      title: '[SE] Dutton Ranch',
+      year: '2026',
+      posterUrl: '',
+      imdbId: 'tt34991493',
+      imdbRating: 8.2,
+      imdbVotes: 29000,
+    };
+    const fourK = {
+      id: 'dutton-4k',
+      type: 'series' as const,
+      title: '[SC-4K] Dutton Ranch (2026) (US)',
+      year: '2026',
+      posterUrl: '',
+    };
+    useLibraryStore.setState({ savedItems: [fourK, standard] });
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800);
+    window.history.replaceState({}, '', '/library/saved');
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText('1 item')).toBeTruthy();
+    act(() => useSettingsStore.getState().updateSetting('catalogGroupTitles', false));
+    expect(screen.getByText('2 items')).toBeTruthy();
+    expect(screen.getAllByRole('group', { name: 'Open Dutton Ranch' })).toHaveLength(2);
+    act(() => useSettingsStore.getState().updateSetting('catalogGroupTitles', true));
+    const card = screen.getByRole('group', { name: 'Open Dutton Ranch' });
+    expect(within(card).getByText('8.2')).toBeTruthy();
+    expect(useLibraryStore.getState().savedItems).toEqual([fourK, standard]);
+
+    await user.hover(card);
+    await user.click(within(card).getByRole('button', { name: 'More options' }));
+    await user.click(screen.getByText('Remove from Library'));
+    expect(screen.getByRole('heading', { name: 'No saved items' })).toBeTruthy();
+  });
+
   it('opens the saved custom list from the old Collections route and selects a new list by ID', async () => {
     await preloadRouteModule('/library');
     const collection = { id: 'weekend', name: 'Weekend', items: [] };

@@ -8,6 +8,7 @@ import {
 } from '@/modules/library/store/useLibraryStore';
 import { useNotificationStore } from '@/shared/notifications/useNotificationStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
+import { groupSavedTitles } from '@/modules/library/data/savedTitles';
 
 const movie = { id: 'movie-1', title: 'Movie', posterUrl: 'poster', type: 'vod' as const };
 
@@ -114,6 +115,37 @@ describe('library store', () => {
     expect(useLibraryStore.getState().isWatched(movie.id)).toBe(true);
     useLibraryStore.getState().toggleWatched(movie);
     expect(useLibraryStore.getState().isWatched(movie.id)).toBe(false);
+  });
+
+  it('recognizes started versions of a saved title without combining different releases', () => {
+    const show = {
+      id: 'show-one',
+      title: 'Show',
+      type: 'series' as const,
+      year: '2026',
+      posterUrl: '',
+      imdbId: 'tt1111111',
+    };
+    const translatedVersion = { ...show, id: 'show-language', title: 'Le feuilleton' };
+    const unidentifiedVersion = { ...show, id: 'show-4k', imdbId: undefined };
+    const remake = { ...unidentifiedVersion, id: 'show-remake', year: '2027' };
+    const differentShow = { ...show, id: 'different-show', imdbId: 'tt2222222' };
+    const store = useLibraryStore.getState();
+    store.toggleSavedItem(show);
+    expect(store.isSavedItem(translatedVersion)).toBe(true);
+    store.saveStartedTitle(unidentifiedVersion);
+    store.saveStartedTitle(remake);
+    store.saveStartedTitle(differentShow);
+    expect(useLibraryStore.getState().savedItems).toEqual([show, remake, differentShow]);
+    expect(store.isSavedItem(unidentifiedVersion)).toBe(false);
+    const anotherUnidentified = { ...unidentifiedVersion, id: 'unknown-show' };
+    expect(groupSavedTitles([unidentifiedVersion, anotherUnidentified])).toEqual([
+      unidentifiedVersion,
+      anotherUnidentified,
+    ]);
+    expect(
+      groupSavedTitles([show, translatedVersion, unidentifiedVersion, remake, differentShow]),
+    ).toEqual([show, unidentifiedVersion, remake, differentShow]);
   });
 
   it('saves newly watched movies and the series of a watched episode only once', () => {

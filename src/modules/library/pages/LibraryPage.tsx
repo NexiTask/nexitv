@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { VirtualizedGrid } from '@/modules/catalog/public/components/VirtualizedGrid';
 import { isQueuedEpisode, useLibraryStore } from '../store/useLibraryStore';
@@ -37,6 +37,7 @@ import { ContinueWatchingList } from './ContinueWatchingList';
 import { WatchNextList } from './WatchNextList';
 import { RecommendationsList } from './RecommendationsList';
 import { useI18n } from '@/shared/i18n/i18n';
+import { groupSavedTitles } from '../data/savedTitles';
 
 export function LibraryPage() {
   const { t, tn, number } = useI18n();
@@ -46,6 +47,11 @@ export function LibraryPage() {
   const resumeItems = history.filter((item) => !isQueuedEpisode(item));
   const watchNext = useWatchNext();
   const savedItems = useLibraryStore((state) => state.savedItems);
+  const groupTitles = useSettingsStore((state) => state.catalogGroupTitles);
+  const savedTitles = useMemo(
+    () => (groupTitles ? groupSavedTitles(savedItems) : savedItems),
+    [groupTitles, savedItems],
+  );
   const downloadCount = useDownloadStore((state) => state.jobs.length);
   const favorites = useLibraryStore((state) => state.favorites);
   const collections = useLibraryStore((state) => state.collections);
@@ -83,7 +89,7 @@ export function LibraryPage() {
       id: 'saved',
       name: 'Saved',
       icon: Bookmark,
-      items: savedItems,
+      items: savedTitles,
       emptyTitle: 'No saved items',
       emptyDescription: 'Use Add to Library to save an item here.',
     },

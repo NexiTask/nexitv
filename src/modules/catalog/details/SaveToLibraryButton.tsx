@@ -13,9 +13,7 @@ export function SaveToLibraryButton({
   activeClassName?: string | undefined;
 }) {
   const { t } = useI18n();
-  const isSaved = useLibraryStore((state) =>
-    state.savedItems.some((entry) => entry.id === item.id),
-  );
+  const isSaved = useLibraryStore((state) => state.isSavedItem(item));
   const toggleSavedItem = useLibraryStore((state) => state.toggleSavedItem);
   const isFavorite = useLibraryStore((state) => state.isFavorite(item.id));
   const label = t(

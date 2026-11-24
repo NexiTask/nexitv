@@ -48,9 +48,7 @@ export function MediaCardMenu({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const isSaved = useLibraryStore((state) =>
-    state.savedItems.some((entry) => entry.id === item.id),
-  );
+  const isSaved = useLibraryStore((state) => state.isSavedItem(item));
   const inFavorites = useLibraryStore((state) => state.isFavorite(item.id));
   const isFavorite = inFavorites || Boolean(item.isFavorite);
   const isWatched =

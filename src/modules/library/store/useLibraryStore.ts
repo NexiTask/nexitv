@@ -77,6 +77,8 @@ function createDebouncedStorage<T>(): PersistStorage<T> {
 }
 import type { MediaItem } from '@/modules/catalog/public/model/media';
 import { getDisplayTitle, getSeriesBaseTitle } from '@/modules/catalog/public/lib/titleParser';
+import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
+import { savedTitleVersions } from '../data/savedTitles';
 
 export interface HistoryItem extends MediaItem {
   progressPercentage: number;
@@ -202,6 +204,7 @@ interface LibraryState {
   addRecentChannel: (id: string) => void;
 
   toggleSavedItem: (item: MediaItem) => void;
+  isSavedItem: (item: MediaItem) => boolean;
   saveStartedTitle: (item: MediaItem) => void;
   addFavorite: (item: MediaItem) => void;
   removeFavorite: (id: string) => void;
@@ -265,17 +268,17 @@ function withoutPlaybackTransport<T extends MediaItem>(item: T): T {
   return safe as T;
 }
 
+function matchingSavedVersions(items: MediaItem[], item: MediaItem): readonly MediaItem[] {
+  return useSettingsStore.getState().catalogGroupTitles
+    ? savedTitleVersions(items, item)
+    : items.filter((entry) => entry.id === item.id);
+}
+
 function withSavedTitle(state: LibraryState, item?: MediaItem): MediaItem[] {
   if (item?.type !== 'vod' && item?.type !== 'series') return state.savedItems;
   const seriesId = item.type === 'series' ? item.seriesId : undefined;
   const id = seriesId || item.id;
-  if (
-    !id ||
-    state.savedItems.some((entry) => entry.id === id) ||
-    state.favorites.some((entry) => entry.id === id)
-  ) {
-    return state.savedItems;
-  }
+  if (!id) return state.savedItems;
   const title = seriesId
     ? {
         id,
@@ -293,7 +296,19 @@ function withSavedTitle(state: LibraryState, item?: MediaItem): MediaItem[] {
         progressPercentage: undefined,
         subtitle: undefined,
       });
+  if (
+    matchingSavedVersions(state.savedItems, title).length ||
+    matchingSavedVersions(state.favorites, title).length
+  ) {
+    return state.savedItems;
+  }
   return [...state.savedItems, title];
+}
+
+function withoutSavedVersions(items: MediaItem[], versions: readonly MediaItem[]): MediaItem[] {
+  if (!versions.length) return items;
+  const ids = new Set(versions.map((item) => item.id));
+  return items.filter((item) => !ids.has(item.id));
 }
 
 function sanitizedLibraryData(
@@ -458,11 +473,10 @@ export const useLibraryStore = create<LibraryState>()(
           removeFavorite(item.id);
           return;
         }
-        const isSaved = savedItems.some((entry) => entry.id === item.id);
+        const versions = matchingSavedVersions(savedItems, item);
+        const isSaved = versions.length > 0;
         set({
-          savedItems: isSaved
-            ? savedItems.filter((entry) => entry.id !== item.id)
-            : [...savedItems, item],
+          savedItems: isSaved ? withoutSavedVersions(savedItems, versions) : [...savedItems, item],
         });
         notify.info(
           isSaved ? 'Removed from Library' : 'Added to Library',
@@ -472,6 +486,8 @@ export const useLibraryStore = create<LibraryState>()(
           'library',
         );
       },
+
+      isSavedItem: (item) => matchingSavedVersions(get().savedItems, item).length > 0,
 
       saveStartedTitle: (item) =>
         set((state) => {
@@ -484,7 +500,10 @@ export const useLibraryStore = create<LibraryState>()(
         if (!exists) {
           set((state) => ({
             favorites: [...state.favorites, item],
-            savedItems: state.savedItems.filter((entry) => entry.id !== item.id),
+            savedItems: withoutSavedVersions(
+              state.savedItems,
+              matchingSavedVersions(state.savedItems, item),
+            ),
           }));
           notify.success(
             'Added to Favorites',
