@@ -2,9 +2,12 @@ import { CATALOG_GENRES, catalogGenreMask } from '@/modules/catalog/public/lib/c
 import { parseMediaDisplayTitle } from '@/modules/catalog/public/lib/titleParser';
 import type { MediaItem } from '@/modules/catalog/public/model/media';
 import type { UpcomingRelease } from '@/modules/guide/public/data/useUpcomingReleases';
-import type { SeriesRecommendationKind, SeriesRecommendationRequest } from '@/platform/tauri';
+import type {
+  RecommendationSeries,
+  SeriesRecommendationKind,
+  SeriesRecommendationRequest,
+} from '@/platform/tauri';
 import { isQueuedEpisode, type HistoryItem, type TrackedSeries } from '../store/useLibraryStore';
-import { rankDiscoveries } from './seriesDiscovery';
 
 interface Candidate {
   key: string;
@@ -15,6 +18,7 @@ interface Candidate {
 interface Inputs {
   catalogue: MediaItem[];
   favorites: MediaItem[];
+  saved?: MediaItem[] | undefined;
   history: HistoryItem[];
   trackedSeries: Record<string, TrackedSeries>;
   started: string[];
@@ -110,7 +114,7 @@ export function collectSeriesRecommendations(input: Inputs) {
   const seriesKey = seriesKeys([...excluded, ...catalogue]);
   const favoriteAnchors = uniqueSeries(favoriteSeries, seriesKey);
   const favoriteGenres = summarize(favoriteAnchors, input.categories);
-  const watchAnchors = uniqueSeries(recentlyViewed, seriesKey).slice(0, 32);
+  const watchAnchors = uniqueSeries(recentlyViewed, seriesKey).slice(0, 64);
   const watchingGenres = summarize(watchAnchors, input.categories);
   const seen = new Set(
     [...excluded, ...input.started.flatMap((id) => byId.get(id) ?? [])].map(seriesKey),
@@ -141,27 +145,45 @@ export function collectSeriesRecommendations(input: Inputs) {
   }
 
   function createRequest(): SeriesRecommendationRequest {
-    const signals = <T extends { item: MediaItem }>(candidate: T) => ({
-      ...candidate,
-      genres: genres(candidate.item, input.categories),
-    });
-    const rankedDiscoveries = rankDiscoveries(
-      discoveries.map(signals),
-      watchAnchors.map((item) => signals({ item })),
-      favoriteAnchors.slice(0, 32).map((item) => signals({ item })),
-      input.categories,
+    const library = uniqueSeries(
+      [
+        ...favoriteAnchors,
+        ...(input.saved ?? []).filter((item) => item.type === 'series').map(current),
+      ],
+      seriesKey,
     );
+    const details = (item: MediaItem): RecommendationSeries => {
+      const title = item.seriesTitle ?? item.title;
+      const { cleanTitle, releaseYear } = parseMediaDisplayTitle(title, item.year);
+      return {
+        localKey: JSON.stringify(['series', item.seriesId ?? item.id]),
+        title: (cleanTitle || title).slice(0, 200),
+        year: releaseYear ?? undefined,
+        genres: genres(item, input.categories),
+        description:
+          item.description
+            ?.replace(/<[^>]*>|https?:\/\/\S+/gi, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 360) || undefined,
+        imdbUrl:
+          item.imdbId && /^tt\d{7,10}$/.test(item.imdbId)
+            ? `https://www.imdb.com/title/${item.imdbId}/`
+            : undefined,
+      };
+    };
     return {
-      favorites: favoriteGenres,
-      watching: watchingGenres,
-      candidates: rankedDiscoveries
-        .slice(0, 16)
-        .map(({ key, kind, genres }) => ({ localKey: key, kind, genres })),
+      library: library.slice(0, 100).map(details),
+      watching: watchAnchors.map(details),
+      catalogue: discoveries.map(({ item, key }) => ({ ...details(item), localKey: key })),
     };
   }
 
-  function groupPicks(picks: { key: string; genreMatch: boolean }[]) {
-    const groups = new Map<string, Candidate & { genreMatch: boolean }>();
+  function groupPicks(picks: { key: string; genreMatch: boolean; reason?: string | undefined }[]) {
+    const groups = new Map<
+      string,
+      Candidate & { genreMatch: boolean; reason?: string | undefined }
+    >();
     for (const pick of picks) {
       const candidate = candidates.get(pick.key);
       if (!candidate) continue;
@@ -169,7 +191,12 @@ export function collectSeriesRecommendations(input: Inputs) {
       const group = groups.get(key);
       const preferred =
         !group || (group.kind !== 'new' && candidate.kind === 'new') ? candidate : group;
-      groups.set(key, { ...preferred, key, genreMatch: pick.genreMatch || !!group?.genreMatch });
+      groups.set(key, {
+        ...preferred,
+        key,
+        genreMatch: pick.genreMatch || !!group?.genreMatch,
+        reason: group?.reason ?? pick.reason,
+      });
     }
     return [...groups.values()];
   }

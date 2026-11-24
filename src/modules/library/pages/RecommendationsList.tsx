@@ -93,7 +93,7 @@ export function RecommendationsList({
           },
         )
       : undefined;
-    return { ...card, reason };
+    return { ...card, reason: card.reason ?? reason };
   });
 
   return (
@@ -137,7 +137,7 @@ export function RecommendationsList({
       <div className={styles.content}>
         <p className={styles.notice}>
           {t(
-            'Generating shares a genre summary and a shortlist of series types with OpenAI and uses your ChatGPT plan.',
+            'Generating shares watched and saved series titles and catalogue metadata with OpenAI and uses your ChatGPT plan.',
           )}
         </p>
         {(generate.isError || snapshot.isError || accounts.isError || catalogue.isError) && (

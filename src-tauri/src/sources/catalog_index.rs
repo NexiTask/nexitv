@@ -948,7 +948,7 @@ pub struct KeyRow {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImdbFacts {
-    id: String,
+    pub(crate) id: String,
     rating: Option<f64>,
     votes: Option<i64>,
 }

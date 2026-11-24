@@ -7,15 +7,24 @@ interface ChatGptConnectionStatus {
 
 export type SeriesRecommendationKind = 'discover' | 'new';
 
+export interface RecommendationSeries {
+  localKey: string;
+  title: string;
+  year?: string | undefined;
+  genres: readonly string[];
+  description?: string | undefined;
+  imdbUrl?: string | undefined;
+}
+
 export interface SeriesRecommendationRequest {
-  favorites: readonly string[];
-  watching: readonly string[];
-  candidates: { localKey: string; kind: SeriesRecommendationKind; genres: readonly string[] }[];
+  library: RecommendationSeries[];
+  watching: RecommendationSeries[];
+  catalogue: RecommendationSeries[];
 }
 
 interface SeriesRecommendationSnapshot {
   generatedAt: number;
-  picks: { key: string; genreMatch: boolean }[];
+  picks: { key: string; genreMatch: boolean; reason?: string | undefined }[];
 }
 
 export interface ImdbRefreshEvent {

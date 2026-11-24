@@ -1,4 +1,5 @@
 mod oauth;
+mod recommendation_catalogue;
 pub(crate) mod recommendations;
 mod store;
 

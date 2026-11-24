@@ -12,7 +12,7 @@ const series = (id: string, genre: string, added?: string): MediaItem => ({
 });
 
 describe('series recommendation inputs', () => {
-  it('learns genres from playback even without favorites and only sends eligible series', () => {
+  it('includes watched titles even without favorites and only offers eligible series for validation', () => {
     const inProgress = series('started show', 'Drama');
     const finished = series('finished show', 'Crime');
     const discovery = series('new show', 'Drama');
@@ -35,47 +35,38 @@ describe('series recommendation inputs', () => {
       today: '2026-11-24',
     });
     const request = input.createRequest();
-    expect(request.favorites).toEqual([]);
-    expect(request.watching).toEqual(['Crime', 'Drama']);
-    expect(request.candidates.map(({ kind }) => kind)).toEqual(['discover']);
-    expect(
-      request.candidates.map(({ localKey }) => input.candidates.get(localKey)?.item.id),
-    ).toEqual(['new show']);
+    expect(request.library).toEqual([]);
+    expect(request.watching.map(({ title, genres }) => ({ title, genres }))).toEqual([
+      { title: 'finished show', genres: ['Crime'] },
+      { title: 'started show', genres: ['Drama'] },
+    ]);
+    expect(request.catalogue.map(({ title }) => title)).toEqual(['new show']);
   });
 
-  it('prioritizes specific similarities to completed shows over unrelated recent entries', () => {
+  it('includes saved series and safe metadata and leaves comparison to the model', () => {
     const watched = {
       ...series('watched', 'Crime'),
       categoryId: 'crime',
       description:
         'Detectives investigate corruption inside a police precinct. A retired investigator returns to uncover the facts.',
     };
-    const alias = {
-      ...watched,
-      id: 'alternate-copy',
-      title: 'Another catalogue title',
-      rating: 10,
-    };
     const favorite = series('favorite', 'Comedy');
     const related = {
       ...series('related', 'Crime'),
       categoryId: 'crime',
-      description: 'Detectives in a local precinct uncover police corruption.',
+      imdbId: 'tt1234567',
+      imdbRating: 8,
+      description: '<p>Detectives uncover corruption.</p> https://example.test/private',
+      streamUrl: 'https://example.test/stream',
     };
-    const otherCrime = {
-      ...series('other-crime', 'Crime'),
-      categoryId: 'crime',
-      rating: 10,
-      description: 'Smugglers take over a seaside vacation town.',
-    };
-    const recent = { ...series('recent-comedy', 'Comedy', '1795478400'), rating: 10 };
     const generic = {
       ...series('generic', 'Drama'),
       description: 'Comedy and crime are words in the listing.',
     };
     const input = collectSeriesRecommendations({
-      catalogue: [watched, alias, favorite, otherCrime, recent, generic, related],
+      catalogue: [watched, favorite, generic, related],
       favorites: [favorite],
+      saved: [related],
       history: [],
       trackedSeries: { watched: { item: watched, lastWatchedAt: 1 } },
       started: ['watched'],
@@ -84,12 +75,17 @@ describe('series recommendation inputs', () => {
       categories: new Map(),
       today: '2026-11-24',
     });
-    const picks = input.createRequest().candidates;
-    expect(picks.map(({ localKey }) => input.candidates.get(localKey)?.item.id)).toEqual([
-      'related',
-      'other-crime',
-      'recent-comedy',
-    ]);
+    const request = input.createRequest();
+    expect(request.library.map(({ title }) => title)).toEqual(['favorite', 'related']);
+    expect(request.catalogue.map(({ title }) => title)).toEqual(['generic', 'related']);
+    expect(request.library[1]).toEqual({
+      title: 'related',
+      localKey: JSON.stringify(['series', 'related']),
+      genres: ['Crime'],
+      description: 'Detectives uncover corruption.',
+      imdbUrl: 'https://www.imdb.com/title/tt1234567/',
+      year: undefined,
+    });
   });
 });
 
@@ -152,7 +148,7 @@ it('filters all three viewing lists across catalogue copies while grouping other
     ].map((parts) => ({ key: JSON.stringify(parts), genreMatch: true })),
   );
   expect(cards.map(({ item }) => item.id)).toEqual(['judge-dub', 'remake']);
-  expect(input.createRequest().candidates.map(({ localKey }) => localKey)).toEqual([
+  expect(input.createRequest().catalogue.map(({ localKey }) => localKey)).toEqual([
     JSON.stringify(['series', 'judge']),
     JSON.stringify(['series', 'remake']),
   ]);

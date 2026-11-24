@@ -52,6 +52,8 @@ export function useSeriesRecommendations(
   }, [snapshot.data]);
   const loadCandidates = enabled && desktop && (prepareEmpty || savedSeriesIds.size > 0);
   const favorites = useLibraryStore((state) => state.favorites);
+  const saved = useLibraryStore((state) => state.savedItems);
+  const collections = useLibraryStore((state) => state.collections);
   const history = useLibraryStore((state) => state.history);
   const trackedSeries = useLibraryStore((state) => state.trackedSeries);
   const started = useLibraryStore((state) => state.startedSeries);
@@ -74,6 +76,10 @@ export function useSeriesRecommendations(
             )
           : [],
         favorites: loadCandidates ? favorites : [],
+        saved:
+          prepareEmpty && loadCandidates
+            ? [...saved, ...collections.flatMap(({ items }) => items)]
+            : [],
         history: loadCandidates ? history : [],
         trackedSeries: loadCandidates ? trackedSeries : {},
         started: loadCandidates ? started : [],
@@ -91,6 +97,8 @@ export function useSeriesRecommendations(
       catalogue.data,
       hideAdult,
       favorites,
+      saved,
+      collections,
       history,
       trackedSeries,
       started,
