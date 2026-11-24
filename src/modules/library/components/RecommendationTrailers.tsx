@@ -156,7 +156,7 @@ function TrailerFeature({
     videoId && wantsPlayback
       ? desktop
         ? endpoint && `${endpoint}${videoId}`
-        : `${YOUTUBE_EMBED}${videoId}?autoplay=1&mute=1&playsinline=1`
+        : `${YOUTUBE_EMBED}${videoId}?autoplay=1&mute=1&playsinline=1&controls=0`
       : undefined;
   useEffect(() => {
     if (!desktop || !embedUrl) return;
