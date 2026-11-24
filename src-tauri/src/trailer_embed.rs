@@ -80,7 +80,7 @@ fn player_page(id: &str, app_id: &str) -> Option<String> {
     Some(format!(
         r#"<!doctype html><html lang="en"><meta charset="utf-8"><title>YouTube trailer</title>
 <style>html,body,iframe{{margin:0;width:100%;height:100%;border:0;display:block;background:#000;overflow:hidden}}</style>
-<iframe id="player" title="YouTube trailer" src="{YOUTUBE}/embed/{id}?autoplay=1&amp;mute=1&amp;playsinline=1&amp;controls=0&amp;enablejsapi=1&amp;widget_referrer={widget_referrer}" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+<iframe id="player" title="YouTube trailer" src="{YOUTUBE}/embed/{id}?autoplay=1&amp;mute=1&amp;playsinline=1&amp;enablejsapi=1&amp;widget_referrer={widget_referrer}" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
 <script>
 function onYouTubeIframeAPIReady() {{
   new YT.Player('player', {{events: {{
@@ -104,7 +104,6 @@ mod tests {
         let page = player_page("ESEUoa-mz2c", "com.nexitv.desktop").unwrap();
         assert!(page.contains("https://www.youtube-nocookie.com/embed/ESEUoa-mz2c?"));
         assert!(page.contains("autoplay=1&amp;mute=1"));
-        assert!(page.contains("&amp;controls=0&amp;"));
         assert!(page.contains("widget_referrer=https%3A%2F%2Fcom.nexitv.desktop"));
         assert!(player_page("bad/path?id", "com.nexitv.desktop").is_none());
         assert!(player_page("ESEUoa-mz2c?x", "com.nexitv.desktop").is_none());
