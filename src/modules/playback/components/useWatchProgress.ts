@@ -5,7 +5,7 @@ import {
   useLibraryStore,
   type WatchProgress,
 } from '@/modules/library/public/store/useLibraryStore';
-import { usePlayerStore } from '../store/usePlayerStore';
+import { usePlayerStore, type PlayableStream } from '../store/usePlayerStore';
 import { findNextEpisode, type SeriesEpisodesBySeason } from '../lib/seriesNavigation';
 import {
   getSeriesBaseTitle,
@@ -14,6 +14,12 @@ import {
 } from '@/modules/catalog/public/lib/titleParser';
 import { getXtreamCredentials, useAuthStore } from '@/modules/sources/public/store/useAuthStore';
 import { getXtreamQueryScope } from '@/modules/sources/public/model/queryKeys';
+
+function playbackTitle(stream: PlayableStream): string {
+  return stream.type === 'series'
+    ? stream.seriesTitle || getSeriesBaseTitle(stream.title)
+    : parseMediaTitle(stream.title).cleanTitle;
+}
 
 export function useWatchProgress() {
   const activeStream = usePlayerStore((state) => state.activeStream);
@@ -26,6 +32,7 @@ export function useWatchProgress() {
   const queryClient = useQueryClient();
   const authScope = getXtreamQueryScope(activeStream?.sourceId, credentials);
   const lastSaveTimeRef = useRef(0);
+  const savedStreamRef = useRef<PlayableStream | null>(null);
   const addRecentChannel = useLibraryStore((state) => state.addRecentChannel);
   const liveChannelId = activeStream?.type === 'live' ? activeStream.id.toString() : null;
 
@@ -68,11 +75,7 @@ export function useWatchProgress() {
       }
     }
 
-    const cleanPlaybackTitle = parseMediaTitle(stream.title).cleanTitle;
-    const seriesTitle =
-      stream.type === 'series'
-        ? stream.seriesTitle || getSeriesBaseTitle(stream.title)
-        : cleanPlaybackTitle;
+    const seriesTitle = playbackTitle(stream);
     updateHistory({
       id: stream.id.toString(),
       seriesId: stream.seriesId?.toString(),
@@ -106,7 +109,35 @@ export function useWatchProgress() {
 
   useEffect(() => {
     if (!activeStream || (activeStream.type !== 'vod' && activeStream.type !== 'series')) return;
+    const saveStartedPlayback = (state: ReturnType<typeof usePlayerStore.getState>) => {
+      if (
+        activeStream === savedStreamRef.current ||
+        activeStream !== state.activeStream ||
+        state.playback.status !== 'playing' ||
+        state.playback.paused ||
+        !state.playback.hasPosition ||
+        (activeStream.type === 'series' && activeStream.seriesId == null)
+      ) {
+        return;
+      }
+      savedStreamRef.current = activeStream;
+      useLibraryStore.getState().saveStartedTitle({
+        id: activeStream.id.toString(),
+        title: playbackTitle(activeStream) || activeStream.title,
+        posterUrl: activeStream.posterUrl || '',
+        type: activeStream.type,
+        sourceId: activeStream.sourceId,
+        sourceItemId: activeStream.sourceItemId,
+        seriesId: activeStream.seriesId?.toString(),
+        seriesSourceItemId: activeStream.seriesSourceItemId?.toString(),
+        seriesPosterUrl: activeStream.seriesPosterUrl,
+        tags: activeStream.tags,
+        country: activeStream.country,
+      });
+    };
+    saveStartedPlayback(usePlayerStore.getState());
     const unsubscribe = usePlayerStore.subscribe((state) => {
+      saveStartedPlayback(state);
       const now = Date.now();
       if (now - lastSaveTimeRef.current > 3000 && state.currentTime > 0 && state.duration > 0) {
         lastSaveTimeRef.current = now;

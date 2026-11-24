@@ -210,7 +210,7 @@ export function MediaCardMenu({
                 run(event, () =>
                   isSeriesCard(item)
                     ? void setSeriesWatched(item, !isWatched)
-                    : useLibraryStore.getState().toggleWatched(item.id),
+                    : useLibraryStore.getState().toggleWatched(item),
                 )
               }
             >

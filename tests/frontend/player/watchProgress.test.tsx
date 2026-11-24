@@ -26,7 +26,13 @@ const credentials = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useLibraryStore.setState({ favorites: [], collections: [], history: [], watched: [] });
+  useLibraryStore.setState({
+    savedItems: [],
+    favorites: [],
+    collections: [],
+    history: [],
+    watched: [],
+  });
   usePlayerStore.getState().closePlayer();
   useAuthStore.setState({
     profiles: [
@@ -79,11 +85,30 @@ describe('watch progress integration', () => {
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     );
     const { result } = renderHook(() => useWatchProgress(), { wrapper });
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
+    act(() => {
+      const player = usePlayerStore.getState();
+      player.updateFromMpvEvent('vo-configured', true);
+      player.updateFromMpvEvent('time-pos', 0.5);
+    });
+    expect(useLibraryStore.getState().savedItems).toMatchObject([
+      {
+        id: 'series-1',
+        title: 'Show',
+        posterUrl: 'series-cover',
+        sourceId,
+        sourceItemId: 'series-raw',
+      },
+    ]);
+    expect(useLibraryStore.getState().history).toEqual([]);
+    const saved = useLibraryStore.getState().savedItems[0]!;
+    act(() => useLibraryStore.getState().toggleSavedItem(saved));
     act(() => {
       usePlayerStore.getState().updateFromMpvEvent('duration', 1000);
       usePlayerStore.getState().updateFromMpvEvent('time-pos', 200);
     });
     act(() => result.current());
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
 
     expect(useLibraryStore.getState().history[0]).toMatchObject({
       id: 'series-1',

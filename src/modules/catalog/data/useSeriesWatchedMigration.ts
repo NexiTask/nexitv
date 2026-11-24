@@ -31,7 +31,7 @@ export async function migrateWatchedSeries(): Promise<number> {
       const episodeIds = Object.values(data.episodes ?? {}).flatMap((episodes) =>
         episodes.map((episode) => xtreamItemId(sourceId, 'episode', episode.id)),
       );
-      library.setWatched(episodeIds, true, true);
+      library.setWatched(episodeIds, true, { quiet: true });
       library.setSeriesStarted(id, true, {
         id,
         title: data.info?.name ?? '',

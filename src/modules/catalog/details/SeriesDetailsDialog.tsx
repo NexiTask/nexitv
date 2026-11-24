@@ -441,7 +441,7 @@ function XtreamSeriesDetailsDialog({
 
   const handleToggleSeasonWatched = () => {
     const library = useLibraryStore.getState();
-    library.setWatched(seasonEpisodeIds, !seasonWatched);
+    library.setWatched(seasonEpisodeIds, !seasonWatched, { item: libraryItem });
     if (seasonWatched || !historyItem || !data?.episodes) return;
     // Continue Watching pointed into this season: move it on to the first
     // episode of the next season, or let the show go when this was the last.
@@ -710,7 +710,7 @@ function XtreamSeriesDetailsDialog({
                       type: 'series' as const,
                       streamUrl: resolveEpisodePlayback(episode, credentials)?.streamUrl || '',
                       httpHeaders: episode.http_headers,
-                      sourceId: episode.source_id,
+                      sourceId: episode.source_id || sourceId,
                       description: episode.info?.plot,
                       seriesId,
                       seriesSourceItemId: providerSeriesId,

@@ -191,7 +191,9 @@ export function useMediaContextMenus() {
             <Circle size={16} />
           ),
           action: () =>
-            isSeriesCard(item) ? void setSeriesWatched(item, !isW) : state.toggleWatched(item.id),
+            isSeriesCard(item) && !options?.isEpisode
+              ? void setSeriesWatched(item, !isW)
+              : state.toggleWatched(item),
         },
       );
 
@@ -329,7 +331,7 @@ export function useMediaContextMenus() {
           label: t('Mark as Finished'),
           icon: <CheckCircle size={16} color="var(--accent-foreground)" />,
           action: () => {
-            state.toggleWatched(item.id);
+            state.setWatched([item.id], true, { item });
             state.removeFromHistory(item.id);
           },
         },

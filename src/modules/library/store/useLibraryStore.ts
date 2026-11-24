@@ -76,7 +76,7 @@ function createDebouncedStorage<T>(): PersistStorage<T> {
   };
 }
 import type { MediaItem } from '@/modules/catalog/public/model/media';
-import { getDisplayTitle } from '@/modules/catalog/public/lib/titleParser';
+import { getDisplayTitle, getSeriesBaseTitle } from '@/modules/catalog/public/lib/titleParser';
 
 export interface HistoryItem extends MediaItem {
   progressPercentage: number;
@@ -202,14 +202,19 @@ interface LibraryState {
   addRecentChannel: (id: string) => void;
 
   toggleSavedItem: (item: MediaItem) => void;
+  saveStartedTitle: (item: MediaItem) => void;
   addFavorite: (item: MediaItem) => void;
   removeFavorite: (id: string) => void;
   isFavorite: (id: string) => boolean;
 
-  toggleWatched: (id: string) => void;
+  toggleWatched: (item: MediaItem) => void;
   isWatched: (id: string) => boolean;
   /** Marks many items (a season's episodes) at once, with one notice. */
-  setWatched: (ids: readonly string[], watched: boolean, quiet?: boolean) => void;
+  setWatched: (
+    ids: readonly string[],
+    watched: boolean,
+    options?: { quiet?: boolean; item?: MediaItem },
+  ) => void;
   /** Points the saved series entry at the episode to watch next,
    * or drops it when there is none (the show is finished). */
   advanceSeriesHistory: (
@@ -258,6 +263,37 @@ function withoutPlaybackTransport<T extends MediaItem>(item: T): T {
   delete safe.fallbacks;
   delete safe.catchupSource;
   return safe as T;
+}
+
+function withSavedTitle(state: LibraryState, item?: MediaItem): MediaItem[] {
+  if (item?.type !== 'vod' && item?.type !== 'series') return state.savedItems;
+  const seriesId = item.type === 'series' ? item.seriesId : undefined;
+  const id = seriesId || item.id;
+  if (
+    !id ||
+    state.savedItems.some((entry) => entry.id === id) ||
+    state.favorites.some((entry) => entry.id === id)
+  ) {
+    return state.savedItems;
+  }
+  const title = seriesId
+    ? {
+        id,
+        title: item.seriesTitle || getSeriesBaseTitle(item.title) || item.title,
+        posterUrl: item.seriesPosterUrl || item.posterUrl,
+        type: 'series' as const,
+        sourceId: item.sourceId,
+        sourceItemId: item.seriesSourceItemId ?? (item.id === id ? item.sourceItemId : undefined),
+        tags: item.tags,
+        country: item.country,
+      }
+    : withoutPlaybackTransport({
+        ...item,
+        progress: undefined,
+        progressPercentage: undefined,
+        subtitle: undefined,
+      });
+  return [...state.savedItems, title];
 }
 
 function sanitizedLibraryData(
@@ -437,6 +473,12 @@ export const useLibraryStore = create<LibraryState>()(
         );
       },
 
+      saveStartedTitle: (item) =>
+        set((state) => {
+          const savedItems = withSavedTitle(state, item);
+          return savedItems === state.savedItems ? state : { savedItems };
+        }),
+
       addFavorite: (item) => {
         const exists = get().favorites.some((f) => f.id === item.id);
         if (!exists) {
@@ -480,12 +522,14 @@ export const useLibraryStore = create<LibraryState>()(
 
       isFavorite: (id) => get().favorites.some((f) => f.id === id),
 
-      toggleWatched: (id) => {
+      toggleWatched: (item) => {
+        const { id } = item;
         const isCurrentlyWatched = (get().watched || []).includes(id);
         set((state) => ({
           watched: isCurrentlyWatched
             ? (state.watched || []).filter((wId) => wId !== id)
             : [...(state.watched || []), id],
+          savedItems: isCurrentlyWatched ? state.savedItems : withSavedTitle(state, item),
         }));
         notify.info(
           isCurrentlyWatched ? 'Marked as Unwatched' : 'Marked as Watched',
@@ -499,7 +543,7 @@ export const useLibraryStore = create<LibraryState>()(
 
       isWatched: (id) => (get().watched || []).includes(id),
 
-      setWatched: (ids, watched, quiet = false) => {
+      setWatched: (ids, watched, { quiet = false, item } = {}) => {
         const targets = new Set(ids);
         if (targets.size === 0) return;
         set((state) => {
@@ -508,6 +552,7 @@ export const useLibraryStore = create<LibraryState>()(
             watched: watched
               ? [...current, ...[...targets].filter((id) => !current.includes(id))]
               : current.filter((id) => !targets.has(id)),
+            savedItems: watched ? withSavedTitle(state, item) : state.savedItems,
           };
         });
         if (!quiet) {

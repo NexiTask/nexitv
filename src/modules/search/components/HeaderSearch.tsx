@@ -274,7 +274,7 @@ export function HeaderSearch({
 
   const handleToggleWatched = (event: React.MouseEvent, item: MediaItem) => {
     event.stopPropagation();
-    useLibraryStore.getState().toggleWatched(item.id);
+    useLibraryStore.getState().toggleWatched(item);
   };
 
   const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {

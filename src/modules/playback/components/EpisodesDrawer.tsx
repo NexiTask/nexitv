@@ -193,7 +193,11 @@ export function EpisodesDrawer() {
                   type: 'series' as const,
                   streamUrl: resolveEpisodePlayback(episode, credentials)?.streamUrl || '',
                   httpHeaders: episode.http_headers,
-                  sourceId: episode.source_id,
+                  sourceId: episode.source_id || activeStream.sourceId,
+                  seriesId: activeStream.seriesId?.toString(),
+                  seriesSourceItemId: activeStream.seriesSourceItemId?.toString(),
+                  seriesTitle: cleanSeriesTitle,
+                  seriesPosterUrl: activeStream.seriesPosterUrl,
                 };
 
                 return (

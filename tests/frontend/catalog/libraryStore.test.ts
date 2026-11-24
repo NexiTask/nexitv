@@ -107,12 +107,46 @@ describe('library store', () => {
     const store = useLibraryStore.getState();
     store.addFavorite(movie);
     store.addFavorite(movie);
-    store.toggleWatched(movie.id);
+    store.toggleWatched(movie);
 
     expect(useLibraryStore.getState().favorites).toEqual([movie]);
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
     expect(useLibraryStore.getState().isWatched(movie.id)).toBe(true);
-    useLibraryStore.getState().toggleWatched(movie.id);
+    useLibraryStore.getState().toggleWatched(movie);
     expect(useLibraryStore.getState().isWatched(movie.id)).toBe(false);
+  });
+
+  it('saves newly watched movies and the series of a watched episode only once', () => {
+    const store = useLibraryStore.getState();
+    const episode = {
+      id: 'episode-1',
+      type: 'series' as const,
+      title: 'Show S01E01',
+      posterUrl: 'still',
+      seriesId: 'show-1',
+      seriesTitle: 'Show',
+      seriesPosterUrl: 'cover',
+      seriesSourceItemId: '24',
+      sourceId: 'xtream-one',
+      streamUrl: 'https://stream.test/episode?token=secret',
+    };
+    store.toggleWatched(movie);
+    store.toggleWatched(episode);
+    store.setWatched(['episode-2'], true, { item: episode });
+    store.toggleWatched(movie);
+
+    expect(useLibraryStore.getState().watched).toEqual(['episode-1', 'episode-2']);
+    const saved = useLibraryStore.getState().savedItems;
+    expect(saved).toHaveLength(2);
+    expect(saved[0]).toMatchObject(movie);
+    expect(saved[1]).toMatchObject({
+      id: 'show-1',
+      title: 'Show',
+      posterUrl: 'cover',
+      sourceId: 'xtream-one',
+      sourceItemId: '24',
+    });
+    expect(saved[1]).not.toHaveProperty('streamUrl');
   });
 
   it('ignores accidental starts without overwriting a real resume point', () => {
