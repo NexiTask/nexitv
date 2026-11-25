@@ -163,6 +163,20 @@ describe('MediaCard IMDb rating', () => {
     renderCard(movieItem);
     expect(screen.queryByText('IMDb')).toBeNull();
   });
+
+  it('shows a series rating alongside episode context', () => {
+    renderCard({
+      ...movieItem,
+      type: 'series',
+      seasonNum: 1,
+      episodeNum: 2,
+      subtitle: 'S1 E2',
+      imdbRating: 8.8,
+    });
+    expect(screen.getByText('IMDb')).toBeTruthy();
+    expect(screen.getByText('8.8')).toBeTruthy();
+    expect(screen.getByText('S1 E2')).toBeTruthy();
+  });
 });
 
 describe('MediaCard quick remove', () => {

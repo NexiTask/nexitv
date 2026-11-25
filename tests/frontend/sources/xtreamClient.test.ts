@@ -35,6 +35,43 @@ afterEach(() => {
 });
 
 describe('Xtream API client', () => {
+  it('reports catalog bytes for an identity-encoded response with a known size', async () => {
+    const data = new TextEncoder().encode('[{"stream_id":1}]');
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(data.slice(0, 8));
+        controller.enqueue(data.slice(8));
+        controller.close();
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(body, {
+          headers: { 'content-length': String(data.byteLength), 'content-encoding': 'identity' },
+        }),
+      ),
+    );
+    const reportProgress = vi.fn();
+
+    await expect(getVodStreams(credentials, undefined, undefined, reportProgress)).resolves.toEqual(
+      [{ stream_id: 1 }],
+    );
+    expect(reportProgress.mock.calls).toContainEqual([47]);
+    expect(reportProgress).toHaveBeenLastCalledWith(null);
+  });
+
+  it('keeps catalog loading indeterminate when the size or encoding is unknown', async () => {
+    const response = new Response('[]', { headers: { 'content-length': '2' } });
+    Object.defineProperty(response, 'type', { value: 'cors' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+    const reportProgress = vi.fn();
+    await expect(getVodStreams(credentials, undefined, undefined, reportProgress)).resolves.toEqual(
+      [],
+    );
+    expect(reportProgress).not.toHaveBeenCalled();
+  });
+
   it('builds encoded native stream URLs for each media type', () => {
     expect(getStreamUrl(credentials, 'live', 42)).toBe(
       'https://primary.test/live/alice%40example.com/p%2Fa%20ss/42.ts',

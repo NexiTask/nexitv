@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MotionConfig } from 'framer-motion';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { type M3uEntry, type M3uPlaylist } from '@/modules/sources/data/m3uClient';
 import { detailQueryKeys } from '@/modules/catalog/data/useDetails';
 import {
@@ -18,23 +18,18 @@ import type { EpgProgramme } from '@/modules/guide/data/useEpg';
 import type { XmltvGuide } from '@/modules/guide/data/xmltvClient';
 import { Sidebar } from '@/app/shell/Sidebar';
 import { WindowChrome } from '@/app/shell/WindowChrome';
-import { PageTransition } from '@/app/shell/PageTransition';
 import { MovieDetailsDialog } from '@/modules/catalog/details/MovieDetailsDialog';
 import { SeriesDetailsDialog } from '@/modules/catalog/details/SeriesDetailsDialog';
 import { M3uEditor } from '@/modules/m3u-editor/components/M3uEditor';
 import { PlayerShell } from '@/modules/playback/components/PlayerShell';
-import { DownloadsPage } from '@/modules/downloads/pages/DownloadsPage';
-import { CollectionsPage } from '@/modules/library/pages/CollectionsPage';
-import { ContinueWatchingPage } from '@/modules/library/pages/ContinueWatchingPage';
+import { LibraryPage } from '@/modules/library/pages/LibraryPage';
 import { EpgPage } from '@/modules/guide/pages/EpgPage';
 import { HomePage } from '@/modules/catalog/pages/HomePage';
-import { FavoritesPage } from '@/modules/library/pages/FavoritesPage';
 import { LiveTvPage } from '@/modules/catalog/pages/LiveTVPage';
 import { MoviesPage } from '@/modules/catalog/pages/MoviesPage';
 import { SearchPage } from '@/modules/search/pages/SearchPage';
 import { SeriesPage } from '@/modules/catalog/pages/SeriesPage';
 import { SettingsPage } from '@/modules/settings/pages/SettingsPage';
-import { UpcomingPage } from '@/modules/guide/pages/UpcomingPage';
 import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import {
   useAuthStore,
@@ -1237,20 +1232,23 @@ function Surface({ surface }: { surface: ReadmeSurface | ReadmeFeatureSurface })
   if (surface === 'hero' || surface === 'light-theme') return <HomePage />;
   if (surface === 'movies') return <MoviesPage />;
   if (surface === 'series') return <SeriesPage />;
-  if (surface === 'continue-watching') return <ContinueWatchingPage />;
-  if (surface === 'favorites') return <FavoritesPage />;
-  if (surface === 'collections') return <CollectionsPage />;
+  if (
+    surface === 'continue-watching' ||
+    surface === 'favorites' ||
+    surface === 'collections' ||
+    surface === 'upcoming' ||
+    surface === 'downloads'
+  ) {
+    return (
+      <Routes>
+        <Route path="/library/:listId" element={<LibraryPage />} />
+      </Routes>
+    );
+  }
   if (surface === 'not-found') return <NotFoundPage />;
   if (surface === 'live-tv') return <LiveTvPage />;
   if (surface === 'live-epg') return <EpgPage />;
-  if (surface === 'upcoming') return <UpcomingPage />;
   if (surface === 'search') return <SearchPage />;
-  if (surface === 'downloads')
-    return (
-      <PageTransition>
-        <DownloadsPage />
-      </PageTransition>
-    );
   if (surface === 'settings' || surface === 'playback-settings') return <SettingsPage />;
   if (surface === 'm3u-editor')
     return <M3uEditor initialSourceId={SOURCE_ID} onClose={() => undefined} />;
@@ -1390,9 +1388,9 @@ const ROUTES: Record<ReadmeSurface, string> = {
   hero: '/',
   movies: '/movies',
   series: '/series',
-  'continue-watching': '/continue',
-  favorites: '/favorites',
-  collections: '/collections',
+  'continue-watching': '/library/continue',
+  favorites: '/library/favorites',
+  collections: '/library/weekend',
   'not-found': '/does-not-exist',
   'live-tv': '/live',
   'live-epg': '/epg',
@@ -1400,11 +1398,11 @@ const ROUTES: Record<ReadmeSurface, string> = {
   'player-series': '/series',
   'library-details': '/movies',
   'series-details': '/series',
-  upcoming: '/upcoming',
+  upcoming: '/library/upcoming',
   search: '/search?q=dune',
   'm3u-editor': `/m3u-editor/${SOURCE_ID}`,
   'm3u-raw-editor': `/m3u-editor/${SOURCE_ID}`,
-  downloads: '/downloads',
+  downloads: '/library/downloads',
   settings: '/settings?section=sources',
   'playback-settings': '/settings?section=playback',
   'light-theme': '/',

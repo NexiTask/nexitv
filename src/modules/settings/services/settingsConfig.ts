@@ -120,6 +120,15 @@ export function sanitizeSettingsConfig(value: unknown): SettingsSnapshot {
       migrated.upcomingHistoryDays,
     ),
     homeSections: migrated.homeSections,
+    recommendationsEnabled: booleanOr(
+      source.recommendationsEnabled,
+      migrated.recommendationsEnabled,
+    ),
+    recommendationsHomeLimit: oneOf(
+      source.recommendationsHomeLimit,
+      [6, 8, 12] as const,
+      migrated.recommendationsHomeLimit,
+    ),
     streamFoldingEnabled: booleanOr(source.streamFoldingEnabled, migrated.streamFoldingEnabled),
     customTitleRules: migrated.customTitleRules,
     badgeVisibility: migrated.badgeVisibility,

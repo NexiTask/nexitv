@@ -2,7 +2,13 @@ import { perfLog, perfSync } from '@/platform/perf';
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { PageTransition } from '@/app/shell/PageTransition';
 import { HorizontalCarousel } from '@/modules/catalog/components/HorizontalCarousel';
-import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
+import { WatchNextFeature } from '../components/WatchNextFeature';
+import { usePlayerStore } from '@/modules/playback/public/store/usePlayerStore';
+import { isQueuedEpisode, useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
+import { useSeriesRecommendations } from '@/modules/library/public/data/useSeriesRecommendations';
+import { useAutomatedRecommendations } from '@/modules/library/public/data/useAutomatedRecommendations';
+import { mixSeriesRecommendations } from '@/modules/library/public/data/seriesRecommendations';
+import { RecommendationTrailers } from '@/modules/library/public/components/RecommendationTrailers';
 import {
   useSettingsStore,
   type HomeSectionId,
@@ -44,6 +50,7 @@ export function HomePage() {
   const { t, language } = useI18n();
   const sources = useEnabledSources();
   const history = useLibraryStore((state) => state.history);
+  const playing = usePlayerStore((state) => state.activeStream !== null);
   const removeFromHistoryById = useLibraryStore((state) => state.removeFromHistory);
   const removeFromHistory = useCallback(
     (item: MediaItem) => removeFromHistoryById(item.id),
@@ -52,6 +59,8 @@ export function HomePage() {
   const upcomingEnabled = useSettingsStore((state) => state.upcomingEnabled);
   const upcomingHomeEnabled = useSettingsStore((state) => state.upcomingHomeEnabled);
   const homeSections = useSettingsStore((state) => state.homeSections);
+  const recommendationsEnabled = useSettingsStore((state) => state.recommendationsEnabled);
+  const recommendationsHomeLimit = useSettingsStore((state) => state.recommendationsHomeLimit);
   const navigate = useNavigate();
   const hasSource = sources.isAvailable;
   const showUpcomingOnHome = upcomingEnabled && upcomingHomeEnabled;
@@ -59,26 +68,42 @@ export function HomePage() {
   const { selectedMovie, selectedSeries, handleCloseMovie, handleCloseSeries, handleItemClick } =
     useMediaDetailState();
 
-  const watchNext = useWatchNext();
-  const updateTrackedSeries = useLibraryStore((state) => state.updateTrackedSeries);
-  const watchNextItems = useMemo(
-    () =>
-      watchNext.slice(0, 20).map((h) => ({
-        ...h,
-        progress: undefined,
-        subtitle: historyCardSubtitle(h, language),
-      })),
-    [watchNext, language],
+  const { items: watchNext } = useWatchNext();
+  const showRecommendations = homeSections.some(
+    ({ id, enabled }) => id === 'recommendations' && enabled,
   );
+  const automatedItems = useAutomatedRecommendations(
+    watchNext,
+    showRecommendations,
+    recommendationsHomeLimit,
+  );
+  const { cards: recommendationCards } = useSeriesRecommendations(
+    watchNext,
+    showRecommendations && recommendationsEnabled,
+  );
+  const recommendations = mixSeriesRecommendations(recommendationCards, automatedItems).slice(
+    0,
+    recommendationsHomeLimit,
+  );
+  const recommendedItems = recommendations.map(({ card }) => card.item);
+  const recommendationDetails = new Map(
+    recommendations.map(({ source, card }) => [
+      card.item.id,
+      { source, description: source === 'chatgpt' ? card.reason : undefined },
+    ]),
+  );
+  const dismissWatchNextById = useLibraryStore((state) => state.dismissWatchNext);
+  const watchNextItems = watchNext.slice(0, 20);
   // Dismissed until the provider lists more episodes of that show.
   const dismissWatchNext = useCallback(
-    (item: MediaItem) => updateTrackedSeries(item.id, { muted: true, knownEpisodes: undefined }),
-    [updateTrackedSeries],
+    (item: MediaItem) => dismissWatchNextById(item.id),
+    [dismissWatchNextById],
   );
 
   const continueWatchingItems = useMemo(() => {
     if (!history || history.length === 0) return [];
-    return [...history]
+    return history
+      .filter((item) => !isQueuedEpisode(item))
       .sort((a, b) => b.lastWatchedAt - a.lastWatchedAt)
       .slice(0, 20)
       .map((h) => ({
@@ -170,7 +195,7 @@ export function HomePage() {
     void Promise.all(failedCatalogQueries.map((query) => query.refetch()));
   };
 
-  // Sections beyond Continue Watching and Coming Up always render once
+  // Catalogue rows always render once
   // enabled — they never had an item-count gate before this became
   // reorderable/toggleable, and users who bother to disable a row expect it
   // to actually be gone, not conditionally back the moment it has content.
@@ -178,6 +203,7 @@ export function HomePage() {
     upcoming: showUpcomingOnHome,
     continueWatching: continueWatchingItems.length > 0,
     watchNext: watchNextItems.length > 0,
+    recommendations: recommendations.length > 0,
     recentMovies: true,
     recentSeries: true,
     popularMovies: true,
@@ -195,7 +221,7 @@ export function HomePage() {
           <UpcomingReleaseCard
             key={id}
             onOpen={handleItemClick}
-            onViewAll={() => navigate('/upcoming')}
+            onViewAll={() => navigate('/library/upcoming')}
             showEmpty
           />
         );
@@ -208,23 +234,44 @@ export function HomePage() {
             title="Continue Watching"
             items={continueWatchingItems}
             onItemClick={handleItemClick}
-            onSeeAll={() => navigate('/continue')}
+            onSeeAll={() => navigate('/library/continue')}
             onRemoveItem={removeFromHistory}
             removeLabel="Remove from Continue Watching"
           />
         );
       case 'watchNext':
-        return loading ? (
-          <CarouselSkeleton key={id} title="Watch Next" />
-        ) : (
-          <HorizontalCarousel
+        return (
+          <WatchNextFeature
             key={id}
-            title="Watch Next"
             items={watchNextItems}
-            onItemClick={handleItemClick}
-            onRemoveItem={dismissWatchNext}
-            removeLabel="Remove from Watch Next"
+            suspended={playing || Boolean(selectedMovie || selectedSeries)}
+            onOpen={handleItemClick}
+            onSeeAll={() => navigate('/library/watch-next')}
+            onDismiss={dismissWatchNext}
           />
+        );
+      case 'recommendations':
+        return (
+          <RecommendationTrailers
+            key={id}
+            fullWidth
+            items={recommendedItems}
+            onOpen={handleItemClick}
+            suspended={playing || Boolean(selectedMovie || selectedSeries)}
+          >
+            {(preview, selectedId, select) => (
+              <HorizontalCarousel
+                title="Recommendations"
+                items={recommendedItems}
+                featuredPreview={preview}
+                previewItemId={selectedId}
+                getPosterDetails={(item) => recommendationDetails.get(item.id)}
+                onItemClick={select}
+                onViewDetails={handleItemClick}
+                onSeeAll={() => navigate('/library/recommendations')}
+              />
+            )}
+          </RecommendationTrailers>
         );
       case 'recentMovies':
         return loading ? (
@@ -298,9 +345,6 @@ export function HomePage() {
         <div className={`${styles.pageHeader} ${styles.homeHeader}`}>
           <div className={styles.homeTitleGroup}>
             <h1 className={styles.pageTitle}>{t('Home')}</h1>
-            <p className={styles.pageSubtitle}>
-              {t("Pick up where you left off and discover what's new")}
-            </p>
           </div>
           <div className={styles.homeSearch}>
             <HeaderSearch onItemClick={handleItemClick} placeholder="Search your library" />

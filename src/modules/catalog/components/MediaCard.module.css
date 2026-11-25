@@ -137,6 +137,54 @@
   visibility: visible;
 }
 
+.posterDetails {
+  background: rgba(var(--neutral-black-rgb), var(--alpha-90));
+  color: var(--text-media-primary);
+  justify-content: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  overflow: auto;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-control);
+}
+
+.posterDescription {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.posterDescription p {
+  margin: 0;
+}
+
+.recommendationBadge {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  border-radius: var(--radius-md);
+  background: var(--surface-media-control);
+  color: var(--text-media-primary);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.recommendationBadge + .posterBadgesRight {
+  top: calc(var(--control-height-sm) + var(--space-3));
+}
+
+.recommendationBadge ~ .posterDetails {
+  padding-top: calc(var(--control-height-sm) + var(--space-3));
+}
+
+.recommendationSource {
+  font-weight: var(--font-weight-semibold);
+}
+
 .topActions {
   display: flex;
   justify-content: flex-end;
@@ -892,4 +940,26 @@
   opacity: var(--alpha-90);
   letter-spacing: 0.2px;
   text-transform: uppercase;
+}
+.cardContainer[aria-current='true'] {
+  outline: 2px solid var(--accent-foreground);
+  outline-offset: 2px;
+}
+
+.cardContainer[aria-current='true']:focus-visible {
+  outline-color: var(--text-primary);
+}
+
+.cardContainer[aria-current] .posterDetails {
+  top: auto;
+  max-height: 64%;
+  background: linear-gradient(
+    to top,
+    rgba(var(--neutral-black-rgb), var(--alpha-90)) 82%,
+    transparent
+  );
+}
+
+.cardContainer[aria-current] .recommendationBadge ~ .posterDetails {
+  padding-top: var(--space-5);
 }

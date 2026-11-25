@@ -6,7 +6,13 @@ export type CatalogFacetTask =
   | { op: 'ranks'; payload: ArrayBuffer };
 
 export type CatalogFacetTaskResult =
-  | { op: 'facets'; ready: boolean; generation: number; facets: CatalogFacetRow[] }
+  | {
+      op: 'facets';
+      ready: boolean;
+      generation: number;
+      remaining: number | null;
+      facets: CatalogFacetRow[];
+    }
   | { op: 'ranks'; needed: boolean; token: string; ranks: Uint32Array };
 
 function decode<T>(payload: ArrayBuffer): T {
@@ -18,12 +24,14 @@ export function runCatalogFacetTask(task: CatalogFacetTask): CatalogFacetTaskRes
     const batch = decode<{
       ready: boolean;
       generation: number;
+      remaining?: number | null;
       rows: Array<[number, unknown]>;
     }>(task.payload);
     return {
       op: 'facets',
       ready: batch.ready,
       generation: batch.generation,
+      remaining: batch.remaining ?? null,
       facets: xtreamFacetRows(task.kind, task.sourceId, batch.rows),
     };
   }

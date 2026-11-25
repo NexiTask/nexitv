@@ -12,6 +12,7 @@ import {
 } from '@/modules/sources/public/data/xtreamClient';
 import type { XtreamCredentials } from '@/modules/sources/public/model/xtream';
 import { getXtreamQueryScope, queryKeys } from '@/modules/sources/public/model/queryKeys';
+import { saveWatchNextEpisodes } from './watchNextCache';
 
 export const detailQueryKeys = {
   vod: queryKeys.vodInfo,
@@ -64,19 +65,19 @@ export function seriesInfoQuery(
 ) {
   const resolvedSourceId = resolveXtreamSourceId(sourceId);
   const authScope = getXtreamQueryScope(resolvedSourceId, credentials);
+  const queryKey = detailQueryKeys.series(seriesId, authScope);
   return {
-    queryKey: detailQueryKeys.series(seriesId, authScope),
+    queryKey,
     queryFn: async ({ signal }: { signal: AbortSignal }): Promise<XtreamSeriesInfoResponse> => {
       const data = await getSeriesInfo(credentials!, seriesId!.toString(), signal);
-      return {
-        ...data,
-        episodes: Object.fromEntries(
-          Object.entries(data.episodes ?? {}).map(([season, episodes]) => [
-            season,
-            episodes.map((episode) => ({ ...episode, source_id: resolvedSourceId })),
-          ]),
-        ),
-      };
+      const episodes = Object.fromEntries(
+        Object.entries(data.episodes ?? {}).map(([season, list]) => [
+          season,
+          list.map((episode) => ({ ...episode, source_id: resolvedSourceId })),
+        ]),
+      );
+      if (!signal.aborted) saveWatchNextEpisodes(queryKey, episodes);
+      return { ...data, episodes };
     },
     staleTime: 1000 * 60 * 15,
     gcTime: 1000 * 60 * 30,

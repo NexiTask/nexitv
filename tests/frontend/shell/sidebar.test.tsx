@@ -1,71 +1,209 @@
 // @vitest-environment happy-dom
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { LiveTvViewToggle } from '@/modules/catalog/components/LiveTvViewToggle';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from '@/app/shell/Sidebar';
-import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
+import { useDownloadStore } from '@/modules/downloads/store/useDownloadStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
+import {
+  trackDataActivity,
+  type ReportDataProgress,
+  type ReportActivityDetail,
+} from '@/shared/lib/dataActivity';
 
-describe('Sidebar library counts', () => {
+function renderSidebar(path = '/') {
+  const client = new QueryClient();
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[path]}>
+        <Sidebar />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+describe('Sidebar', () => {
   const originalMatchMedia = window.matchMedia;
 
   beforeEach(() => {
-    useLibraryStore.setState({
-      history: [
-        {
-          id: 'history-1',
-          title: 'Movie',
-          type: 'vod',
-          posterUrl: '',
-          progressPercentage: 42,
-          lastWatchedAt: 1,
-        },
-      ],
-      favorites: [],
-      collections: [],
+    useDownloadStore.setState({ jobs: [] });
+    useDownloadStore
+      .getState()
+      .enqueue({ id: 'download', sourceUrl: 'https://media.test/video.mp4' });
+  });
+
+  it('shows ongoing data tasks above Settings and clears them as they finish', async () => {
+    useSettingsStore.setState({ sidebarCollapsed: false });
+    renderSidebar();
+
+    const settings = screen.getByRole('link', { name: 'Settings' });
+    const status = screen.getByRole('status');
+    let finishCatalog!: () => void;
+    let failIndex!: (error: Error) => void;
+    let reportIndex!: ReportDataProgress;
+    let reportIndexDetail!: ReportActivityDetail;
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      act(() => {
+        void trackDataActivity(
+          'guide',
+          () => new Promise<void>((resolve) => window.setTimeout(resolve, 100)),
+        );
+      });
+      await act(() => vi.advanceTimersByTimeAsync(100));
+      act(() => vi.advanceTimersByTime(400));
+      expect(status.textContent).toBe('');
+
+      let catalog!: Promise<void>;
+      let index!: Promise<void>;
+      act(() => {
+        catalog = trackDataActivity(
+          'catalog',
+          () =>
+            new Promise<void>((resolve) => {
+              finishCatalog = resolve;
+            }),
+        );
+        index = trackDataActivity(
+          'index',
+          (reportProgress, reportDetail) =>
+            new Promise<void>((_, reject) => {
+              failIndex = reject;
+              reportIndex = reportProgress;
+              reportIndexDetail = reportDetail;
+            }),
+        );
+      });
+      expect(status.textContent).toBe('');
+
+      act(() => vi.advanceTimersByTime(400));
+      expect(screen.getByText('Loading the provider catalog…')).toBeTruthy();
+      expect(screen.getByText('Preparing the library index…')).toBeTruthy();
+      expect(screen.queryByRole('progressbar')).toBeNull();
+      expect(status.nextElementSibling?.contains(settings)).toBe(true);
+
+      act(() => useSettingsStore.setState({ sidebarCollapsed: true }));
+      expect(screen.getByTitle('Loading the provider catalog…')).toBeTruthy();
+
+      act(() => {
+        reportIndex(25);
+        reportIndexDetail({ phase: 'index-titles', kind: 'vod', completed: 1000, total: 4000 });
+      });
+      const progress = screen.getByRole('progressbar', { name: 'Indexing titles…' });
+      expect(progress.getAttribute('aria-valuenow')).toBe('25');
+      expect(
+        screen
+          .getByTitle('Indexing titles… · 25% · Movies · 1,000 of 4,000 titles indexed')
+          .contains(progress),
+      ).toBe(true);
+      expect(screen.getByText('25%')).toBeTruthy();
+
+      await act(async () => {
+        finishCatalog();
+        await catalog;
+      });
+      expect(screen.queryByText('Loading the provider catalog…')).toBeNull();
+      expect(screen.getByRole('progressbar', { name: 'Indexing titles…' })).toBe(progress);
+      act(() => {
+        reportIndex(null);
+        reportIndexDetail({ phase: 'sort-titles', kind: 'vod' });
+      });
+      expect(screen.getByText('Preparing the library index…')).toBeTruthy();
+      expect(screen.getByText('Movies · Sorting titles by name')).toBeTruthy();
+      expect(screen.queryByRole('progressbar')).toBeNull();
+
+      await act(async () => {
+        const error = new Error('Index unavailable');
+        failIndex(error);
+        await expect(index).rejects.toBe(error);
+      });
+      expect(status.textContent).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows download progress above Settings and clears it after the transfer ends', () => {
+    useSettingsStore.setState({ sidebarCollapsed: false });
+    renderSidebar();
+    const activity = within(screen.getByRole('status'));
+    const settings = screen.getByRole('link', { name: 'Settings' });
+    expect(activity.queryByText('Downloading…')).toBeNull();
+
+    act(() =>
+      useDownloadStore.getState().sync({
+        id: 'download',
+        state: 'downloading',
+        downloadedBytes: 25,
+        totalBytes: 100,
+      }),
+    );
+    const progress = activity.getByRole('progressbar', { name: 'Downloading…' });
+    expect(progress.getAttribute('aria-valuenow')).toBe('25');
+    expect(activity.getByText('25%')).toBeTruthy();
+    expect(
+      progress.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    act(() => {
+      const store = useDownloadStore.getState();
+      store.enqueue({ id: 'second', sourceUrl: 'https://media.test/second.mp4' });
+      store.sync({ id: 'second', state: 'downloading', downloadedBytes: 0 });
     });
+    expect(activity.getByText('2 downloads')).toBeTruthy();
+    expect(activity.queryByRole('progressbar')).toBeNull();
+
+    act(() =>
+      useDownloadStore.getState().sync({
+        id: 'second',
+        state: 'downloading',
+        downloadedBytes: 175,
+        totalBytes: 300,
+      }),
+    );
+    expect(
+      activity.getByRole('progressbar', { name: 'Downloading…' }).getAttribute('aria-valuenow'),
+    ).toBe('50');
+
+    act(() => {
+      const store = useDownloadStore.getState();
+      store.sync({ id: 'second', state: 'completed', downloadedBytes: 300, totalBytes: 300 });
+      store.sync({ id: 'download', state: 'paused', downloadedBytes: 25, totalBytes: 100 });
+    });
+    expect(activity.queryByText('Downloading…')).toBeNull();
+    expect(activity.queryByRole('progressbar')).toBeNull();
   });
 
   it('shows a collapsed library count while announcing its full label', () => {
     useSettingsStore.setState({ sidebarCollapsed: true, showCollapsedSidebarBadges: true });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
-    const link = screen.getByRole('link', { name: 'Continue Watching, 1 item' });
-    expect(link.getAttribute('title')).toBe('Continue Watching (1)');
+    const link = screen.getByRole('link', { name: 'Library, 1 download' });
+    expect(link.getAttribute('title')).toBe('Library (1)');
     expect(link.querySelector('[class*="collapsedBadge"]')?.textContent).toBe('1');
   });
 
   it('can hide collapsed library counts without changing their accessible labels', () => {
     useSettingsStore.setState({ sidebarCollapsed: true, showCollapsedSidebarBadges: false });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
-    const link = screen.getByRole('link', { name: 'Continue Watching, 1 item' });
-    expect(link.getAttribute('title')).toBe('Continue Watching (1)');
+    const link = screen.getByRole('link', { name: 'Library, 1 download' });
+    expect(link.getAttribute('title')).toBe('Library (1)');
     expect(document.querySelector('aside')?.className).not.toContain('showCollapsedBadges');
   });
 
   it('shows the restrained inline count when the sidebar is expanded', () => {
     useSettingsStore.setState({ sidebarCollapsed: false });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
-    expect(screen.getByRole('link', { name: /Continue Watching/ }).textContent).toContain('1');
+    expect(screen.getByRole('link', { name: 'Library' }).textContent).toContain('1');
     // Seasonal decorations only rest on the full-width footer.
     expect(document.querySelector('[data-seasonal-decor="sidebar-footer"]')).toBeTruthy();
   });
@@ -73,11 +211,7 @@ describe('Sidebar library counts', () => {
   it('keeps collapsed navigation links accessible after their labels leave the rail', () => {
     useSettingsStore.setState({ sidebarCollapsed: true });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
     expect(screen.getByRole('link', { name: 'Home' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Settings' })).toBeTruthy();
@@ -86,11 +220,7 @@ describe('Sidebar library counts', () => {
   it('uses one explicit sidebar toggle and keeps the wordmark decorative', () => {
     useSettingsStore.setState({ sidebarCollapsed: false });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
     expect(screen.getByRole('complementary', { name: 'Primary navigation' })).toBeTruthy();
     expect(screen.getAllByRole('button', { name: 'Collapse sidebar' })).toHaveLength(1);
@@ -124,27 +254,26 @@ describe('Sidebar library counts', () => {
     return mediaQuery;
   }
 
-  it('hides the Coming Up workspace when its master preference is disabled', () => {
-    useSettingsStore.setState({ upcomingEnabled: false, sidebarCollapsed: false });
+  it('uses one Library link for its lists', () => {
+    useSettingsStore.setState({ upcomingEnabled: true, sidebarCollapsed: false });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar('/library/favorites');
 
-    expect(screen.queryByRole('link', { name: 'Coming Up' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Library' })).toBeNull();
+    const browse = within(screen.getByRole('navigation', { name: 'Browse' }));
+    const search = browse.getByRole('link', { name: 'Search' });
+    const library = browse.getByRole('link', { name: 'Library' });
+    expect(search.nextElementSibling).toBe(library);
+    expect(library.getAttribute('href')).toBe('/library');
+    expect(library.getAttribute('aria-current')).toBe('page');
+    expect(screen.queryByRole('link', { name: 'Downloads' })).toBeNull();
   });
 
   it('uses the compact rail without changing the saved normal-width preference', () => {
     setCompactViewport(true);
     useSettingsStore.setState({ sidebarCollapsed: false });
 
-    render(
-      <MemoryRouter>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar();
 
     expect(document.querySelector('aside')?.className).toContain('collapsed');
     expect(document.querySelector('[data-seasonal-decor]')).toBeNull();
@@ -167,11 +296,7 @@ describe('Live TV holds the guide', () => {
 
   it('has no separate TV Guide entry and stays highlighted on the guide', () => {
     useSettingsStore.setState({ liveTvView: 'guide' });
-    render(
-      <MemoryRouter initialEntries={['/epg']}>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderSidebar('/epg');
     expect(screen.queryByRole('link', { name: 'TV Guide' })).toBeNull();
     const live = screen.getByRole('link', { name: 'Live TV' });
     expect(live.getAttribute('href')).toBe('/epg');

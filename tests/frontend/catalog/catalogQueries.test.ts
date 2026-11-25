@@ -2,9 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseM3u } from '@/modules/sources/data/m3uClient';
 import { QueryClient } from '@tanstack/react-query';
 import { CATALOG_FRESH_MS } from '@/modules/catalog/data/catalogFreshness';
-import { catalogQueryOptions, selectFoldedLiveCatalog } from '@/modules/catalog/data/useCatalog';
+import {
+  catalogQueryOptions,
+  refreshProviderCatalogs,
+  selectFoldedLiveCatalog,
+} from '@/modules/catalog/data/useCatalog';
 import { queryKeys } from '@/modules/sources/model/queryKeys';
 import { categoriesQueryOptions } from '@/modules/catalog/data/useCategories';
+import { useDataActivities } from '@/shared/lib/dataActivity';
 import type { EnabledSourcesSnapshot } from '@/modules/sources/hooks/useEnabledSources';
 
 const xc = vi.hoisted(() => ({
@@ -22,7 +27,11 @@ const xc = vi.hoisted(() => ({
 
 vi.mock('@/modules/sources/data/xtreamClient', () => xc);
 
-const disk = vi.hoisted(() => ({ rememberProviderList: vi.fn(), loadProviderList: vi.fn() }));
+const disk = vi.hoisted(() => ({
+  rememberProviderList: vi.fn(),
+  loadProviderList: vi.fn(),
+  storeProviderList: vi.fn(),
+}));
 const desktop = vi.hoisted(() => ({ value: true }));
 vi.mock('@/modules/catalog/data/catalogDiskCache', () => disk);
 vi.mock('@/platform/desktop', async (importOriginal) => {
@@ -331,11 +340,51 @@ describe('source-scoped catalog and category queries', () => {
       client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
     });
 
+    it('refreshes the three provider lists directly and keeps previous data for a failed list', async () => {
+      const previous = [{ id: 'xtream-one:vod:7', sourceId: 'xtream-one', title: 'Saved Movie' }];
+      client.setQueryData(vodKey, previous);
+      const live = [{ stream_id: 4, name: 'New Channel' }];
+      const series = [{ series_id: 9, name: 'New Series' }];
+      xc.getLiveStreams.mockResolvedValue(live);
+      xc.getVodStreams.mockRejectedValue(new Error('Movies temporarily unavailable'));
+      xc.getSeries.mockResolvedValue(series);
+      const settled = vi.fn();
+      const started = vi.fn();
+
+      await expect(
+        refreshProviderCatalogs(
+          sources(),
+          { onListSettled: settled, onCatalogStarted: started },
+          client,
+        ),
+      ).resolves.toEqual(['Provider']);
+      expect(settled).toHaveBeenCalledTimes(3);
+      expect(started.mock.calls).toEqual([['live'], ['vod'], ['series']]);
+      expect(disk.loadProviderList).not.toHaveBeenCalled();
+      expect(disk.storeProviderList.mock.calls).toEqual([
+        ['xtream-one', 'live', 'xtream-scope', live],
+        ['xtream-one', 'series', 'xtream-scope', series],
+      ]);
+      expect(client.getQueryData(vodKey)).toEqual(previous);
+      expect(client.getQueryData(queryKeys.catalog('live', 'sources-scope'))).toMatchObject([
+        { title: 'New Channel' },
+      ]);
+    });
+
     it('keeps each provider list for the next start under its account scope', async () => {
-      xc.getVodStreams.mockResolvedValue(streams);
+      let resolveProvider!: (value: typeof streams) => void;
+      xc.getVodStreams.mockReturnValueOnce(
+        new Promise<typeof streams>((resolve) => {
+          resolveProvider = resolve;
+        }),
+      );
+      const request = runQuery<any[]>(catalogQueryOptions('vod', sources()));
 
-      await runQuery<any[]>(catalogQueryOptions('vod', sources()));
+      await vi.waitFor(() => expect(useDataActivities.getState().catalog).toBe(1));
+      resolveProvider(streams);
+      await request;
 
+      expect(useDataActivities.getState().catalog).toBe(0);
       expect(disk.rememberProviderList).toHaveBeenCalledWith(
         'xtream-one',
         'vod',

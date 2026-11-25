@@ -32,6 +32,8 @@ export interface UpcomingRelease {
 }
 
 export interface UpcomingReleaseOptions {
+  enabled?: boolean | undefined;
+  cachedOnly?: boolean | undefined;
   /** Restrict the batch to specific favorite ids while preserving the same
    * canonical search/detail caches used by the full Coming Up workspace. */
   favoriteIds?: readonly string[] | undefined;
@@ -162,7 +164,11 @@ export function useUpcomingReleases(hookOptions: UpcomingReleaseOptions = {}) {
   const language =
     tmdbLanguage === 'auto' ? uiLanguageDefinition(appLanguage).locale : tmdbLanguage;
   const enabled =
-    upcomingEnabled && tmdbEnabled && Boolean(tmdbApiKey.trim()) && trackedFavorites.length > 0;
+    hookOptions.enabled !== false &&
+    upcomingEnabled &&
+    tmdbEnabled &&
+    Boolean(tmdbApiKey.trim()) &&
+    trackedFavorites.length > 0;
   const options: TmdbRequestOptions = {
     language,
     includeAdult: tmdbIncludeAdult,
@@ -192,7 +198,7 @@ export function useUpcomingReleases(hookOptions: UpcomingReleaseOptions = {}) {
       historyDays,
       calendarDay,
     ),
-    enabled,
+    enabled: enabled && !hookOptions.cachedOnly,
     staleTime: DETAILS_STALE_TIME,
     retry: 1,
     // Show the last saved schedule immediately; a snapshot from an earlier day

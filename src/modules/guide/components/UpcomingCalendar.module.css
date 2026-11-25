@@ -218,7 +218,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 760px) {
+@container catalog-main (max-width: 760px) {
   .calendar {
     padding: var(--space-3);
   }
@@ -235,7 +235,7 @@
   }
 }
 
-@media (max-width: 500px) {
+@container catalog-main (max-width: 500px) {
   .header {
     align-items: flex-start;
     flex-direction: column;

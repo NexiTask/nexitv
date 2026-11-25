@@ -6,6 +6,7 @@ import {
   buildLogoAspectMenuItem,
   useMediaContextMenus,
 } from '@/modules/catalog/hooks/useMediaContextMenus';
+import { useLibraryStore } from '@/modules/library/store/useLibraryStore';
 import { useContextMenuStore } from '@/shared/ui/context-menu/useContextMenuStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
 
@@ -48,14 +49,21 @@ describe('media download actions', () => {
       clientY: 20,
     } as unknown as React.MouseEvent;
 
-    result.current.handleMediaCardContextMenu(event, {
-      id: 'episode-1',
-      title: 'Series - S01E01',
-      posterUrl: '',
-      type: 'series',
-      streamUrl: 'https://media.test/episode.mp4',
-    });
+    result.current.handleMediaCardContextMenu(
+      event,
+      {
+        id: 'episode-1',
+        title: 'Series - S01E01',
+        posterUrl: '',
+        type: 'series',
+        streamUrl: 'https://media.test/episode.mp4',
+      },
+      { isEpisode: true },
+    );
 
+    expect(useContextMenuStore.getState().items.some((item) => item.id === 'save-library')).toBe(
+      false,
+    );
     const downloadItem = useContextMenuStore
       .getState()
       .items.find((item) => item.id === 'download');
@@ -115,6 +123,11 @@ describe('media download actions', () => {
       posterUrl: 'https://example.com/arena.png',
       type: 'live',
     });
+
+    const save = useContextMenuStore.getState().items.find((item) => item.id === 'save-library');
+    expect(save?.label).toBe('Add to Library');
+    save?.action?.();
+    expect(useLibraryStore.getState().savedItems).toMatchObject([{ id: 'channel-arena-3' }]);
 
     const aspectMenu = useContextMenuStore
       .getState()

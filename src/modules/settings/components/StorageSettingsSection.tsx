@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { tauriApi } from '@/platform/tauri';
 import { desktopApi } from '@/platform/desktop';
 import { FolderOpen, RotateCcw } from 'lucide-react';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -18,6 +20,12 @@ import { useI18n } from '@/shared/i18n/i18n';
 export function StorageSettingsSection() {
   const { t } = useI18n();
   const settings = useSettingsStore();
+  const { data: defaultDownloadDirectory } = useQuery({
+    queryKey: ['download-default-directory'],
+    queryFn: tauriApi.downloadDefaultDirectory,
+    enabled: desktopApi.isDesktop(),
+    retry: false,
+  });
 
   useEffect(() => {
     startQueuedDownloads();
@@ -76,7 +84,11 @@ export function StorageSettingsSection() {
       >
         <SettingsRow
           title="Save Folder"
-          description="Use the folder picker for a native path, or enter an absolute path manually."
+          description={
+            defaultDownloadDirectory
+              ? t('Default download folder is {path}.', { path: defaultDownloadDirectory })
+              : 'Use the folder picker for a native path, or enter an absolute path manually.'
+          }
           wideControl
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>

@@ -15,6 +15,57 @@ beforeEach(() => {
 });
 
 describe('settings store', () => {
+  it('adds Recommendations when restoring a Home layout saved with version 15', async () => {
+    const savedLayout = [
+      { id: 'upcoming', enabled: true },
+      { id: 'watchNext', enabled: true },
+      { id: 'continueWatching', enabled: false },
+      { id: 'recentMovies', enabled: false },
+      { id: 'recentSeries', enabled: false },
+      { id: 'popularMovies', enabled: false },
+      { id: 'popularSeries', enabled: false },
+      { id: 'liveChannels', enabled: false },
+    ];
+    localStorage.setItem(
+      'iptv-settings-storage',
+      JSON.stringify({ version: 15, state: { homeSections: savedLayout } }),
+    );
+
+    await useSettingsStore.persist.rehydrate();
+
+    expect(useSettingsStore.getState().homeSections).toEqual([
+      ...savedLayout.slice(0, 2),
+      { id: 'recommendations', enabled: true },
+      ...savedLayout.slice(2),
+    ]);
+  });
+
+  it('merges saved recommendation rows and retains access from the last visited list', async () => {
+    localStorage.setItem(
+      'iptv-settings-storage',
+      JSON.stringify({
+        version: 17,
+        state: {
+          homeSections: [
+            { id: 'automatedRecommendations', enabled: true },
+            { id: 'recentSeries', enabled: true },
+            { id: 'recommendations', enabled: false },
+          ],
+          lastCollectionId: 'automated-recommendations',
+        },
+      }),
+    );
+    await useSettingsStore.persist.rehydrate();
+    const { homeSections, lastCollectionId } = useSettingsStore.getState();
+    expect(homeSections.filter(({ id }) => id.toLowerCase().includes('recommendations'))).toEqual([
+      { id: 'recommendations', enabled: true },
+    ]);
+    expect(homeSections.findIndex(({ id }) => id === 'recentSeries')).toBeLessThan(
+      homeSections.findIndex(({ id }) => id === 'recommendations'),
+    );
+    expect(lastCollectionId).toBe('recommendations');
+  });
+
   it('defaults and resets the interface theme to dark', () => {
     expect(useSettingsStore.getState().themePreference).toBe('dark');
     useSettingsStore.getState().updateSetting('themePreference', 'light');
@@ -131,7 +182,7 @@ describe('settings store', () => {
     });
   });
 
-  it('resets metadata and release schedule preferences to false by default', () => {
+  it('resets metadata and release schedule preferences to their defaults', () => {
     useSettingsStore.setState({
       tmdbEnabled: true,
       upcomingEnabled: true,
@@ -147,7 +198,7 @@ describe('settings store', () => {
     expect(useSettingsStore.getState()).toMatchObject({
       tmdbEnabled: false,
       upcomingEnabled: false,
-      upcomingHomeEnabled: false,
+      upcomingHomeEnabled: true,
       upcomingCountdownEnabled: false,
       upcomingCalendarEnabled: false,
       upcomingExactTimesEnabled: false,

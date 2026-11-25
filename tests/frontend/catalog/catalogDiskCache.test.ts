@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadProviderList, rememberProviderList } from '@/modules/catalog/data/catalogDiskCache';
+import {
+  loadProviderList,
+  rememberProviderList,
+  storeProviderList,
+} from '@/modules/catalog/data/catalogDiskCache';
 import { debugLog } from '@/modules/diagnostics/store/useDebugStore';
 
 const native = vi.hoisted(() => ({ catalogCacheStore: vi.fn(), catalogCacheLoad: vi.fn() }));
@@ -40,6 +44,17 @@ describe('rememberProviderList', () => {
     vi.advanceTimersByTime(10_000);
 
     expect(native.catalogCacheStore).not.toHaveBeenCalled();
+  });
+
+  it('replaces a queued cache write when the provider is refreshed explicitly', async () => {
+    vi.useFakeTimers();
+    rememberProviderList('xtream-one', 'vod', 'sources-abc', [{ stream_id: 1 }]);
+    await storeProviderList('xtream-one', 'vod', 'sources-abc', [{ stream_id: 2 }]);
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(native.catalogCacheStore.mock.calls).toEqual([
+      ['xtream-one', 'vod', 'sources-abc', '[{"stream_id":2}]'],
+    ]);
   });
 
   it('logs a failed save without disturbing the catalogue', async () => {

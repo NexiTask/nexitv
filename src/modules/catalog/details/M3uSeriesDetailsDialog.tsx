@@ -18,6 +18,8 @@ import {
   formatEpisodePlaybackTitle,
 } from '../lib/titleParser';
 import styles from './SeriesDetailsDialog.module.css';
+import type { MediaItem } from '../model/media';
+import { SaveToLibraryButton } from './SaveToLibraryButton';
 import { useI18n } from '@/shared/i18n/i18n';
 import { SeriesUpcomingEpisodes } from '@/modules/guide/public/components/SeriesUpcomingEpisodes';
 import { episodeScheduleKey } from '@/modules/guide/public/lib/upcoming';
@@ -64,6 +66,14 @@ export function M3uSeriesDetailsDialog({
   );
   const downloadedByLibraryId = useDownloadStore((state) => state.downloadedByLibraryId);
   const parsedSeries = parseMediaDisplayTitle(seriesTitle);
+  const libraryItem: MediaItem = {
+    id: seriesId,
+    sourceItemId: sourceItemId || seriesId,
+    sourceId,
+    title: parsedSeries.cleanTitle,
+    posterUrl: seriesPoster,
+    type: 'series',
+  };
   const [selectedSeason, setSelectedSeason] = useState('');
   const requestedEpisodeRef = useRef<HTMLButtonElement>(null);
   const positionedEpisodeRef = useRef(false);
@@ -258,21 +268,15 @@ export function M3uSeriesDetailsDialog({
                 </span>
               </button>
             )}
+            <SaveToLibraryButton
+              item={libraryItem}
+              className={styles.favoriteBtn}
+              activeClassName={styles.activeFavoriteBtn}
+            />
             <button
               type="button"
               className={`${styles.favoriteBtn} ${isFavorite ? styles.activeFavoriteBtn : ''}`}
-              onClick={() =>
-                isFavorite
-                  ? removeFavorite(seriesId)
-                  : addFavorite({
-                      id: seriesId,
-                      sourceItemId: sourceItemId || seriesId,
-                      sourceId,
-                      title: parsedSeries.cleanTitle,
-                      posterUrl: seriesPoster,
-                      type: 'series',
-                    })
-              }
+              onClick={() => (isFavorite ? removeFavorite(seriesId) : addFavorite(libraryItem))}
               aria-label={t(isFavorite ? 'Remove from favorites' : 'Add to favorites')}
               aria-pressed={isFavorite}
             >
@@ -356,7 +360,7 @@ export function M3uSeriesDetailsDialog({
                 availableEpisodeKeys={availableEpisodeKeys}
                 onViewSchedule={() => {
                   onClose();
-                  navigate('/upcoming');
+                  navigate('/library/upcoming');
                 }}
               />
             </div>

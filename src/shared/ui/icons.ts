@@ -9,14 +9,12 @@ import {
   Clapperboard,
   Clock3,
   Contrast,
-  Download,
   Film,
   Folder,
   Gauge,
   Grid3X3,
   HardDrive,
   Heart,
-  History,
   Home,
   Import,
   Keyboard,
@@ -64,8 +62,6 @@ export const RiClosedCaptioningFill = Captions;
 export const RiClosedCaptioningLine = Captions;
 export const RiContrastFill = Contrast;
 export const RiContrastLine = Contrast;
-export const RiDownload2Fill = Download;
-export const RiDownload2Line = Download;
 export const RiEqualizer3Fill = Gauge;
 export const RiEqualizer3Line = Gauge;
 export const RiFolderFill = Folder;
@@ -76,8 +72,6 @@ export const RiHardDrive2Fill = HardDrive;
 export const RiHardDrive2Line = HardDrive;
 export const RiHeartFill = Heart;
 export const RiHeartLine = Heart;
-export const RiHistoryFill = History;
-export const RiHistoryLine = History;
 export const RiHome5Fill = Home;
 export const RiHome5Line = Home;
 export const RiHomeLine = Home;

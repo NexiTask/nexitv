@@ -1,0 +1,126 @@
+.card:not(:empty) {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  padding: var(--space-2-5) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-size-control);
+  line-height: var(--line-height-tight);
+}
+
+.details {
+  flex: 1;
+  min-width: 0;
+}
+
+.heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.detail {
+  display: -webkit-box;
+  margin-top: var(--space-0-75);
+  color: var(--text-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-normal);
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.value {
+  flex: none;
+  min-inline-size: 5ch;
+  color: var(--text-primary);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.track {
+  height: var(--space-0-75);
+  margin-top: var(--space-1-5);
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-control-active);
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-foreground);
+  transform-origin: left;
+  transition: transform var(--duration-normal) var(--ease-standard);
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+.icon[data-state='working'] {
+  color: var(--accent-foreground);
+  animation: spin var(--duration-loop-normal) linear infinite;
+}
+
+.icon[data-state='complete'] {
+  color: var(--color-success);
+}
+
+.icon[data-state='error'] {
+  color: var(--color-warning);
+}
+
+.compact:not(:empty) {
+  padding-inline: var(--space-2);
+}
+
+.compact .row {
+  position: relative;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.compact .details {
+  display: contents;
+}
+
+.compact .heading,
+.compact .detail {
+  position: absolute;
+  width: var(--space-px);
+  height: var(--space-px);
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.compact .track {
+  width: 100%;
+  margin-top: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

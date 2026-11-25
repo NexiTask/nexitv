@@ -3,6 +3,8 @@ import { UI_LANGUAGE_DEFINITIONS, type UiLanguage } from '@/shared/i18n/config';
 import { ensureUiMessages } from '@/shared/i18n/i18n';
 import { Select } from '@/shared/ui/Select';
 import { SegmentedControl } from '@/shared/ui/SegmentedControl';
+import { desktopApi } from '@/platform/desktop';
+import { ChatGptSettingsGroup } from './ChatGptSettingsGroup';
 import {
   SettingsGroup,
   SettingsPageContent,
@@ -102,6 +104,7 @@ export function GeneralSettingsSection() {
           />
         </SettingsRow>
       </SettingsGroup>
+      {desktopApi.isDesktop() && <ChatGptSettingsGroup />}
     </SettingsPageContent>
   );
 }

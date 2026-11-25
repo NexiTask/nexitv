@@ -13,12 +13,15 @@ import {
   SettingsToggle,
 } from './SettingsControls';
 import { useI18n } from '@/shared/i18n/i18n';
+import { Select } from '@/shared/ui/Select';
 
 const rowControlsStyle = { display: 'flex', alignItems: 'center', gap: 'var(--space-2)' } as const;
 
 export function HomeSettingsSection() {
-  const { t } = useI18n();
+  const { t, number } = useI18n();
   const homeSections = useSettingsStore((state) => state.homeSections);
+  const recommendationsEnabled = useSettingsStore((state) => state.recommendationsEnabled);
+  const recommendationsHomeLimit = useSettingsStore((state) => state.recommendationsHomeLimit);
   const updateSetting = useSettingsStore((state) => state.updateSetting);
 
   const toggleSection = (id: HomeSectionId) => {
@@ -91,6 +94,34 @@ export function HomeSettingsSection() {
           <SettingsButton onClick={() => updateSetting('homeSections', DEFAULT_HOME_SECTIONS)}>
             <RotateCcw size={15} /> {t('Reset to Default')}
           </SettingsButton>
+        </SettingsRow>
+      </SettingsGroup>
+      <SettingsGroup title="Recommendations">
+        <SettingsRow
+          title="Enable Smart Recommendations"
+          description="Include picks from ChatGPT in Recommendations."
+        >
+          <SettingsToggle
+            label="Enable Smart Recommendations"
+            checked={recommendationsEnabled}
+            onChange={(checked) => updateSetting('recommendationsEnabled', checked)}
+          />
+        </SettingsRow>
+        <SettingsRow
+          title="Recommendations on Home"
+          description="Maximum number of series shown in Recommendations on Home."
+        >
+          <Select
+            value={recommendationsHomeLimit}
+            options={([6, 8, 12] as const).map((value) => ({
+              value,
+              label: number(value),
+              localize: false,
+            }))}
+            onChange={(value) => updateSetting('recommendationsHomeLimit', value)}
+            variant="settings"
+            ariaLabel="Maximum recommendations on Home"
+          />
         </SettingsRow>
       </SettingsGroup>
     </SettingsPageContent>

@@ -13,6 +13,27 @@ beforeEach(() => {
 });
 
 describe('Home layout settings', () => {
+  it('changes recommendation visibility and the Home card limit independently', async () => {
+    const user = userEvent.setup();
+    render(<HomeSettingsSection />);
+    await user.click(screen.getByRole('button', { name: 'Maximum recommendations on Home' }));
+    await user.click(screen.getByRole('option', { name: '12' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Show Recommendations' }));
+    expect(useSettingsStore.getState().recommendationsHomeLimit).toBe(12);
+    expect(useSettingsStore.getState().recommendationsEnabled).toBe(true);
+    expect(
+      useSettingsStore.getState().homeSections.find((section) => section.id === 'recommendations')
+        ?.enabled,
+    ).toBe(false);
+    await user.click(screen.getByRole('checkbox', { name: 'Enable Smart Recommendations' }));
+    expect(useSettingsStore.getState().recommendationsEnabled).toBe(false);
+    expect(
+      screen
+        .getByRole('button', { name: 'Maximum recommendations on Home' })
+        .hasAttribute('disabled'),
+    ).toBe(false);
+  });
+
   it('toggles a row off and back on', async () => {
     const user = userEvent.setup();
     render(<HomeSettingsSection />);
@@ -42,9 +63,10 @@ describe('Home layout settings', () => {
     await user.click(screen.getByRole('button', { name: 'Move Coming Up down' }));
 
     expect(useSettingsStore.getState().homeSections.map((s) => s.id)).toEqual([
-      'continueWatching',
-      'upcoming',
       'watchNext',
+      'recommendations',
+      'upcoming',
+      'continueWatching',
       'recentMovies',
       'recentSeries',
       'popularMovies',
@@ -56,9 +78,9 @@ describe('Home layout settings', () => {
   it('disables the up arrow for the first row and the down arrow for the last row', () => {
     render(<HomeSettingsSection />);
 
-    expect(screen.getByRole('button', { name: 'Move Coming Up up' }).hasAttribute('disabled')).toBe(
-      true,
-    );
+    expect(
+      screen.getByRole('button', { name: 'Move Watch Next up' }).hasAttribute('disabled'),
+    ).toBe(true);
     expect(
       screen.getByRole('button', { name: 'Move Live TV Channels down' }).hasAttribute('disabled'),
     ).toBe(true);

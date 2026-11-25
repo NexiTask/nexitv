@@ -129,6 +129,8 @@ export interface SettingsState {
 
   // Discover/home page layout
   homeSections: HomeSectionPref[];
+  recommendationsEnabled: boolean;
+  recommendationsHomeLimit: 6 | 8 | 12;
 
   // Title Normalization & Stream Folding
   streamFoldingEnabled: boolean;
@@ -328,6 +330,8 @@ export const SETTINGS_SNAPSHOT_KEYS = [
   'upcomingExactTimesEnabled',
   'upcomingHistoryDays',
   'homeSections',
+  'recommendationsEnabled',
+  'recommendationsHomeLimit',
   'streamFoldingEnabled',
   'customTitleRules',
   'badgeVisibility',

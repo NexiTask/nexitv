@@ -110,7 +110,7 @@ enabled channels, catalogues, categories, and guides in one workspace.
 
 **Library and offline use**
 
-- Save favorites, custom collections, watch history, and Continue Watching progress locally.
+- Use Add to Library to bookmark an item in Saved. Library also holds Continue Watching, Watch Next, Coming Up, Favorites, and custom lists.
 - Download movies and episodes with multi-threaded background transfers (1–8 parallel queues), pause, resume, retry, and file reveal.
 - Record live TV streams directly to the system Downloads folder with sandboxed path validation.
 

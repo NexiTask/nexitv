@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  Bookmark,
   Check,
   CheckCircle,
   ChevronRight,
@@ -16,7 +17,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
+import { isQueuedEpisode, useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import { notify } from '@/shared/notifications/useNotificationStore';
 import type { MediaItem } from '../model/media';
 import styles from './MediaCard.module.css';
@@ -47,12 +48,14 @@ export function MediaCardMenu({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const isFavorite =
-    useLibraryStore((state) => state.favorites.some((entry) => entry.id === item.id)) ||
-    Boolean(item.isFavorite);
+  const isSaved = useLibraryStore((state) => state.isSavedItem(item));
+  const inFavorites = useLibraryStore((state) => state.isFavorite(item.id));
+  const isFavorite = inFavorites || Boolean(item.isFavorite);
   const isWatched =
     useLibraryStore((state) => state.watched.includes(item.id)) || Boolean(item.isWatched);
-  const inHistory = useLibraryStore((state) => state.history.some((entry) => entry.id === item.id));
+  const inHistory = useLibraryStore((state) =>
+    state.history.some((entry) => entry.id === item.id && !isQueuedEpisode(entry)),
+  );
   const collections = useLibraryStore((state) => state.collections);
 
   const close = () => {
@@ -104,9 +107,8 @@ export function MediaCardMenu({
     const name = newCollectionName.trim();
     if (!name) return;
     const store = useLibraryStore.getState();
-    store.createCollection(name);
-    const collection = useLibraryStore.getState().collections.find((entry) => entry.name === name);
-    if (collection) useLibraryStore.getState().addToCollection(collection.id, item);
+    const collectionId = store.createCollection(name);
+    store.addToCollection(collectionId, item);
     setNewCollectionName('');
     close();
   };
@@ -167,6 +169,24 @@ export function MediaCardMenu({
               type="button"
               className={styles.menuItem}
               onClick={(event) =>
+                run(event, () => useLibraryStore.getState().toggleSavedItem(item))
+              }
+            >
+              <Bookmark size={14} fill={isSaved ? 'currentColor' : 'none'} />
+              <span>
+                {t(
+                  inFavorites
+                    ? 'Move to Saved'
+                    : isSaved
+                      ? 'Remove from Library'
+                      : 'Add to Library',
+                )}
+              </span>
+            </button>
+            <button
+              type="button"
+              className={styles.menuItem}
+              onClick={(event) =>
                 run(event, () => {
                   const store = useLibraryStore.getState();
                   if (isFavorite) store.removeFavorite(item.id);
@@ -188,7 +208,7 @@ export function MediaCardMenu({
                 run(event, () =>
                   isSeriesCard(item)
                     ? void setSeriesWatched(item, !isWatched)
-                    : useLibraryStore.getState().toggleWatched(item.id),
+                    : useLibraryStore.getState().toggleWatched(item),
                 )
               }
             >

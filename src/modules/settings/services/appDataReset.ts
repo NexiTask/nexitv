@@ -31,6 +31,7 @@ const PERSISTED_STORAGE_KEYS = [
   'movena-downloads-v1',
   'iptv-search-storage',
   'movena-stream-verification',
+  'nexitv-watch-next-episodes-v1',
   'movena-playback-recovery-v1',
   'movena-m3u-editor-filters-v1',
   TRANSFORM_PRESET_KEY,
@@ -77,7 +78,13 @@ export async function clearAllAppData(): Promise<void> {
     isInitializing: false,
     initializationError: null,
   });
-  useLibraryStore.setState({ favorites: [], collections: [], history: [], watched: [] });
+  useLibraryStore.setState({
+    savedItems: [],
+    favorites: [],
+    collections: [],
+    history: [],
+    watched: [],
+  });
   useDownloadStore.setState({ jobs: [] });
   useSearchStore.setState({ recentSearches: [] });
   useStreamVerificationStore.setState({ verifiedStreams: {} });

@@ -1,12 +1,15 @@
 mod app_data;
+mod chatgpt;
 mod credentials;
 mod downloads;
+mod loopback;
 mod metadata;
 mod perf;
 mod platform;
 mod player;
 mod posters;
 mod sources;
+mod trailer_embed;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -33,7 +36,15 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol(posters::SCHEME, posters::handle)
         .manage(player::NativePlayerManager::default())
         .manage(downloads::DownloadManager::default())
+        .manage(chatgpt::Connection::default())
         .invoke_handler(tauri::generate_handler![
+            chatgpt::chatgpt_status,
+            chatgpt::chatgpt_connect,
+            chatgpt::chatgpt_cancel,
+            chatgpt::chatgpt_disconnect,
+            chatgpt::recommendations::recommendations_cached,
+            chatgpt::recommendations::recommendations_generate,
+            trailer_embed::recommendation_trailer_endpoint,
             perf::perf_log,
             platform::commands::player_set_fullscreen,
             platform::commands::player_set_cursor_hidden,
@@ -51,6 +62,7 @@ pub fn run() {
             metadata::imdb::imdb_refresh_status,
             metadata::imdb::imdb_refresh_start,
             metadata::imdb::imdb_refresh_set_enabled,
+            downloads::download_default_directory,
             downloads::download_media_start,
             downloads::download_media_pause,
             downloads::download_media_resume,

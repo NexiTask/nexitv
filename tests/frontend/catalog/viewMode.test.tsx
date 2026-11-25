@@ -20,7 +20,11 @@ beforeEach(() => {
 
 describe('grid/list view per section', () => {
   it('names a section by its first path segment', () => {
-    expect(viewSection('/collections/abc')).toBe('collections');
+    expect(viewSection('/library/abc')).toBe('collections');
+    expect(viewSection('/library/favorites')).toBe('favorites');
+    expect(viewSection('/library/saved')).toBe('saved');
+    expect(viewSection('/library/continue')).toBe('continue');
+    expect(viewSection('/library/watch-next')).toBe('watch-next');
     expect(viewSection('/')).toBe('home');
   });
 
@@ -34,7 +38,7 @@ describe('grid/list view per section', () => {
     expect(series.result.current[0]).toBe('grid');
 
     useSettingsStore.getState().updateSetting('viewMode', 'list');
-    const favorites = renderHook(() => useViewMode(), { wrapper: at('/favorites') });
+    const favorites = renderHook(() => useViewMode(), { wrapper: at('/library/favorites') });
     expect(favorites.result.current[0]).toBe('list');
     expect(series.result.current[0]).toBe('list');
     act(() => series.result.current[1]('grid'));

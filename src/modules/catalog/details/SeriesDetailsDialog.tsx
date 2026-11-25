@@ -51,6 +51,7 @@ import {
 } from '@/modules/playback/public/lib/playback';
 import { xtreamItemId } from '@/modules/sources/public/lib/sourceIdentity';
 import { M3uSeriesDetailsDialog } from './M3uSeriesDetailsDialog';
+import { SaveToLibraryButton } from './SaveToLibraryButton';
 import { useI18n } from '@/shared/i18n/i18n';
 import { useNavigate } from 'react-router-dom';
 import { SeriesUpcomingEpisodes } from '@/modules/guide/public/components/SeriesUpcomingEpisodes';
@@ -136,18 +137,18 @@ function XtreamSeriesDetailsDialog({
   });
   const enriched = tmdb.details;
 
+  const libraryItem: MediaItem = {
+    id: seriesId,
+    title: seriesTitle,
+    posterUrl: seriesPoster,
+    type: 'series',
+    sourceItemId: providerSeriesId,
+    sourceId: Object.values(data?.episodes ?? {})[0]?.[0]?.source_id || sourceId,
+    description: data?.info?.plot,
+  };
   const toggleFavorite = () => {
     if (isFav) removeFavorite(seriesId);
-    else
-      addFavorite({
-        id: seriesId,
-        title: seriesTitle,
-        posterUrl: seriesPoster,
-        type: 'series',
-        sourceItemId: providerSeriesId,
-        sourceId: Object.values(data?.episodes ?? {})[0]?.[0]?.source_id || sourceId,
-        description: data?.info?.plot,
-      });
+    else addFavorite(libraryItem);
   };
 
   const [isRetryingDetails, setIsRetryingDetails] = useState(false);
@@ -440,7 +441,7 @@ function XtreamSeriesDetailsDialog({
 
   const handleToggleSeasonWatched = () => {
     const library = useLibraryStore.getState();
-    library.setWatched(seasonEpisodeIds, !seasonWatched);
+    library.setWatched(seasonEpisodeIds, !seasonWatched, { item: libraryItem });
     if (seasonWatched || !historyItem || !data?.episodes) return;
     // Continue Watching pointed into this season: move it on to the first
     // episode of the next season, or let the show go when this was the last.
@@ -618,6 +619,11 @@ function XtreamSeriesDetailsDialog({
                       <span>{t('Start Watching')}</span>
                     </button>
                   ) : null}
+                  <SaveToLibraryButton
+                    item={libraryItem}
+                    className={heroStyles.iconBtn}
+                    activeClassName={heroStyles.iconBtnActive}
+                  />
                   <button
                     type="button"
                     className={`${heroStyles.iconBtn} ${isFav ? heroStyles.iconBtnActive : ''}`}
@@ -704,7 +710,7 @@ function XtreamSeriesDetailsDialog({
                       type: 'series' as const,
                       streamUrl: resolveEpisodePlayback(episode, credentials)?.streamUrl || '',
                       httpHeaders: episode.http_headers,
-                      sourceId: episode.source_id,
+                      sourceId: episode.source_id || sourceId,
                       description: episode.info?.plot,
                       seriesId,
                       seriesSourceItemId: providerSeriesId,
@@ -756,6 +762,7 @@ function XtreamSeriesDetailsDialog({
                         onClick={() => handlePlayEpisode(episode)}
                         onContextMenu={(e) =>
                           handleMediaCardContextMenu(e, episodeItem, {
+                            isEpisode: true,
                             onPlay: () => handlePlayEpisode(episode),
                           })
                         }
@@ -828,7 +835,7 @@ function XtreamSeriesDetailsDialog({
                     availableEpisodeKeys={availableEpisodeKeys}
                     onViewSchedule={() => {
                       onClose();
-                      navigate('/upcoming');
+                      navigate('/library/upcoming');
                     }}
                   />
                 </div>

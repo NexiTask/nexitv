@@ -34,7 +34,7 @@ export async function setSeriesWatched(item: MediaItem, watched: boolean): Promi
     // Fall back to the series alone.
   }
   const library = useLibraryStore.getState();
-  library.setWatched(ids, watched);
+  library.setWatched(ids, watched, { item });
   library.setSeriesStarted(item.id, watched, item);
   if (watched) library.markSeriesSynced(item.id);
 }

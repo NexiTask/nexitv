@@ -8,6 +8,7 @@ import {
 } from '@/modules/library/store/useLibraryStore';
 import { useNotificationStore } from '@/shared/notifications/useNotificationStore';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
+import { groupSavedTitles } from '@/modules/library/data/savedTitles';
 
 const movie = { id: 'movie-1', title: 'Movie', posterUrl: 'poster', type: 'vod' as const };
 
@@ -26,6 +27,7 @@ beforeEach(() => {
   useSettingsStore.getState().resetSettings();
   useNotificationStore.setState({ notifications: [] });
   useLibraryStore.setState({
+    savedItems: [],
     favorites: [],
     collections: [],
     history: [],
@@ -36,16 +38,147 @@ beforeEach(() => {
 });
 
 describe('library store', () => {
+  it('persists saved items without stream transport and preserves custom lists when moving them', async () => {
+    const item = {
+      ...movie,
+      sourceId: 'm3u-source',
+      sourceItemId: 'item-1',
+      streamUrl: 'https://stream.test/movie?token=secret',
+      httpHeaders: { Authorization: 'secret' },
+      fallbacks: [{ streamUrl: 'https://stream.test/fallback' }],
+      catchupSource: 'https://stream.test/catchup',
+    };
+    const library = useLibraryStore.getState();
+    library.toggleSavedItem(item);
+    expect(useLibraryStore.getState().favorites).toEqual([]);
+    expect(useLibraryStore.getState().collections).toEqual([]);
+    window.dispatchEvent(new Event('beforeunload'));
+
+    const snapshot = JSON.parse(localStorage.getItem('iptv-library-storage')!);
+    const safeItem = { ...movie, sourceId: item.sourceId, sourceItemId: item.sourceItemId };
+    expect(snapshot.state.savedItems).toEqual([safeItem]);
+    useLibraryStore.setState({ savedItems: [] });
+    await useLibraryStore.persist.rehydrate();
+    expect(useLibraryStore.getState().savedItems).toEqual([safeItem]);
+
+    const list = library.createCollection('Weekend');
+    library.addToCollection(list, movie);
+    library.addFavorite(safeItem);
+    expect(useLibraryStore.getState()).toMatchObject({
+      savedItems: [],
+      favorites: [safeItem],
+      collections: [{ id: list, items: [movie] }],
+    });
+    library.removeFavorite(item.id);
+    library.removeFavorite(item.id);
+    expect(useLibraryStore.getState()).toMatchObject({
+      savedItems: [safeItem],
+      favorites: [],
+      collections: [{ id: list, items: [movie] }],
+    });
+    library.clearAllData();
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
+  });
+
+  it('keeps old favorites and discards overlapping or malformed saved entries during hydration', async () => {
+    localStorage.setItem(
+      'iptv-library-storage',
+      JSON.stringify({ version: 3, state: { favorites: [movie] } }),
+    );
+    await useLibraryStore.persist.rehydrate();
+    expect(useLibraryStore.getState().favorites).toEqual([movie]);
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
+
+    const savedOnly = { ...movie, id: 'saved-only' };
+    localStorage.setItem(
+      'iptv-library-storage',
+      JSON.stringify({
+        version: 4,
+        state: {
+          favorites: [movie],
+          savedItems: [null, 3, { id: 'no-title' }, movie, savedOnly, savedOnly],
+        },
+      }),
+    );
+    await useLibraryStore.persist.rehydrate();
+    expect(useLibraryStore.getState().favorites).toEqual([movie]);
+    expect(useLibraryStore.getState().savedItems).toEqual([savedOnly]);
+  });
   it('deduplicates favorites and toggles watched state', () => {
     const store = useLibraryStore.getState();
     store.addFavorite(movie);
     store.addFavorite(movie);
-    store.toggleWatched(movie.id);
+    store.toggleWatched(movie);
 
     expect(useLibraryStore.getState().favorites).toEqual([movie]);
+    expect(useLibraryStore.getState().savedItems).toEqual([]);
     expect(useLibraryStore.getState().isWatched(movie.id)).toBe(true);
-    useLibraryStore.getState().toggleWatched(movie.id);
+    useLibraryStore.getState().toggleWatched(movie);
     expect(useLibraryStore.getState().isWatched(movie.id)).toBe(false);
+  });
+
+  it('recognizes started versions of a saved title without combining different releases', () => {
+    const show = {
+      id: 'show-one',
+      title: 'Show',
+      type: 'series' as const,
+      year: '2026',
+      posterUrl: '',
+      imdbId: 'tt1111111',
+    };
+    const translatedVersion = { ...show, id: 'show-language', title: 'Le feuilleton' };
+    const unidentifiedVersion = { ...show, id: 'show-4k', imdbId: undefined };
+    const remake = { ...unidentifiedVersion, id: 'show-remake', year: '2027' };
+    const differentShow = { ...show, id: 'different-show', imdbId: 'tt2222222' };
+    const store = useLibraryStore.getState();
+    store.toggleSavedItem(show);
+    expect(store.isSavedItem(translatedVersion)).toBe(true);
+    store.saveStartedTitle(unidentifiedVersion);
+    store.saveStartedTitle(remake);
+    store.saveStartedTitle(differentShow);
+    expect(useLibraryStore.getState().savedItems).toEqual([show, remake, differentShow]);
+    expect(store.isSavedItem(unidentifiedVersion)).toBe(false);
+    const anotherUnidentified = { ...unidentifiedVersion, id: 'unknown-show' };
+    expect(groupSavedTitles([unidentifiedVersion, anotherUnidentified])).toEqual([
+      unidentifiedVersion,
+      anotherUnidentified,
+    ]);
+    expect(
+      groupSavedTitles([show, translatedVersion, unidentifiedVersion, remake, differentShow]),
+    ).toEqual([show, unidentifiedVersion, remake, differentShow]);
+  });
+
+  it('saves newly watched movies and the series of a watched episode only once', () => {
+    const store = useLibraryStore.getState();
+    const episode = {
+      id: 'episode-1',
+      type: 'series' as const,
+      title: 'Show S01E01',
+      posterUrl: 'still',
+      seriesId: 'show-1',
+      seriesTitle: 'Show',
+      seriesPosterUrl: 'cover',
+      seriesSourceItemId: '24',
+      sourceId: 'xtream-one',
+      streamUrl: 'https://stream.test/episode?token=secret',
+    };
+    store.toggleWatched(movie);
+    store.toggleWatched(episode);
+    store.setWatched(['episode-2'], true, { item: episode });
+    store.toggleWatched(movie);
+
+    expect(useLibraryStore.getState().watched).toEqual(['episode-1', 'episode-2']);
+    const saved = useLibraryStore.getState().savedItems;
+    expect(saved).toHaveLength(2);
+    expect(saved[0]).toMatchObject(movie);
+    expect(saved[1]).toMatchObject({
+      id: 'show-1',
+      title: 'Show',
+      posterUrl: 'cover',
+      sourceId: 'xtream-one',
+      sourceItemId: '24',
+    });
+    expect(saved[1]).not.toHaveProperty('streamUrl');
   });
 
   it('ignores accidental starts without overwriting a real resume point', () => {

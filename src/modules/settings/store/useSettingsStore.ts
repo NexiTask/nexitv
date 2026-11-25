@@ -6,7 +6,10 @@ import { COLOR_THEMES, type ColorTheme } from '@/shared/design/appearance';
 import { DEFAULT_RECORDING_DIRECTORY } from '@/modules/playback/public/lib/recording';
 import { isUiLanguage, isUiLocale } from '@/shared/i18n/config';
 import type { CustomTitleRule } from '@/modules/catalog/public/lib/titleParser';
-import { sanitizeHomeSections } from '@/modules/catalog/public/lib/homeSections';
+import {
+  migrateLegacyHomeOrder,
+  sanitizeHomeSections,
+} from '@/modules/catalog/public/lib/homeSections';
 import {
   SETTINGS_SNAPSHOT_KEYS,
   type BadgeVisibilitySettings,
@@ -254,11 +257,13 @@ const DEFAULT_SETTINGS = {
   tmdbImageSize: 'w500' as const,
   tmdbIncludeAdult: false,
   upcomingEnabled: false,
-  upcomingHomeEnabled: false,
+  upcomingHomeEnabled: true,
   upcomingCountdownEnabled: false,
   upcomingCalendarEnabled: false,
   upcomingExactTimesEnabled: false,
   homeSections: sanitizeHomeSections(undefined),
+  recommendationsEnabled: true,
+  recommendationsHomeLimit: 8 as const,
   upcomingHistoryDays: 7 as UpcomingHistoryDays,
 
   streamFoldingEnabled: true,
@@ -526,7 +531,9 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
     tmdbIncludeAdult: typeof state.tmdbIncludeAdult === 'boolean' ? state.tmdbIncludeAdult : false,
     upcomingEnabled: typeof state.upcomingEnabled === 'boolean' ? state.upcomingEnabled : false,
     upcomingHomeEnabled:
-      typeof state.upcomingHomeEnabled === 'boolean' ? state.upcomingHomeEnabled : false,
+      typeof state.upcomingHomeEnabled === 'boolean'
+        ? state.upcomingHomeEnabled
+        : DEFAULT_SETTINGS.upcomingHomeEnabled,
     upcomingCountdownEnabled:
       typeof state.upcomingCountdownEnabled === 'boolean' ? state.upcomingCountdownEnabled : false,
     upcomingCalendarEnabled:
@@ -542,6 +549,11 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
         ? state.upcomingHistoryDays
         : 7,
     homeSections: sanitizeHomeSections(state.homeSections),
+    recommendationsEnabled: state.recommendationsEnabled !== false,
+    recommendationsHomeLimit:
+      state.recommendationsHomeLimit === 6 || state.recommendationsHomeLimit === 12
+        ? state.recommendationsHomeLimit
+        : 8,
     streamFoldingEnabled:
       typeof state.streamFoldingEnabled === 'boolean' ? state.streamFoldingEnabled : true,
     customTitleRules: normalizeCustomTitleRules(state.customTitleRules),
@@ -600,7 +612,9 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
     catalogFilters: normalizeCatalogFilterSet(state.catalogFilters),
     lastCollectionId:
       typeof state.lastCollectionId === 'string' && state.lastCollectionId.length <= 512
-        ? state.lastCollectionId
+        ? state.lastCollectionId === 'automated-recommendations'
+          ? 'recommendations'
+          : state.lastCollectionId
         : null,
     epgZoomPercent: clampImageValue(state.epgZoomPercent, 50, 200, 100),
     m3uEditorDensity: state.m3uEditorDensity === 'compact' ? 'compact' : 'comfortable',
@@ -756,8 +770,12 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'iptv-settings-storage',
-      version: 15,
-      migrate: migrateSettingsState,
+      version: 19,
+      migrate: (persistedState, version) => {
+        const settings = migrateSettingsState(persistedState);
+        if (version < 19) settings.homeSections = migrateLegacyHomeOrder(settings.homeSections);
+        return settings;
+      },
       partialize: ({ tmdbApiKey: _tmdbApiKey, ...persistedState }) => persistedState,
     },
   ),

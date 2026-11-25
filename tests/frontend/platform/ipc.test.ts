@@ -146,9 +146,15 @@ describe('typed Tauri IPC wrapper', () => {
     ],
     [
       'catalogIndexFacetBatch',
-      ['xtream-one', 'vod', 'sources-abc', 4000],
+      ['xtream-one', 'vod', 'sources-abc', 4000, 7],
       'catalog_index_facet_batch',
-      { sourceId: 'xtream-one', kind: 'vod', scope: 'sources-abc', limit: 4000 },
+      {
+        sourceId: 'xtream-one',
+        kind: 'vod',
+        scope: 'sources-abc',
+        limit: 4000,
+        progressGeneration: 7,
+      },
     ],
     [
       'catalogIndexStoreFacets',
@@ -197,6 +203,7 @@ describe('typed Tauri IPC wrapper', () => {
     ['mpvPlayPause', 'mpv_play_pause'],
     ['credentialLoad', 'credential_load'],
     ['credentialDelete', 'credential_delete'],
+    ['downloadDefaultDirectory', 'download_default_directory'],
   ] as const)('%s invokes without an accidental payload', async (method, command) => {
     await tauriApi[method]();
     expect(invokeMock).toHaveBeenCalledWith(command);

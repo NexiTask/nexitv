@@ -1,8 +1,43 @@
-import { invoke } from '@tauri-apps/api/core';
+import { Channel, invoke } from '@tauri-apps/api/core';
+import type { RecommendationStage } from '@/shared/lib/dataActivity';
+
+interface ChatGptConnectionStatus {
+  activeClient: string | null;
+  accounts: { clientId: string; label: string; planPermission: boolean }[];
+}
+
+export type SeriesRecommendationKind = 'discover' | 'new';
+
+export interface RecommendationSeries {
+  localKey: string;
+  title: string;
+  year?: string | undefined;
+  genres: readonly string[];
+  description?: string | undefined;
+  imdbUrl?: string | undefined;
+}
+
+export interface SeriesRecommendationRequest {
+  library: RecommendationSeries[];
+  watching: RecommendationSeries[];
+  catalogue: RecommendationSeries[];
+}
+
+interface SeriesRecommendationSnapshot {
+  generatedAt: number;
+  picks: { key: string; genreMatch: boolean; reason?: string | undefined }[];
+}
+
+export interface ImdbRefreshEvent {
+  stage: string;
+  dataset?: 'ratings' | 'titles' | null;
+  percent?: number | null;
+}
 
 /** The IMDb pipeline's state (metadata/imdb.rs). Unix seconds where set. */
 export interface ImdbRefreshStatus {
   running: boolean;
+  importProgress: ImdbRefreshEvent | null;
   /** The automatic refresh (weekly dumps, daily backfill) is on. */
   enabled: boolean;
   lastRefresh: number | null;
@@ -272,6 +307,29 @@ export type MpvPropertyUpdate =
  * Strongly-typed wrapper for all Tauri IPC commands in NexiTV.
  */
 export const tauriApi = {
+  chatGptStatus: () => invoke<ChatGptConnectionStatus>('chatgpt_status'),
+  chatGptConnect: (clientId: string | null) =>
+    invoke<{ status: ChatGptConnectionStatus; firstPlanPermission: boolean }>('chatgpt_connect', {
+      clientId,
+    }),
+  chatGptCancel: () => invoke<void>('chatgpt_cancel'),
+  chatGptDisconnect: () =>
+    invoke<{ status: ChatGptConnectionStatus; revocationConfirmed: boolean }>('chatgpt_disconnect'),
+  recommendationsCached: (clientId: string) =>
+    invoke<SeriesRecommendationSnapshot | null>('recommendations_cached', { clientId }),
+  recommendationsGenerate: (
+    clientId: string,
+    request: SeriesRecommendationRequest,
+    reportStage: (stage: Exclude<RecommendationStage, 'preparing'>) => void,
+  ) =>
+    invoke<SeriesRecommendationSnapshot>('recommendations_generate', {
+      clientId,
+      request,
+      onStage: new Channel(reportStage),
+    }),
+
+  recommendationTrailerEndpoint: () => invoke<string>('recommendation_trailer_endpoint'),
+
   /** Spawn or re-initialize native mpv player instance */
   mpvStart: (options: MpvStartOptions) => invoke<void>('mpv_start', { options }),
 
@@ -362,6 +420,8 @@ export const tauriApi = {
   /** Turn the automatic refresh (weekly dumps, daily backfill) off or on. */
   imdbRefreshSetEnabled: (enabled: boolean) =>
     invoke<void>('imdb_refresh_set_enabled', { enabled }),
+
+  downloadDefaultDirectory: () => invoke<string>('download_default_directory'),
 
   /** Start a managed media download; progress and lifecycle arrive on download-event. */
   downloadMediaStart: (options: DownloadMediaOptions & { id: string }) =>
@@ -477,8 +537,20 @@ export const tauriApi = {
     ),
 
   /** Rows still waiting for facets, as JSON bytes for the facet worker. */
-  catalogIndexFacetBatch: (sourceId: string, kind: CatalogPageKind, scope: string, limit: number) =>
-    invoke<ArrayBuffer>('catalog_index_facet_batch', { sourceId, kind, scope, limit }),
+  catalogIndexFacetBatch: (
+    sourceId: string,
+    kind: CatalogPageKind,
+    scope: string,
+    limit: number,
+    progressGeneration?: number,
+  ) =>
+    invoke<ArrayBuffer>('catalog_index_facet_batch', {
+      sourceId,
+      kind,
+      scope,
+      limit,
+      progressGeneration,
+    }),
 
   /** Store worker-derived facet rows; false when the list changed meanwhile. */
   catalogIndexStoreFacets: (

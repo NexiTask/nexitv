@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { MediaItem } from '@/modules/catalog/model/media';
-import { MediaCard } from './MediaCard';
+import { MediaCard, type MediaCardPosterDetails } from './MediaCard';
 import styles from './HorizontalCarousel.module.css';
 import { useI18n } from '@/shared/i18n/i18n';
 
@@ -16,6 +16,10 @@ interface HorizontalCarouselProps {
   /** A quick-remove X on each card (Continue Watching), with its label. */
   onRemoveItem?: ((item: MediaItem) => void) | undefined;
   removeLabel?: string | undefined;
+  getPosterDetails?: ((item: MediaItem) => MediaCardPosterDetails | undefined) | undefined;
+  featuredPreview?: ReactNode;
+  previewItemId?: string | undefined;
+  onViewDetails?: ((item: MediaItem) => void) | undefined;
 }
 
 export function HorizontalCarousel({
@@ -26,6 +30,10 @@ export function HorizontalCarousel({
   seeAllLabel = 'See all',
   onRemoveItem,
   removeLabel,
+  getPosterDetails,
+  featuredPreview,
+  previewItemId,
+  onViewDetails,
   isLiveTv = false,
 }: HorizontalCarouselProps) {
   const { t } = useI18n();
@@ -113,6 +121,7 @@ export function HorizontalCarousel({
         </div>
       </div>
 
+      {featuredPreview}
       <div className={styles.scrollArea} ref={scrollRef} onScroll={updateScrollState}>
         <div className={styles.itemTrack}>
           {items.map((item, index) => {
@@ -129,10 +138,15 @@ export function HorizontalCarousel({
                 <MediaCard
                   item={item}
                   onClick={() => onItemClick(item)}
+                  onViewDetails={onViewDetails}
+                  previewSelected={
+                    previewItemId === undefined ? undefined : previewItemId === item.id
+                  }
                   style={{ transformOrigin }}
                   isLiveTv={isLiveTv}
                   onRemove={onRemoveItem}
                   removeLabel={removeLabel}
+                  posterDetails={getPosterDetails?.(item)}
                 />
               </div>
             );

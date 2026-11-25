@@ -186,7 +186,7 @@
   background: color-mix(in srgb, var(--color-error) 12%, transparent);
 }
 
-@media (max-width: 700px) {
+@container catalog-main (max-width: 700px) {
   .rowTopline {
     align-items: flex-start;
     flex-direction: column;

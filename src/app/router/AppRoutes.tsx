@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { Compass } from 'lucide-react';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { useI18n } from '@/shared/i18n/i18n';
@@ -7,19 +7,15 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { PageTransition } from '../shell/PageTransition';
 import styles from '../shell/AppLayout.module.css';
 import {
-  CollectionsPage,
-  ContinueWatchingPage,
-  DownloadsPage,
   EpgPage,
-  FavoritesPage,
   HomePage,
+  LibraryPage,
   LiveTvPage,
   M3uEditorPage,
   MoviesPage,
   SearchPage,
   SeriesPage,
   SettingsPage,
-  UpcomingPage,
 } from './routeModules';
 
 export function NotFoundPage() {
@@ -58,11 +54,13 @@ export function AppRoutes() {
           <Route path="/movies" element={<MoviesPage />} />
           <Route path="/series" element={<SeriesPage />} />
           <Route path="/search" element={<SearchPage />} />
-          <Route path="/continue" element={<ContinueWatchingPage />} />
-          <Route path="/favorites" element={<FavoritesPage />} />
-          <Route path="/collections" element={<CollectionsPage />} />
-          <Route path="/downloads" element={<DownloadsPage />} />
-          <Route path="/upcoming" element={<UpcomingPage />} />
+          <Route path="/continue" element={<Navigate to="/library/continue" replace />} />
+          <Route path="/watch-next" element={<Navigate to="/library/watch-next" replace />} />
+          <Route path="/library/:listId?" element={<LibraryPage />} />
+          <Route path="/favorites" element={<Navigate to="/library/favorites" replace />} />
+          <Route path="/collections" element={<Navigate to="/library" replace />} />
+          <Route path="/downloads" element={<Navigate to="/library/downloads" replace />} />
+          <Route path="/upcoming" element={<Navigate to="/library/upcoming" replace />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/m3u-editor/:sourceId?" element={<M3uEditorPage />} />
           <Route path="*" element={<NotFoundPage />} />

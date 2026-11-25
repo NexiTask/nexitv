@@ -4,6 +4,7 @@ export const HOME_SECTION_IDS = [
   'upcoming',
   'continueWatching',
   'watchNext',
+  'recommendations',
   'recentMovies',
   'recentSeries',
   'popularMovies',
@@ -18,8 +19,15 @@ export interface HomeSectionPref {
   enabled: boolean;
 }
 
-/** Display order matches NexiTV's original fixed Discover layout. */
-export const DEFAULT_HOME_SECTIONS: HomeSectionPref[] = HOME_SECTION_IDS.map((id) => ({
+const DEFAULT_HOME_ORDER: readonly HomeSectionId[] = [
+  'watchNext',
+  'upcoming',
+  'recommendations',
+  'continueWatching',
+  ...HOME_SECTION_IDS.slice(4),
+];
+
+export const DEFAULT_HOME_SECTIONS: HomeSectionPref[] = DEFAULT_HOME_ORDER.map((id) => ({
   id,
   enabled: true,
 }));
@@ -29,6 +37,7 @@ export const HOME_SECTION_LABELS: Record<HomeSectionId, string> = {
   upcoming: 'Coming Up',
   continueWatching: 'Continue Watching',
   watchNext: 'Watch Next',
+  recommendations: 'Recommendations',
   recentMovies: 'Recently Added Movies',
   recentSeries: 'Recently Added Series',
   popularMovies: 'Popular Movies',
@@ -51,14 +60,29 @@ export function sanitizeHomeSections(value: unknown): HomeSectionPref[] {
   const result: HomeSectionPref[] = [];
 
   if (Array.isArray(value)) {
-    for (const entry of value) {
-      if (!entry || typeof entry !== 'object') continue;
-      const id = (entry as { id?: unknown }).id;
+    const entries = value.filter(
+      (entry): entry is { id?: unknown; enabled?: unknown } =>
+        entry !== null && typeof entry === 'object',
+    );
+    const formerLibraryRow = entries.find(({ id }) => id === 'automatedRecommendations');
+    const hasRecommendations = entries.some(({ id }) => id === 'recommendations');
+    for (const entry of entries) {
+      if (entry.id === 'automatedRecommendations' && hasRecommendations) continue;
+      const id = entry.id === 'automatedRecommendations' ? 'recommendations' : entry.id;
       if (!isHomeSectionId(id) || seen.has(id)) continue;
       seen.add(id);
-      result.push({ id, enabled: (entry as { enabled?: unknown }).enabled !== false });
+      result.push({
+        id,
+        enabled:
+          entry.enabled !== false ||
+          (id === 'recommendations' &&
+            formerLibraryRow !== undefined &&
+            formerLibraryRow.enabled !== false),
+      });
     }
   }
+
+  if (result.length === 0) return DEFAULT_HOME_SECTIONS.map((section) => ({ ...section }));
 
   // A section the save predates goes right after the one that precedes it in
   // the default layout (Watch Next lands under Continue Watching), else last.
@@ -69,6 +93,12 @@ export function sanitizeHomeSections(value: unknown): HomeSectionPref[] {
   });
 
   return result;
+}
+
+export function migrateLegacyHomeOrder(sections: HomeSectionPref[]): HomeSectionPref[] {
+  if (!HOME_SECTION_IDS.every((id, index) => sections[index]?.id === id)) return sections;
+  const byId = new Map(sections.map((section) => [section.id, section]));
+  return DEFAULT_HOME_ORDER.map((id) => byId.get(id) ?? { id, enabled: true });
 }
 
 export function moveHomeSection(

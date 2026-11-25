@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_HOME_SECTIONS,
   HOME_SECTION_IDS,
+  migrateLegacyHomeOrder,
   moveHomeSection,
   sanitizeHomeSections,
 } from '@/modules/catalog/lib/homeSections';
@@ -56,9 +57,10 @@ describe('moveHomeSection', () => {
     const sections = DEFAULT_HOME_SECTIONS;
     const movedDown = moveHomeSection(sections, 0, 1);
     expect(movedDown.map((section) => section.id)).toEqual([
-      'continueWatching',
       'upcoming',
       'watchNext',
+      'recommendations',
+      'continueWatching',
       'recentMovies',
       'recentSeries',
       'popularMovies',
@@ -103,5 +105,16 @@ describe('a layout saved before Watch Next existed', () => {
     ]);
     expect(result.find((section) => section.id === 'watchNext')?.enabled).toBe(true);
     expect(result.find((section) => section.id === 'recentMovies')?.enabled).toBe(false);
+  });
+});
+
+describe('migrateLegacyHomeOrder', () => {
+  it('updates the old default order and preserves visibility flags', () => {
+    const previousDefault = HOME_SECTION_IDS.map((id) => ({ id, enabled: id !== 'upcoming' }));
+    expect(migrateLegacyHomeOrder(previousDefault)).toEqual(
+      DEFAULT_HOME_SECTIONS.map(({ id }) => ({ id, enabled: id !== 'upcoming' })),
+    );
+    const custom = moveHomeSection(previousDefault, 0, 1);
+    expect(migrateLegacyHomeOrder(custom)).toBe(custom);
   });
 });

@@ -1,6 +1,17 @@
-import { Play, Heart, Check, Film, Clapperboard, Radio, HardDriveDownload, X } from 'lucide-react';
+import {
+  Play,
+  Heart,
+  Check,
+  Film,
+  Clapperboard,
+  Radio,
+  HardDriveDownload,
+  X,
+  Sparkles,
+  LibraryBig,
+} from 'lucide-react';
 import styles from './MediaCard.module.css';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useLibraryStore } from '@/modules/library/public/store/useLibraryStore';
 import { useDownloadStore } from '@/modules/downloads/public/store/useDownloadStore';
 import { useMediaContextMenus } from '../hooks/useMediaContextMenus';
@@ -41,6 +52,12 @@ import {
 } from '@/modules/sources/public/lib/streamProvider';
 import type { MediaItem } from '../model/media';
 
+export interface MediaCardPosterDetails {
+  source?: 'chatgpt' | 'library' | undefined;
+  description?: ReactNode;
+  action?: ReactNode;
+}
+
 interface MediaCardProps {
   item: MediaItem;
   onClick?: ((item: MediaItem) => void) | undefined;
@@ -54,6 +71,10 @@ interface MediaCardProps {
   /** A quick X in the card's corner (Continue Watching), with its label. */
   onRemove?: ((item: MediaItem) => void) | undefined;
   removeLabel?: string | undefined;
+  /** Context to show over a poster on hover or focus. */
+  posterDetails?: MediaCardPosterDetails | undefined;
+  /** Present when this poster selects the featured trailer. */
+  previewSelected?: boolean | undefined;
 }
 
 function formatChannelNumber(value: string | number | undefined): string {
@@ -142,10 +163,15 @@ function MediaCardComponent({
   showTypeInList = true,
   onRemove,
   removeLabel = 'Remove',
+  posterDetails,
+  previewSelected,
 }: MediaCardProps) {
   const { t, tn, language, number } = useI18n();
   const { handleMediaCardContextMenu } = useMediaContextMenus();
   const queryClient = useQueryClient();
+  const descriptionId = useId();
+  const details = viewMode === 'grid' ? posterDetails : undefined;
+  const SourceIcon = details?.source === 'chatgpt' ? Sparkles : LibraryBig;
   const [imgError, setImgError] = useState(() => isPosterHostDead(item.posterUrl));
   const [imgLoaded, setImgLoaded] = useState(false);
   // The hover overlay (play, favourite, menu, badges) is built on first hover or
@@ -328,7 +354,15 @@ function MediaCardComponent({
       className={`${styles.cardContainer} ${viewMode === 'list' ? styles.listView : ''} ${isLiveTvGrid ? styles.cardContainerLiveTvGrid : ''}`}
       style={style}
       role="group"
-      aria-label={onClick ? t('Open {title}', { title: displayTitle }) : displayTitle}
+      aria-label={
+        previewSelected !== undefined
+          ? t('Preview {title}', { title: displayTitle })
+          : onClick
+            ? t('Open {title}', { title: displayTitle })
+            : displayTitle
+      }
+      aria-current={previewSelected}
+      aria-describedby={details ? descriptionId : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={() => onClick?.(item)}
       onKeyDown={handleCardKeyDown}
@@ -396,6 +430,12 @@ function MediaCardComponent({
           <div className={styles.channelBadge}>{item.channelNum}</div>
         )}
 
+        {details?.source && (
+          <span className={styles.recommendationBadge} aria-hidden="true">
+            <SourceIcon size={16} />
+          </span>
+        )}
+
         {viewMode !== 'list' && visibleQualityBadges.length > 0 && (
           <div className={styles.posterBadgesRight}>
             {visibleQualityBadges.map((badge) => (
@@ -436,35 +476,52 @@ function MediaCardComponent({
               </h3>
             </div>
 
-            {isResumeItem && !isLive ? (
+            {imdbRating && (
+              <div
+                className={styles.posterMeta}
+                title={tn(
+                  'IMDb rating {rating} out of 10 from {count} vote',
+                  'IMDb rating {rating} out of 10 from {count} votes',
+                  item.imdbVotes ?? 0,
+                  { rating: imdbRating, count: number(item.imdbVotes ?? 0) },
+                )}
+              >
+                <span className={styles.imdbBadge}>IMDb</span>
+                <span className={styles.imdbRating}>{imdbRating}</span>
+                {item.imdbVotes ? (
+                  <span className={styles.imdbVotes}>
+                    {number(item.imdbVotes, { notation: 'compact' })}
+                  </span>
+                ) : null}
+              </div>
+            )}
+            {isResumeItem && !isLive && (
               <div className={styles.posterMeta}>
                 <span className={styles.posterContext}>{cardContext}</span>
               </div>
-            ) : (
-              imdbRating && (
-                <div
-                  className={styles.posterMeta}
-                  title={tn(
-                    'IMDb rating {rating} out of 10 from {count} vote',
-                    'IMDb rating {rating} out of 10 from {count} votes',
-                    item.imdbVotes ?? 0,
-                    { rating: imdbRating, count: number(item.imdbVotes ?? 0) },
-                  )}
-                >
-                  <span className={styles.imdbBadge}>IMDb</span>
-                  <span className={styles.imdbRating}>{imdbRating}</span>
-                  {item.imdbVotes ? (
-                    <span className={styles.imdbVotes}>
-                      {number(item.imdbVotes, { notation: 'compact' })}
-                    </span>
-                  ) : null}
-                </div>
-              )
             )}
           </div>
         )}
 
-        {viewMode !== 'list' && (
+        {details && (
+          <div className={`${styles.overlay} ${styles.posterDetails}`}>
+            <div id={descriptionId} className={styles.posterDescription}>
+              {details.source && (
+                <p className={styles.recommendationSource}>
+                  {t(
+                    details.source === 'chatgpt'
+                      ? 'Recommended using your ChatGPT account'
+                      : 'Recommended from your Library',
+                  )}
+                </p>
+              )}
+              {details.description}
+            </div>
+            {hot && details.action}
+          </div>
+        )}
+
+        {viewMode !== 'list' && !details && (
           <div className={styles.overlay}>
             {hot && (
               <>

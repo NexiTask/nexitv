@@ -222,8 +222,9 @@ describe('custom control keyboard contracts', () => {
     expect(onChange).toHaveBeenCalledWith(true);
   });
 
-  it('gives the media-card quick-create field and submit action accessible names', async () => {
-    useLibraryStore.setState({ favorites: [], collections: [], history: [], watched: [] });
+  it('adds an item to the newly created collection even when its name is already in use', async () => {
+    const previous = { id: 'previous', name: 'Weekend', items: [] };
+    useLibraryStore.setState({ favorites: [], collections: [previous], history: [], watched: [] });
     renderWithClient(
       <MediaCardMenu
         item={{ id: 'movie-1', title: 'Movie', posterUrl: '', type: 'vod' }}
@@ -235,8 +236,12 @@ describe('custom control keyboard contracts', () => {
     await userEvent.click(screen.getByRole('button', { name: 'More options' }));
     await userEvent.click(screen.getByRole('button', { name: 'Add to Collection' }));
 
-    expect(screen.getByRole('textbox', { name: 'New collection…' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Create and add' })).toBeTruthy();
+    await userEvent.type(screen.getByRole('textbox', { name: 'New collection…' }), previous.name);
+    await userEvent.click(screen.getByRole('button', { name: 'Create and add' }));
+
+    const [first, created] = useLibraryStore.getState().collections;
+    expect(first).toEqual(previous);
+    expect(created).toMatchObject({ name: previous.name, items: [{ id: 'movie-1' }] });
   });
 
   it('keeps the Play quick action while avoiding duplicate menu commands', async () => {
