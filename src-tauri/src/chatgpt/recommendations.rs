@@ -1,5 +1,6 @@
 use super::recommendation_catalogue::{self, Catalogue, Request};
 use super::store::{Account, Session, Store};
+use crate::sources::catalog_index::catalog_index_imdb;
 use eventsource_stream::Eventsource;
 use futures_util::StreamExt;
 use reqwest::{Client, StatusCode};
@@ -156,14 +157,15 @@ pub(crate) async fn recommendations_generate(
         .filter(|session| session.has_plan_permission())
         .and_then(|session| session.access_token.as_deref())
         .ok_or_else(|| "Enable ChatGPT plan usage in Settings.".to_string())?;
+    let catalogue = Catalogue::new(&request, |item_id: &str| {
+        catalog_index_imdb(app.clone(), "series".into(), item_id.to_owned())
+            .ok()
+            .flatten()
+            .map(|facts| facts.id)
+    });
     let snapshot = tokio::time::timeout(
         Duration::from_secs(180),
-        rank(
-            &client,
-            token,
-            Catalogue::new(Some(&app), &request),
-            &report,
-        ),
+        rank(&client, token, catalogue, &report),
     )
     .await
     .map_err(|_| "ChatGPT took too long to validate recommendations. Try again.".to_string())??;
@@ -248,10 +250,10 @@ fn error_message(status: StatusCode) -> String {
     .into()
 }
 
-async fn rank(
+async fn rank<F: Fn(&str) -> Option<String>>(
     client: &Client,
     token: &str,
-    mut catalogue: Catalogue<'_>,
+    mut catalogue: Catalogue<'_, F>,
     report: impl Fn(RecommendationStage),
 ) -> Result<Snapshot, String> {
     let unavailable = || "Could not reach ChatGPT. Try again.".to_string();
@@ -404,7 +406,7 @@ async fn stream_output(response: reqwest::Response) -> Result<(String, Vec<Value
     Err("ChatGPT ended the response before the recommendations were ready.".into())
 }
 
-fn snapshot(output: &str, catalogue: &Catalogue<'_>) -> Result<Snapshot, String> {
+fn snapshot<F>(output: &str, catalogue: &Catalogue<'_, F>) -> Result<Snapshot, String> {
     let invalid = || "ChatGPT returned an invalid recommendation list.".to_string();
     let rankings: Rankings = serde_json::from_str(output).map_err(|_| invalid())?;
     let mut seen = HashSet::new();
@@ -453,7 +455,7 @@ mod tests {
             "library": [], "watching": [],
             "catalogue": [{"localKey":"private-id","title":"The Show","year":"2024","genres":["Crime"]}]
         })).unwrap();
-        let mut catalogue = Catalogue::new(None, &request);
+        let mut catalogue = Catalogue::new(&request, |_| None);
         let picks = r#"{"picks":[{"id":0,"reason":"Another crime series."}]}"#;
         assert!(!catalogue.context().to_string().contains("private-id"));
         assert!(snapshot(picks, &catalogue).is_err());
@@ -478,5 +480,35 @@ mod tests {
             result.picks[0].reason.as_deref(),
             Some("Another crime series.")
         );
+    }
+
+    #[test]
+    fn populates_missing_imdb_urls_from_lookup_without_overwriting_existing_ones() {
+        let request: Request = serde_json::from_value(json!({
+            "library": [
+                {"localKey":"[\"source-1\",\"42\"]","title":"Saved Show","genres":["Drama"]},
+                {"localKey":"[\"source-1\",\"99\"]","title":"Tagged Show","genres":["Drama"],"imdbUrl":"https://www.imdb.com/title/tt9999999/"}
+            ],
+            "watching": [],
+            "catalogue": [
+                {"localKey":"plain-key","title":"No Tuple","genres":["Crime"]}
+            ]
+        }))
+        .unwrap();
+        let catalogue = Catalogue::new(&request, |item_id| match item_id {
+            "42" => Some("tt1234567".into()),
+            "99" => Some("tt0000000".into()),
+            _ => None,
+        });
+        let context = catalogue.context();
+        assert_eq!(
+            context["savedSeries"][0]["imdbUrl"],
+            "https://www.imdb.com/title/tt1234567/"
+        );
+        assert_eq!(
+            context["savedSeries"][1]["imdbUrl"],
+            "https://www.imdb.com/title/tt9999999/"
+        );
+        assert!(context["availableSeriesSample"][0].get("imdbUrl").is_none());
     }
 }

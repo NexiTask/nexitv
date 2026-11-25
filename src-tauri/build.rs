@@ -1,3 +1,20 @@
+const WINDOWS_APP_MANIFEST: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+</assembly>
+"#;
+
 fn main() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let lib_path = std::path::Path::new(&manifest_dir).join("lib");
@@ -186,5 +203,34 @@ fn main() {
         }
     }
 
-    tauri_build::build()
+    // `tauri_build::build()` embeds the Windows Common Controls v6 manifest
+    // via `embed-resource` using `cargo:rustc-link-arg-bins`, which only
+    // reaches `[[bin]]` targets (`nexitv.exe`) and leaves `cargo test --lib`
+    // binaries without a manifest. When debug generic sharing or a test pulls
+    // `tao` / `rfd` imports from `comctl32.dll` v6 (`SetWindowSubclass`,
+    // `TaskDialogIndirect`) into `movena_lib-*.exe`, Windows loads legacy
+    // `comctl32.dll` v5.82 and aborts startup with `0xc0000139`
+    // (`STATUS_ENTRYPOINT_NOT_FOUND`). On MSVC, pass the same manifest to the
+    // linker for all linked targets instead, and skip `tauri-build`'s duplicate
+    // `RT_MANIFEST` resource.
+    let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    if target_os == "windows" && target_env == "msvc" {
+        let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR must be set by Cargo");
+        let manifest_path = std::path::Path::new(&out_dir).join("windows-app-manifest.xml");
+        std::fs::write(&manifest_path, WINDOWS_APP_MANIFEST)
+            .expect("failed to write Windows application manifest");
+        println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
+        println!(
+            "cargo:rustc-link-arg=/MANIFESTINPUT:{}",
+            manifest_path.display()
+        );
+        tauri_build::try_build(
+            tauri_build::Attributes::new()
+                .windows_attributes(tauri_build::WindowsAttributes::new_without_app_manifest()),
+        )
+        .expect("failed to run tauri-build");
+    } else {
+        tauri_build::build();
+    }
 }
