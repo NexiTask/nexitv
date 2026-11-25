@@ -8,6 +8,34 @@ for tagged releases.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-25
+
+### Added
+
+- Connect a ChatGPT account to get recommendations based on the series you watch.
+  Recommendations show as posters with IMDb ratings and source badges, play
+  trailers inline, and appear on Home and in Settings.
+- Library now holds Saved, Favorites, and your own lists, with a way to move
+  titles between Saved and Favorites. Continue Watching, Watch Next, Coming Up,
+  and Downloads moved into Library.
+- Watch Next has its own page, a queue of upcoming episodes, and a sidebar count.
+  Home features Watch Next episodes in a rotating banner.
+- The sidebar shows activity for provider refreshes, IMDb imports, downloads,
+  and recommendation generation.
+
+### Changed
+
+- Home uses the full window width, and the sidebar is more compact.
+- Saved groups the different provider versions of a title.
+- Titles are saved when playback starts and when you mark them watched.
+
+### Fixed
+
+- Long downloads keep running and resume after an interruption.
+- Media redirects no longer forward provider headers.
+- YouTube trailers keep their playback controls.
+- Windows unit tests no longer crash at startup.
+
 ## [0.1.0] - 2026-11-22
 
 The first NexiTV release includes macOS DMGs for Apple Silicon and Intel,
