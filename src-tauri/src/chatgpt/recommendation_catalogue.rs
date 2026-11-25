@@ -1,4 +1,3 @@
-use crate::sources::catalog_index::catalog_index_imdb;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -45,17 +44,13 @@ fn normalized(text: &str) -> String {
         .to_lowercase()
 }
 
-fn display(app: Option<&tauri::AppHandle>, series: &Series) -> Value {
+fn display(imdb_id: &impl Fn(&str) -> Option<String>, series: &Series) -> Value {
     let mut value = json!(series);
     if series.imdb_url.is_none() {
-        if let Some(imdb_id) = app.and_then(|app| {
-            let (_, item_id) = serde_json::from_str::<(String, String)>(&series.local_key).ok()?;
-            Some(
-                catalog_index_imdb(app.clone(), "series".into(), item_id)
-                    .ok()??
-                    .id,
-            )
-        }) {
+        if let Some(imdb_id) = serde_json::from_str::<(String, String)>(&series.local_key)
+            .ok()
+            .and_then(|(_, item_id)| imdb_id(&item_id))
+        {
             value["imdbUrl"] = json!(format!("https://www.imdb.com/title/{imdb_id}/"));
         }
     }
@@ -79,16 +74,24 @@ struct Search {
     offset: usize,
 }
 
-pub(super) struct Catalogue<'a> {
-    app: Option<&'a tauri::AppHandle>,
+pub(super) struct Catalogue<'a, F> {
+    imdb_id: F,
     request: &'a Request,
     titles: HashMap<String, Vec<usize>>,
     verified: HashSet<usize>,
     miss_rounds: u8,
 }
 
-impl<'a> Catalogue<'a> {
-    pub(super) fn new(app: Option<&'a tauri::AppHandle>, request: &'a Request) -> Self {
+impl<'a, F> Catalogue<'a, F> {
+    pub(super) fn key(&self, id: usize) -> Option<&str> {
+        self.verified
+            .contains(&id)
+            .then(|| self.request.catalogue[id].local_key.as_str())
+    }
+}
+
+impl<'a, F: Fn(&str) -> Option<String>> Catalogue<'a, F> {
+    pub(super) fn new(request: &'a Request, imdb_id: F) -> Self {
         let mut titles: HashMap<String, Vec<usize>> = HashMap::new();
         for (id, series) in request.catalogue.iter().enumerate() {
             titles
@@ -97,7 +100,7 @@ impl<'a> Catalogue<'a> {
                 .push(id);
         }
         Self {
-            app,
+            imdb_id,
             request,
             titles,
             verified: HashSet::new(),
@@ -111,23 +114,17 @@ impl<'a> Catalogue<'a> {
         let sample = (0..sample_size).map(|position| self.entry(position * total / sample_size));
         json!({
             "task": "Recommend up to 12 TV series for this viewer and validate availability before returning.",
-            "watchedSeries": self.request.watching.iter().map(|series| display(self.app, series)).collect::<Vec<_>>(),
-            "savedSeries": self.request.library.iter().map(|series| display(self.app, series)).collect::<Vec<_>>(),
+            "watchedSeries": self.request.watching.iter().map(|series| display(&self.imdb_id, series)).collect::<Vec<_>>(),
+            "savedSeries": self.request.library.iter().map(|series| display(&self.imdb_id, series)).collect::<Vec<_>>(),
             "availableSeriesCount": total,
             "availableSeriesSample": sample.collect::<Vec<_>>(),
         })
     }
 
     fn entry(&self, id: usize) -> Value {
-        let mut value = display(self.app, &self.request.catalogue[id]);
+        let mut value = display(&self.imdb_id, &self.request.catalogue[id]);
         value["id"] = json!(id);
         value
-    }
-
-    pub(super) fn key(&self, id: usize) -> Option<&str> {
-        self.verified
-            .contains(&id)
-            .then(|| self.request.catalogue[id].local_key.as_str())
     }
 
     pub(super) fn call(&mut self, name: &str, arguments: &str) -> Value {
