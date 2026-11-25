@@ -337,7 +337,7 @@ cargo:MIT OR Apache-2.0
 - cmake@0.1.58
 - compression-codecs@0.4.38
 - compression-core@0.4.32
-- cookie@0.18.2
+- cookie@0.18.3
 - core-foundation-sys@0.8.7
 - core-foundation@0.10.1
 - core-foundation@0.9.4
