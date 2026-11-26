@@ -1082,7 +1082,7 @@ fn resolve_recording_path(path: &str, downloads: &Path) -> Result<PathBuf, Strin
 #[cfg(test)]
 mod recording_path_tests {
     use super::{
-        build_diagnostic_sample, build_http_options, first_existing_file, mpv_log_level,
+        build_diagnostic_sample, build_http_options, first_existing_file, mpv_cmd, mpv_log_level,
         resolve_recording_path, sanitize_mpv_log_text, set_mpv_option, set_optional_mpv_option,
         ytdlp_script_option, MpvGuard, DIAGNOSTIC_PROPERTIES, HDR_OPTIONS,
     };
@@ -1288,6 +1288,29 @@ mod recording_path_tests {
             let quality = [("tone-mapping", "auto"), ("gamut-mapping-mode", "auto")];
             for (key, value) in HDR_OPTIONS.iter().chain(quality.iter()) {
                 assert_eq!(set_mpv_option(mpv, key, value), Ok(()), "{key}={value}");
+            }
+        }
+    }
+
+    /// Runs every aspect override the frontend can send through the linked
+    /// libmpv, which the Linux release job checks before packaging.
+    #[test]
+    fn linked_libmpv_accepts_every_aspect_override() {
+        unsafe {
+            let mpv = libmpv_sys::mpv_create();
+            assert!(!mpv.is_null());
+            let _guard = MpvGuard::new(mpv);
+            for (key, value) in [("vo", "null"), ("ao", "null"), ("idle", "yes")] {
+                assert_eq!(set_mpv_option(mpv, key, value), Ok(()));
+            }
+            assert!(libmpv_sys::mpv_initialize(mpv) >= 0);
+
+            for value in super::property::VIDEO_ASPECT_OVERRIDES {
+                assert_eq!(
+                    mpv_cmd(mpv, &["set", "video-aspect-override", value]),
+                    Ok(()),
+                    "video-aspect-override={value}"
+                );
             }
         }
     }

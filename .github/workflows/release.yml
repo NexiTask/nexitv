@@ -283,7 +283,7 @@ jobs:
       # play video, including the YouTube trailers.
       - run: npm ci
       - name: Check the libmpv being packaged supports the player's options
-        run: cargo test --manifest-path src-tauri/Cargo.toml --lib linked_libmpv_supports_the_picture_quality_options
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib linked_libmpv_
       - name: Build Tauri bundles
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}

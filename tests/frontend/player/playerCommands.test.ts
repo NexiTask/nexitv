@@ -28,7 +28,7 @@ describe('native player command helpers', () => {
     await applyAspectRatio('zoom');
 
     expect(mpvSetProperty.mock.calls).toEqual([
-      [{ property: 'video-aspect-override', value: '-2' }],
+      [{ property: 'video-aspect-override', value: 'no' }],
       [{ property: 'keepaspect', value: 'yes' }],
       [{ property: 'panscan', value: '1' }],
       [{ property: 'video-unscaled', value: 'no' }],
