@@ -8,6 +8,8 @@ for tagged releases.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-26
+
 ### Fixed
 
 - Linux AppImage playback no longer stops with "Failed to set mpv option
