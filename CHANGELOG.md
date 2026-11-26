@@ -8,6 +8,12 @@ for tagged releases.
 
 ## [Unreleased]
 
+### Fixed
+
+- The Auto aspect ratio no longer fails with "mpv command 'set' failed with
+  error -12" in the Linux AppImage. It now uses mpv's default aspect handling,
+  which every bundled libmpv supports.
+
 ## [0.2.1] - 2026-11-26
 
 ### Fixed

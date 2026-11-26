@@ -293,7 +293,7 @@ export interface DeleteDownloadOptions {
 }
 
 export type MpvPropertyUpdate =
-  | { property: 'video-aspect-override'; value: '-2' | '16:9' | '4:3' | '1:1' | '5:4' }
+  | { property: 'video-aspect-override'; value: 'no' | '16:9' | '4:3' | '1:1' | '5:4' }
   | { property: 'keepaspect' | 'video-unscaled'; value: 'yes' | 'no' }
   | { property: 'panscan'; value: '0' | '1' }
   | { property: 'video-crop'; value: '' | '50%x100%+0+0' }

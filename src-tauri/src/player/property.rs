@@ -20,6 +20,11 @@ fn string_property_value(value: &Value) -> Result<&str, String> {
         .ok_or_else(|| "The mpv property value is invalid".to_string())
 }
 
+/// Aspect overrides the frontend may send. `no` keeps the source's own aspect.
+/// Every value must work on the oldest libmpv a release bundles (0.37 in the
+/// Linux AppImage); `-2` failed there.
+pub(crate) const VIDEO_ASPECT_OVERRIDES: [&str; 5] = ["no", "16:9", "4:3", "1:1", "5:4"];
+
 pub(crate) fn validate_mpv_property(
     update: &MpvPropertyUpdate,
 ) -> Result<(&'static str, String), String> {
@@ -28,7 +33,7 @@ pub(crate) fn validate_mpv_property(
     match property {
         "video-aspect-override" => {
             let value = string_property_value(&update.value)?;
-            if ["-2", "16:9", "4:3", "1:1", "5:4"].contains(&value) {
+            if VIDEO_ASPECT_OVERRIDES.contains(&value) {
                 Ok(("video-aspect-override", value.to_string()))
             } else {
                 invalid()

@@ -6,13 +6,13 @@ export type AspectMode =
  * window. Every mode sets all four, so switching between them can never leave a
  * setting behind from the previous one.
  *
- * - `video-aspect-override`  -2 means "use the container's aspect"
+ * - `video-aspect-override`  no means "use the source's own aspect"
  * - `keepaspect`             no lets the picture distort to fill
  * - `panscan`                1 fills the window by cropping
  * - `video-unscaled`         yes shows the source at its native pixel size
  */
 export interface AspectSettings {
-  'video-aspect-override': '-2' | '16:9' | '4:3' | '1:1' | '5:4';
+  'video-aspect-override': 'no' | '16:9' | '4:3' | '1:1' | '5:4';
   keepaspect: 'yes' | 'no';
   panscan: '0' | '1';
   'video-unscaled': 'yes' | 'no';
@@ -37,31 +37,31 @@ export const ASPECT_OPTIONS: AspectOption[] = [
     mode: 'auto',
     label: 'Auto',
     hint: "The source's own aspect ratio",
-    settings: fit('-2'),
+    settings: fit('no'),
   },
   {
     mode: 'fit100',
     label: '100% Fit',
     hint: 'Native pixel size, never scaled',
-    settings: { ...fit('-2'), 'video-unscaled': 'yes' },
+    settings: { ...fit('no'), 'video-unscaled': 'yes' },
   },
   {
     mode: 'stretch',
     label: 'Stretch',
     hint: 'Fill the window, distorting the picture',
-    settings: { ...fit('-2'), keepaspect: 'no' },
+    settings: { ...fit('no'), keepaspect: 'no' },
   },
   {
     mode: 'zoom',
     label: 'Zoom',
     hint: 'Fill the window by cropping the edges',
-    settings: { ...fit('-2'), panscan: '1' },
+    settings: { ...fit('no'), panscan: '1' },
   },
   {
     mode: 'fitScreen',
     label: 'Fit to Screen',
     hint: 'Scale to fit, letterboxed',
-    settings: fit('-2'),
+    settings: fit('no'),
   },
   { mode: '16:9', label: '16:9', hint: 'Widescreen', settings: fit('16:9') },
   { mode: '4:3', label: '4:3', hint: 'Classic television', settings: fit('4:3') },
