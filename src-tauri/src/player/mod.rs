@@ -74,6 +74,30 @@ unsafe fn set_mpv_option(mpv: *mut mpv_handle, key: &str, value: &str) -> Result
     }
 }
 
+/// Sets a rendering-quality option that older libmpv builds may not know.
+///
+/// Linux AppImages bundle the build distro's libmpv (0.34 on Ubuntu 22.04),
+/// which lacks `target-colorspace-hint` and `gamut-mapping-mode` and rejects
+/// `tone-mapping=auto`. Those options only tune picture quality, so an
+/// unknown option or value is logged and skipped instead of aborting playback.
+unsafe fn set_optional_mpv_option(
+    mpv: *mut mpv_handle,
+    key: &str,
+    value: &str,
+) -> Result<(), String> {
+    let c_key = CString::new(key).map_err(|e| e.to_string())?;
+    let c_value = CString::new(value).map_err(|e| e.to_string())?;
+    let res = mpv_set_option_string(mpv, c_key.as_ptr(), c_value.as_ptr());
+    if res == mpv_error_MPV_ERROR_OPTION_NOT_FOUND || res == mpv_error_MPV_ERROR_OPTION_ERROR {
+        log::warn!("libmpv does not support option '{key}={value}' (error {res}); skipping");
+        Ok(())
+    } else if res < 0 {
+        Err(format!("Failed to set mpv option '{key}' (error {res})"))
+    } else {
+        Ok(())
+    }
+}
+
 /// Maps the frontend's `debugLogLevel` setting to the mpv client API log
 /// level requested via `mpv_request_log_messages`. mpv's own levels are more
 /// granular ("v", "debug", "trace" below "info"); "verbose" only goes one
@@ -551,18 +575,18 @@ pub fn mpv_start(
         }
 
         if hdr {
-            set_mpv_option(mpv, "target-colorspace-hint", "yes")?;
-            set_mpv_option(mpv, "hdr-compute-peak", "auto")?;
-            set_mpv_option(mpv, "target-peak", "auto")?;
-            set_mpv_option(mpv, "target-prim", "auto")?;
-            set_mpv_option(mpv, "target-trc", "auto")?;
+            set_optional_mpv_option(mpv, "target-colorspace-hint", "yes")?;
+            set_optional_mpv_option(mpv, "hdr-compute-peak", "auto")?;
+            set_optional_mpv_option(mpv, "target-peak", "auto")?;
+            set_optional_mpv_option(mpv, "target-prim", "auto")?;
+            set_optional_mpv_option(mpv, "target-trc", "auto")?;
         }
 
         let tm = tone_mapping.as_deref().unwrap_or("auto");
-        set_mpv_option(mpv, "tone-mapping", tm)?;
+        set_optional_mpv_option(mpv, "tone-mapping", tm)?;
         // `clip` is mpv's explicitly low-quality path. gpu-next's automatic
         // selection chooses a perceptual mapping when the GPU supports it.
-        set_mpv_option(mpv, "gamut-mapping-mode", "auto")?;
+        set_optional_mpv_option(mpv, "gamut-mapping-mode", "auto")?;
 
         if mpv_initialize(mpv) < 0 {
             return Err("Failed to initialize mpv".to_string());
@@ -1051,8 +1075,8 @@ fn resolve_recording_path(path: &str, downloads: &Path) -> Result<PathBuf, Strin
 mod recording_path_tests {
     use super::{
         build_diagnostic_sample, build_http_options, first_existing_file, mpv_log_level,
-        resolve_recording_path, sanitize_mpv_log_text, set_mpv_option, ytdlp_script_option,
-        MpvGuard, DIAGNOSTIC_PROPERTIES,
+        resolve_recording_path, sanitize_mpv_log_text, set_mpv_option, set_optional_mpv_option,
+        ytdlp_script_option, MpvGuard, DIAGNOSTIC_PROPERTIES,
     };
     use serde_json::json;
     use std::collections::HashMap;
@@ -1239,6 +1263,24 @@ mod recording_path_tests {
             let error = set_mpv_option(mpv, "script-opt", &option).unwrap_err();
             assert_eq!(error, "Failed to set mpv option 'script-opt' (error -5)");
             assert!(!error.contains("Program Files"));
+        }
+    }
+
+    #[test]
+    fn optional_mpv_options_skip_what_libmpv_does_not_support() {
+        unsafe {
+            let mpv = libmpv_sys::mpv_create();
+            assert!(!mpv.is_null());
+            let _guard = MpvGuard::new(mpv);
+
+            // Stands in for an option an older bundled libmpv lacks.
+            assert_eq!(
+                set_optional_mpv_option(mpv, "nexitv-missing-option", "yes"),
+                Ok(())
+            );
+            // A value the option rejects is skipped too.
+            assert_eq!(set_optional_mpv_option(mpv, "target-peak", "bogus"), Ok(()));
+            assert_eq!(set_optional_mpv_option(mpv, "target-peak", "auto"), Ok(()));
         }
     }
 }

@@ -8,6 +8,12 @@ for tagged releases.
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux AppImage playback no longer stops with "Failed to set mpv option
+  'target-colorspace-hint'". The bundled libmpv is older, so picture-quality
+  options it does not support are now skipped.
+
 ## [0.2.0] - 2026-11-25
 
 ### Added
