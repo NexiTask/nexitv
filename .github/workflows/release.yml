@@ -271,7 +271,16 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libmpv-dev \
-            patchelf
+            patchelf \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad \
+            gstreamer1.0-libav \
+            gstreamer1.0-gl \
+            gstreamer1.0-pulseaudio
+      # The AppImage bundles the GStreamer plugins above
+      # (bundleMediaFramework in tauri.linux.conf.json). WebKit needs them to
+      # play video, including the YouTube trailers.
       - run: npm ci
       - name: Check the libmpv being packaged supports the player's options
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib linked_libmpv_supports_the_picture_quality_options

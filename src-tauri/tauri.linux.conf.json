@@ -1,3 +1,10 @@
 {
-  "identifier": "com.nexitv.desktop"
+  "identifier": "com.nexitv.desktop",
+  "bundle": {
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    }
+  }
 }
