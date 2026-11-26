@@ -74,11 +74,21 @@ unsafe fn set_mpv_option(mpv: *mut mpv_handle, key: &str, value: &str) -> Result
     }
 }
 
+/// Options applied when HDR output is enabled.
+const HDR_OPTIONS: [(&str, &str); 5] = [
+    ("target-colorspace-hint", "yes"),
+    ("hdr-compute-peak", "auto"),
+    ("target-peak", "auto"),
+    ("target-prim", "auto"),
+    ("target-trc", "auto"),
+];
+
 /// Sets a rendering-quality option that older libmpv builds may not know.
 ///
-/// Linux AppImages bundle the build distro's libmpv (0.34 on Ubuntu 22.04),
-/// which lacks `target-colorspace-hint` and `gamut-mapping-mode` and rejects
-/// `tone-mapping=auto`. Those options only tune picture quality, so an
+/// Linux packages use the build distro's libmpv (the AppImage bundles it, the
+/// .deb depends on it). Releases are built where it supports every option here
+/// (see `linked_libmpv_supports_the_picture_quality_options`), but a distro
+/// libmpv can still be older. These options only tune picture quality, so an
 /// unknown option or value is logged and skipped instead of aborting playback.
 unsafe fn set_optional_mpv_option(
     mpv: *mut mpv_handle,
@@ -575,11 +585,9 @@ pub fn mpv_start(
         }
 
         if hdr {
-            set_optional_mpv_option(mpv, "target-colorspace-hint", "yes")?;
-            set_optional_mpv_option(mpv, "hdr-compute-peak", "auto")?;
-            set_optional_mpv_option(mpv, "target-peak", "auto")?;
-            set_optional_mpv_option(mpv, "target-prim", "auto")?;
-            set_optional_mpv_option(mpv, "target-trc", "auto")?;
+            for (key, value) in HDR_OPTIONS {
+                set_optional_mpv_option(mpv, key, value)?;
+            }
         }
 
         let tm = tone_mapping.as_deref().unwrap_or("auto");
@@ -1076,7 +1084,7 @@ mod recording_path_tests {
     use super::{
         build_diagnostic_sample, build_http_options, first_existing_file, mpv_log_level,
         resolve_recording_path, sanitize_mpv_log_text, set_mpv_option, set_optional_mpv_option,
-        ytdlp_script_option, MpvGuard, DIAGNOSTIC_PROPERTIES,
+        ytdlp_script_option, MpvGuard, DIAGNOSTIC_PROPERTIES, HDR_OPTIONS,
     };
     use serde_json::json;
     use std::collections::HashMap;
@@ -1263,6 +1271,24 @@ mod recording_path_tests {
             let error = set_mpv_option(mpv, "script-opt", &option).unwrap_err();
             assert_eq!(error, "Failed to set mpv option 'script-opt' (error -5)");
             assert!(!error.contains("Program Files"));
+        }
+    }
+
+    /// Release bundles ship or depend on the build host's libmpv, and the Linux
+    /// release job runs this test before packaging. A libmpv too old for these
+    /// options (like Ubuntu 22.04's 0.34) fails the release instead of shipping
+    /// with degraded picture settings.
+    #[test]
+    fn linked_libmpv_supports_the_picture_quality_options() {
+        unsafe {
+            let mpv = libmpv_sys::mpv_create();
+            assert!(!mpv.is_null());
+            let _guard = MpvGuard::new(mpv);
+
+            let quality = [("tone-mapping", "auto"), ("gamut-mapping-mode", "auto")];
+            for (key, value) in HDR_OPTIONS.iter().chain(quality.iter()) {
+                assert_eq!(set_mpv_option(mpv, key, value), Ok(()), "{key}={value}");
+            }
         }
     }
 
