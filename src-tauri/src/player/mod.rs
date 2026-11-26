@@ -74,6 +74,40 @@ unsafe fn set_mpv_option(mpv: *mut mpv_handle, key: &str, value: &str) -> Result
     }
 }
 
+/// Options applied when HDR output is enabled.
+const HDR_OPTIONS: [(&str, &str); 5] = [
+    ("target-colorspace-hint", "yes"),
+    ("hdr-compute-peak", "auto"),
+    ("target-peak", "auto"),
+    ("target-prim", "auto"),
+    ("target-trc", "auto"),
+];
+
+/// Sets a rendering-quality option that older libmpv builds may not know.
+///
+/// Linux packages use the build distro's libmpv (the AppImage bundles it, the
+/// .deb depends on it). Releases are built where it supports every option here
+/// (see `linked_libmpv_supports_the_picture_quality_options`), but a distro
+/// libmpv can still be older. These options only tune picture quality, so an
+/// unknown option or value is logged and skipped instead of aborting playback.
+unsafe fn set_optional_mpv_option(
+    mpv: *mut mpv_handle,
+    key: &str,
+    value: &str,
+) -> Result<(), String> {
+    let c_key = CString::new(key).map_err(|e| e.to_string())?;
+    let c_value = CString::new(value).map_err(|e| e.to_string())?;
+    let res = mpv_set_option_string(mpv, c_key.as_ptr(), c_value.as_ptr());
+    if res == mpv_error_MPV_ERROR_OPTION_NOT_FOUND || res == mpv_error_MPV_ERROR_OPTION_ERROR {
+        log::warn!("libmpv does not support option '{key}={value}' (error {res}); skipping");
+        Ok(())
+    } else if res < 0 {
+        Err(format!("Failed to set mpv option '{key}' (error {res})"))
+    } else {
+        Ok(())
+    }
+}
+
 /// Maps the frontend's `debugLogLevel` setting to the mpv client API log
 /// level requested via `mpv_request_log_messages`. mpv's own levels are more
 /// granular ("v", "debug", "trace" below "info"); "verbose" only goes one
@@ -551,18 +585,16 @@ pub fn mpv_start(
         }
 
         if hdr {
-            set_mpv_option(mpv, "target-colorspace-hint", "yes")?;
-            set_mpv_option(mpv, "hdr-compute-peak", "auto")?;
-            set_mpv_option(mpv, "target-peak", "auto")?;
-            set_mpv_option(mpv, "target-prim", "auto")?;
-            set_mpv_option(mpv, "target-trc", "auto")?;
+            for (key, value) in HDR_OPTIONS {
+                set_optional_mpv_option(mpv, key, value)?;
+            }
         }
 
         let tm = tone_mapping.as_deref().unwrap_or("auto");
-        set_mpv_option(mpv, "tone-mapping", tm)?;
+        set_optional_mpv_option(mpv, "tone-mapping", tm)?;
         // `clip` is mpv's explicitly low-quality path. gpu-next's automatic
         // selection chooses a perceptual mapping when the GPU supports it.
-        set_mpv_option(mpv, "gamut-mapping-mode", "auto")?;
+        set_optional_mpv_option(mpv, "gamut-mapping-mode", "auto")?;
 
         if mpv_initialize(mpv) < 0 {
             return Err("Failed to initialize mpv".to_string());
@@ -1051,8 +1083,8 @@ fn resolve_recording_path(path: &str, downloads: &Path) -> Result<PathBuf, Strin
 mod recording_path_tests {
     use super::{
         build_diagnostic_sample, build_http_options, first_existing_file, mpv_log_level,
-        resolve_recording_path, sanitize_mpv_log_text, set_mpv_option, ytdlp_script_option,
-        MpvGuard, DIAGNOSTIC_PROPERTIES,
+        resolve_recording_path, sanitize_mpv_log_text, set_mpv_option, set_optional_mpv_option,
+        ytdlp_script_option, MpvGuard, DIAGNOSTIC_PROPERTIES, HDR_OPTIONS,
     };
     use serde_json::json;
     use std::collections::HashMap;
@@ -1239,6 +1271,42 @@ mod recording_path_tests {
             let error = set_mpv_option(mpv, "script-opt", &option).unwrap_err();
             assert_eq!(error, "Failed to set mpv option 'script-opt' (error -5)");
             assert!(!error.contains("Program Files"));
+        }
+    }
+
+    /// Release bundles ship or depend on the build host's libmpv, and the Linux
+    /// release job runs this test before packaging. A libmpv too old for these
+    /// options (like Ubuntu 22.04's 0.34) fails the release instead of shipping
+    /// with degraded picture settings.
+    #[test]
+    fn linked_libmpv_supports_the_picture_quality_options() {
+        unsafe {
+            let mpv = libmpv_sys::mpv_create();
+            assert!(!mpv.is_null());
+            let _guard = MpvGuard::new(mpv);
+
+            let quality = [("tone-mapping", "auto"), ("gamut-mapping-mode", "auto")];
+            for (key, value) in HDR_OPTIONS.iter().chain(quality.iter()) {
+                assert_eq!(set_mpv_option(mpv, key, value), Ok(()), "{key}={value}");
+            }
+        }
+    }
+
+    #[test]
+    fn optional_mpv_options_skip_what_libmpv_does_not_support() {
+        unsafe {
+            let mpv = libmpv_sys::mpv_create();
+            assert!(!mpv.is_null());
+            let _guard = MpvGuard::new(mpv);
+
+            // Stands in for an option an older bundled libmpv lacks.
+            assert_eq!(
+                set_optional_mpv_option(mpv, "nexitv-missing-option", "yes"),
+                Ok(())
+            );
+            // A value the option rejects is skipped too.
+            assert_eq!(set_optional_mpv_option(mpv, "target-peak", "bogus"), Ok(()));
+            assert_eq!(set_optional_mpv_option(mpv, "target-peak", "auto"), Ok(()));
         }
     }
 }

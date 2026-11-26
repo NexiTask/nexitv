@@ -60,7 +60,9 @@ Current v0.x packages have these disclosed limitations:
 - Windows packages are not Authenticode-signed and may trigger SmartScreen.
 - macOS packages bundle libmpv. They use ad-hoc signing, so first launch may
   require the Open Anyway steps in the README.
-- Linux packages depend on compatible system libmpv and WebKit/Tauri libraries.
+- Linux packages are built on Ubuntu 24.04. The AppImage bundles its libmpv
+  (0.37); the .deb depends on the system libmpv and WebKit/Tauri libraries,
+  and needs Ubuntu 24.04, Debian 13, or a newer distribution.
 
 Do not describe a build as Authenticode-signed, Developer ID signed, notarized,
 stapled, or store-certified until the workflow performs and verifies that exact

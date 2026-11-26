@@ -8,6 +8,16 @@ for tagged releases.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-26
+
+### Fixed
+
+- Linux AppImage playback no longer stops with "Failed to set mpv option
+  'target-colorspace-hint'". The AppImage is now built on Ubuntu 24.04 and
+  bundles libmpv 0.37; options an older libmpv lacks are skipped.
+- Trailers play in the Linux AppImage, which now bundles the GStreamer plugins
+  WebKit needs for video.
+
 ## [0.2.0] - 2026-11-25
 
 ### Added
