@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, type ReactNode } from 'react';
-import { SlidersHorizontal, type LucideIcon } from 'lucide-react';
+import { LoaderCircle, SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { VirtualizedGrid } from './VirtualizedGrid';
 import type { MediaItem } from '../model/media';
@@ -357,6 +357,7 @@ export function CatalogPage({
   const isLoading = isLegacy
     ? isLegacyLoading
     : mode === 'pending' || indexed.isLoading || (isIndexed && !indexResult);
+  const isUpdating = !isLoading && (isIndexed ? indexed.isFetching : isFetching);
 
   const pageError = getCombinedErrorMessage([error, categoriesError], '');
   const errorPresentation = getErrorPresentation(pageError, title);
@@ -374,23 +375,41 @@ export function CatalogPage({
 
   const getCountMeta = () => {
     if (isLoading) {
-      if (type === 'vod') return t('Loading movies');
-      if (type === 'series') return t('Loading series');
-      return t('Loading channels');
+      const label =
+        type === 'vod'
+          ? t('Loading movies')
+          : type === 'series'
+            ? t('Loading series')
+            : t('Loading channels');
+      return (
+        <span className={styles.metaUpdating}>
+          <LoaderCircle size={13} className={styles.metaSpinner} aria-hidden="true" />
+          <span>{label}</span>
+        </span>
+      );
     }
-    if (type === 'vod') {
-      return tn('{count} movie', '{count} movies', itemCount, {
-        count: number(itemCount),
-      });
-    }
-    if (type === 'series') {
-      return tn('{count} series', '{count} series', itemCount, {
-        count: number(itemCount),
-      });
-    }
-    return tn('{count} channel', '{count} channels', itemCount, {
-      count: number(itemCount),
-    });
+    const countLabel =
+      type === 'vod'
+        ? tn('{count} movie', '{count} movies', itemCount, {
+            count: number(itemCount),
+          })
+        : type === 'series'
+          ? tn('{count} series', '{count} series', itemCount, {
+              count: number(itemCount),
+            })
+          : tn('{count} channel', '{count} channels', itemCount, {
+              count: number(itemCount),
+            });
+    if (!isUpdating) return countLabel;
+    return (
+      <>
+        <span>{countLabel}</span>
+        <span className={styles.metaUpdating} aria-live="polite">
+          <LoaderCircle size={13} className={styles.metaSpinner} aria-hidden="true" />
+          <span>{t('Updating…')}</span>
+        </span>
+      </>
+    );
   };
 
   return (
@@ -503,7 +522,7 @@ export function CatalogPage({
             <EmptyState icon={EmptyIcon} title={emptyTitle} description={emptyDescription} />
           </div>
         ) : (
-          <div className={styles.catalogContent}>
+          <div className={styles.catalogContent} aria-busy={isUpdating}>
             {type !== 'live' && catalogGenreBar && (
               <GenreFilterBar
                 items={indexGenreCounts ? undefined : categoryItems}

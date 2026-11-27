@@ -6,13 +6,19 @@ import {
   getSeries,
   getStreamUrl,
   getVodStreams,
+  promoteXtreamServer,
   type XtreamLiveStream,
   type XtreamSeries,
   type XtreamVodStream,
 } from '@/modules/sources/public/data/xtreamClient';
 import { desktopApi } from '@/platform/desktop';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
-import { loadProviderList, rememberProviderList, storeProviderList } from './catalogDiskCache';
+import {
+  loadProviderList,
+  refreshProviderListNative,
+  rememberProviderList,
+  storeProviderList,
+} from './catalogDiskCache';
 import { CATALOG_FRESH_MS } from './catalogFreshness';
 import { perfAsync, perfSync } from '@/platform/perf';
 import { queryKeys } from '@/modules/sources/public/model/queryKeys';
@@ -196,11 +202,35 @@ export async function refreshProviderCatalogs(
   for (const type of catalogTypes) {
     progress.onCatalogStarted?.(type);
     const queryKey = queryKeys.catalog(type, sources.queryScope);
+    const shouldUpdateCache =
+      !desktopApi.isDesktop() ||
+      sources.m3uSources.length > 0 ||
+      client.getQueryData(queryKey) !== undefined ||
+      (client.getQueryCache().find({ queryKey, exact: true })?.getObserversCount() ?? 0) > 0;
     const refreshed = await Promise.allSettled(
       targets.map(async (source) => {
         try {
           if (!source.credentials || !source.isAvailable) {
             throw new Error('The saved credential is unavailable');
+          }
+          if (desktopApi.isDesktop() && !shouldUpdateCache) {
+            const refreshedNative = await refreshProviderListNative(
+              source.id,
+              type,
+              source.queryScope,
+              source.credentials,
+            );
+            if (refreshedNative.activeUrl && refreshedNative.activeUrl !== source.credentials.url) {
+              promoteXtreamServer(source.id, refreshedNative.activeUrl);
+              notify.info(
+                'Backup Server Active',
+                'NexiTV switched this source to an available provider server.',
+                4500,
+                undefined,
+                'connection',
+              );
+            }
+            return { sourceId: source.id, items: [] };
           }
           const list = await fetchProviderRefresh(type, source);
           if (list.length === 0) {
@@ -212,8 +242,8 @@ export async function refreshProviderCatalogs(
               throw new Error('The provider returned an empty catalogue');
             }
           }
-          const items = mapXtreamList(type, source, list);
           await storeProviderList(source.id, type, source.queryScope, list);
+          const items = mapXtreamList(type, source, list);
           return { sourceId: source.id, items };
         } finally {
           progress.onListSettled();
@@ -226,7 +256,7 @@ export async function refreshProviderCatalogs(
       failed.set(source.id, source.profile.name);
       return [];
     });
-    if (!lists.length) continue;
+    if (!lists.length || !shouldUpdateCache) continue;
     await client.cancelQueries({ queryKey, exact: true });
     client.setQueryData<CatalogItem[]>(queryKey, (current) => {
       const base =

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Search, Tv, X } from 'lucide-react';
+import { LoaderCircle, Search, Tv, X } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { getXtreamCredentials, useAuthStore } from '@/modules/sources/public/store/useAuthStore';
 import { useLiveStreams, type CatalogItem } from '@/modules/catalog/public/data/useCatalog';
@@ -32,6 +32,7 @@ import { useLogoAspect } from '@/modules/catalog/public/hooks/useLogoAspect';
  */
 const ROW_HEIGHT = 46;
 const CATEGORY_CHUNK = 1_000;
+const SEARCH_DEBOUNCE_MS = 120;
 const NO_FAVORITES: { id: string }[] = [];
 const NO_CATEGORIES: { category_id: string; category_name: string }[] = [];
 const NO_OVERRIDES: Record<string, never> = {};
@@ -93,6 +94,16 @@ export function ChannelsDrawer() {
   );
 
   const [query, setQuery] = useState('');
+  const [settledQuery, setSettledQuery] = useState('');
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setSettledQuery('');
+      return;
+    }
+    const timer = window.setTimeout(() => setSettledQuery(trimmed), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [query]);
   const listRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const numberBufferRef = useRef('');
@@ -117,6 +128,9 @@ export function ChannelsDrawer() {
   // sources or while the index is being built.
   const indexAvailable = useLiveIndexAvailable();
   const [indexFailed, setIndexFailed] = useState(false);
+  useEffect(() => {
+    if (!shouldShow) setIndexFailed(false);
+  }, [shouldShow]);
   const fromIndex = indexAvailable && !indexFailed;
   const trimmedQuery = query.trim();
   const categoryParams = useMemo<IndexedPageParams>(
@@ -137,8 +151,8 @@ export function ChannelsDrawer() {
     [activeCategoryId, hiddenCategoryIds, streamFoldingEnabled],
   );
   const categoryPage = useIndexedCatalogPage('live', categoryParams, shouldShow && fromIndex);
-  const indexSearch = useIndexedSearch('live', trimmedQuery, {
-    enabled: shouldShow && fromIndex && trimmedQuery.length > 0,
+  const indexSearch = useIndexedSearch('live', settledQuery, {
+    enabled: shouldShow && fromIndex && settledQuery.length > 0,
     fold: streamFoldingEnabled,
     hiddenCategoryIds,
     head: 40,
@@ -147,6 +161,7 @@ export function ChannelsDrawer() {
     if (categoryPage.isError || indexSearch.isError) setIndexFailed(true);
   }, [categoryPage.isError, indexSearch.isError]);
   const searching = trimmedQuery.length > 0;
+  const searchSettling = searching && trimmedQuery !== settledQuery;
   const indexCount = searching
     ? (indexSearch.result?.total ?? 0)
     : (categoryPage.result?.total ?? 0);
@@ -162,7 +177,21 @@ export function ChannelsDrawer() {
     }
   }, [activeCategoryId, fromIndex, indexCount, requestIndexRange, searching]);
 
-  const { data: allChannels = [] } = useLiveStreams({ enabled: shouldShow && !fromIndex });
+  const {
+    data: allChannels = [],
+    isLoading: isLegacyLoading,
+    isFetching: isLegacyFetching,
+  } = useLiveStreams({ enabled: shouldShow && !fromIndex });
+  const isLoadingList = fromIndex
+    ? searching
+      ? searchSettling || indexSearch.isLoading
+      : categoryPage.isLoading || !categoryPage.result
+    : isLegacyLoading;
+  const isUpdatingList = fromIndex
+    ? searching
+      ? searchSettling || indexSearch.isLoading
+      : categoryPage.isFetching
+    : isLegacyFetching;
 
   // Scoped to the category the current channel was opened from — the full
   // catalogue is what caused the freeze this replaces, and it's also just
@@ -183,17 +212,6 @@ export function ChannelsDrawer() {
     if (!trimmed) return visible;
     return visible.filter((c) => c.title.toLowerCase().includes(trimmed));
   }, [allChannels, activeCategoryId, fromIndex, hiddenCategoryIds, query]);
-  const indexedChannels = useMemo(
-    () =>
-      fromIndex
-        ? Array.from({ length: indexCount }, (_, index) => getIndexItem(index)).filter(
-            (item): item is CatalogItem => Boolean(item),
-          )
-        : [],
-    [fromIndex, getIndexItem, indexCount],
-  );
-  // What the keyboard steps through: every loaded channel of the list.
-  const channels = fromIndex ? indexedChannels : legacyChannels;
   const listCount = fromIndex ? indexCount : legacyChannels.length;
   const channelAt = (index: number) => (fromIndex ? getIndexItem(index) : legacyChannels[index]);
 
@@ -226,11 +244,19 @@ export function ChannelsDrawer() {
 
   useEffect(() => {
     if (!shouldShow || !isLive || !activeStream) return;
+    const loadedChannels = () =>
+      fromIndex
+        ? Array.from({ length: indexCount }, (_, index) => getIndexItem(index)).filter(
+            (item): item is CatalogItem => Boolean(item),
+          )
+        : legacyChannels;
     const playByIndex = (delta: number) => {
-      const current = channels.findIndex(
+      const list = loadedChannels();
+      if (list.length === 0) return;
+      const current = list.findIndex(
         (channel) => (channel.sourceItemId || channel.id).toString() === activeKey,
       );
-      const next = channels[(current + delta + channels.length) % channels.length];
+      const next = list[(current + delta + list.length) % list.length];
       if (!next) return;
       const playable = playableFromMediaItem({ ...next, type: 'live' }, credentials);
       if (playable) playStream(playable);
@@ -250,7 +276,7 @@ export function ChannelsDrawer() {
       numberTimerRef.current = setTimeout(() => {
         const number = numberBufferRef.current;
         numberBufferRef.current = '';
-        const target = channels.find(
+        const target = loadedChannels().find(
           (channel) => String(channel.channelNum ?? '').replace(/^#/, '') === number,
         );
         if (target) {
@@ -264,7 +290,18 @@ export function ChannelsDrawer() {
       window.removeEventListener('keydown', onKeyDown);
       if (numberTimerRef.current) clearTimeout(numberTimerRef.current);
     };
-  }, [activeKey, activeStream, channels, credentials, isLive, playStream, shouldShow]);
+  }, [
+    activeKey,
+    activeStream,
+    credentials,
+    fromIndex,
+    getIndexItem,
+    indexCount,
+    isLive,
+    legacyChannels,
+    playStream,
+    shouldShow,
+  ]);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   const firstRow = virtualRows[0]?.index ?? 0;
@@ -303,7 +340,15 @@ export function ChannelsDrawer() {
               </button>
             </div>
             <div className={styles.searchWrapper}>
-              <Search size={15} className={styles.searchIcon} />
+              {isUpdatingList ? (
+                <LoaderCircle
+                  size={15}
+                  className={`${styles.searchIcon} ${styles.spinner}`}
+                  aria-hidden="true"
+                />
+              ) : (
+                <Search size={15} className={styles.searchIcon} />
+              )}
               <input
                 ref={searchInputRef}
                 type="text"
@@ -316,8 +361,17 @@ export function ChannelsDrawer() {
             </div>
           </div>
 
-          <div ref={listRef} className={`${drawerStyles.list} subtle-scrollbar`}>
-            {listCount === 0 ? (
+          <div
+            ref={listRef}
+            className={`${drawerStyles.list} subtle-scrollbar`}
+            aria-busy={isLoadingList || isUpdatingList}
+          >
+            {listCount === 0 && isLoadingList ? (
+              <div className={styles.channelsLoading} aria-live="polite">
+                <LoaderCircle size={16} className={styles.spinner} aria-hidden="true" />
+                <span>{searching ? t('Searching channels…') : t('Loading channels…')}</span>
+              </div>
+            ) : listCount === 0 ? (
               <div className={styles.channelsEmpty}>{t('No channels found.')}</div>
             ) : (
               <div
@@ -329,7 +383,26 @@ export function ChannelsDrawer() {
               >
                 {virtualRows.map((virtualRow) => {
                   const channel = channelAt(virtualRow.index);
-                  if (!channel) return null;
+                  if (!channel) {
+                    return (
+                      <div
+                        key={`pending-${virtualRow.index}`}
+                        className={styles.channelRowSkeleton}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: virtualRow.size,
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                        aria-hidden="true"
+                      >
+                        <span className={styles.channelLogoSkeleton} />
+                        <span className={styles.channelTitleSkeleton} />
+                      </div>
+                    );
+                  }
                   const isActive = (channel.sourceItemId || channel.id).toString() === activeKey;
                   const parsed = parseLiveChannelTitle(channel.title, customRules);
                   const badges = getPrimaryMediaTags(

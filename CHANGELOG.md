@@ -8,11 +8,33 @@ for tagged releases.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-27
+
+### Changed
+
+- Faster startup and significantly lower memory and disk usage: Home recommendations
+  load saved picks from the SQLite index without pulling the full series catalogue
+  into the webview, facet caches load lazily with idle eviction, SQLite reads use
+  a bounded reader pool with a capped WAL size, and live-channel folding is cached
+  across scroll chunks.
+- Desktop Xtream catalogue refreshes stream directly to disk and SQLite in Rust
+  with backup-server failover instead of round-tripping large JSON payloads through
+  the webview.
+- Loading and background work across Home, Recommendations, Catalog, EPG, Search,
+  drawers, and the M3U Editor are now non-blocking with inline loading indicators
+  and skeletons, including off-main-thread M3U parsing and recommendation request
+  preparation.
+
 ### Fixed
 
 - The Auto aspect ratio no longer fails with "mpv command 'set' failed with
   error -12" in the Linux AppImage. It now uses mpv's default aspect handling,
   which every bundled libmpv supports.
+- Recommendation generation now waits for hidden-category exclusions to resolve
+  before building requests, and indexed pick lookups refresh automatically after
+  facet builds or IMDb updates.
+- Switching sources or editing in the M3U Editor while a playlist or checkpoint is
+  loading no longer overwrites newer edits or leaves the loading state stuck.
 
 ## [0.2.1] - 2026-11-26
 

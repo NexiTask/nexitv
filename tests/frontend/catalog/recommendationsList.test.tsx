@@ -16,18 +16,38 @@ import { DataActivityStatus } from '@/app/components/DataActivityStatus';
 import { RecommendationsList } from '@/modules/library/pages/RecommendationsList';
 import { useSeriesRecommendations } from '@/modules/library/public/data/useSeriesRecommendations';
 import { useLibraryStore, type HistoryItem } from '@/modules/library/public/store/useLibraryStore';
+import { useAuthStore } from '@/modules/sources/store/useAuthStore';
+import { useSourceStore } from '@/modules/sources/store/useSourceStore';
 import { tauriApi } from '@/platform/tauri';
 import { useDataActivities } from '@/shared/lib/dataActivity';
 
-vi.mock('@/platform/desktop', () => ({ desktopApi: { isDesktop: () => true } }));
-vi.mock('@/modules/catalog/public/data/useCategories', () => ({
-  useVisibleCatalog: () => ({
+const catalogMocks = vi.hoisted(() => ({
+  useVisibleCatalog: vi.fn((_type?: string, _options?: { enabled?: boolean }) => ({
     data: [
       { id: 'test-series', title: 'The Fixture', type: 'series', posterUrl: '', genres: ['Crime'] },
     ],
     isLoading: false,
-  }),
-  useCategories: () => ({ data: [] }),
+  })),
+  useCategories: vi.fn((_type?: string, _options?: { enabled?: boolean }) => ({ data: [] })),
+  useHiddenCategoryState: vi.fn(() => ({
+    ids: new Set<string>(),
+    originIds: new Set<string>(),
+    isResolved: true,
+  })),
+}));
+
+vi.mock('@/platform/desktop', () => ({
+  desktopApi: {
+    isDesktop: () => true,
+    onCatalogIndexUpdated: vi.fn(() => Promise.resolve(() => {})),
+    onImdbRefreshed: vi.fn(() => Promise.resolve(() => {})),
+  },
+}));
+vi.mock('@/modules/catalog/public/data/useCategories', () => ({
+  useVisibleCatalog: catalogMocks.useVisibleCatalog,
+  useCategories: catalogMocks.useCategories,
+  useHiddenCategoryIds: () => new Set<string>(),
+  useHiddenCategoryState: catalogMocks.useHiddenCategoryState,
 }));
 vi.mock('@/modules/guide/public/data/useUpcomingReleases', () => ({
   useUpcomingReleases: () => ({ data: [] }),
@@ -189,5 +209,216 @@ it('loads saved Home cards when enabled and removes them if they enter Watch Nex
     read.mockRestore();
     generate.mockRestore();
     imdb.mockRestore();
+  }
+});
+
+it('looks up Home recommendation picks by id from the index without loading the full series catalogue', async () => {
+  const previousAuth = useAuthStore.getState();
+  const previousSources = useSourceStore.getState();
+  const sourceId = 'xtream-home-idx';
+  useAuthStore.setState({
+    profiles: [
+      {
+        id: sourceId,
+        kind: 'xtream',
+        name: 'Provider',
+        locationLabel: 'provider.test',
+        username: 'user',
+        userInfo: { auth: 1 } as never,
+        serverInfo: {} as never,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ],
+    runtimes: {
+      [sourceId]: {
+        credentials: {
+          sourceId,
+          url: 'https://provider.test',
+          username: 'user',
+          password: 'secret',
+        },
+        status: 'ready',
+        error: null,
+        revision: 1,
+      },
+    },
+    isInitializing: false,
+  });
+  useSourceStore.setState({
+    profiles: [],
+    runtimes: {},
+    enabledSourceIds: [sourceId],
+    isInitializing: false,
+  });
+  catalogMocks.useVisibleCatalog.mockClear();
+
+  const status = vi.spyOn(tauriApi, 'chatGptStatus').mockResolvedValue({
+    activeClient: 'client',
+    accounts: [{ clientId: 'client', label: 'Test', planPermission: true }],
+  });
+  const read = vi.spyOn(tauriApi, 'recommendationsCached').mockResolvedValue({
+    generatedAt: 1780000000,
+    picks: [{ key: JSON.stringify(['series', `${sourceId}:series:42`]), genreMatch: false }],
+  });
+  const byIds = vi.spyOn(tauriApi, 'catalogIndexItemsByIds').mockResolvedValue({
+    ready: true,
+    rows: [
+      {
+        sourceId,
+        ord: 0,
+        raw: { series_id: 42, name: 'Indexed Pick', cover: '', last_modified: '1700000000' },
+        imdb: { id: 'tt7654321', rating: 8.8, votes: 25000 },
+      },
+    ],
+  });
+  const imdb = vi.spyOn(tauriApi, 'catalogIndexImdb');
+  const client = new QueryClient();
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  try {
+    const { result } = renderHook(() => useSeriesRecommendations([], true), { wrapper });
+    await waitFor(() =>
+      expect(result.current.cards[0]?.item).toMatchObject({
+        id: `${sourceId}:series:42`,
+        title: 'Indexed Pick',
+        imdbId: 'tt7654321',
+        imdbRating: 8.8,
+        imdbVotes: 25000,
+      }),
+    );
+    expect(byIds).toHaveBeenCalledWith(
+      'series',
+      [expect.objectContaining({ sourceId })],
+      [`${sourceId}:series:42`],
+    );
+    expect(imdb).not.toHaveBeenCalled();
+    expect(catalogMocks.useVisibleCatalog).not.toHaveBeenCalledWith('series', { enabled: true });
+  } finally {
+    useAuthStore.setState({
+      profiles: previousAuth.profiles,
+      runtimes: previousAuth.runtimes,
+      isInitializing: previousAuth.isInitializing,
+    });
+    useSourceStore.setState({
+      profiles: previousSources.profiles,
+      runtimes: previousSources.runtimes,
+      enabledSourceIds: previousSources.enabledSourceIds,
+      isInitializing: previousSources.isInitializing,
+    });
+    status.mockRestore();
+    read.mockRestore();
+    byIds.mockRestore();
+    imdb.mockRestore();
+  }
+});
+
+it('shows a non-blocking loading indicator on RecommendationsList while saved picks load', async () => {
+  const previousSaved = useLibraryStore.getState().savedItems;
+  useLibraryStore.setState({ savedItems: [] });
+  let resolveCached!: (value: { generatedAt: number; picks: [] } | null) => void;
+  const status = vi.spyOn(tauriApi, 'chatGptStatus').mockResolvedValue({
+    activeClient: 'client',
+    accounts: [{ clientId: 'client', label: 'Test', planPermission: true }],
+  });
+  const read = vi.spyOn(tauriApi, 'recommendationsCached').mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        resolveCached = resolve;
+      }),
+  );
+  try {
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <RecommendationsList next={[]} onOpen={vi.fn()} />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('Loading recommendations…')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'No recommendations to show' })).toBeNull();
+    await waitFor(() => expect(read).toHaveBeenCalledOnce());
+    act(() => resolveCached(null));
+    expect(await screen.findByRole('heading', { name: 'No recommendations to show' })).toBeTruthy();
+  } finally {
+    useLibraryStore.setState({ savedItems: previousSaved });
+    status.mockRestore();
+    read.mockRestore();
+  }
+});
+
+it('waits until hidden-category exclusions resolve before enabling recommendation generation', async () => {
+  const sourceId = 'xtream-hidden-gate';
+  const previousProfiles = useAuthStore.getState().profiles;
+  const previousRuntimes = useAuthStore.getState().runtimes;
+  const previousEnabled = useSourceStore.getState().enabledSourceIds;
+  useAuthStore.setState({
+    profiles: [
+      {
+        id: sourceId,
+        kind: 'xtream',
+        name: 'Provider',
+        locationLabel: 'provider.test',
+        username: 'viewer',
+        userInfo: { auth: 1 } as never,
+        serverInfo: {} as never,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ],
+    runtimes: {
+      [sourceId]: {
+        credentials: {
+          sourceId,
+          url: 'https://provider.test',
+          username: 'viewer',
+          password: 'secret',
+        },
+        status: 'ready',
+        error: null,
+        revision: 1,
+      },
+    },
+  });
+  useSourceStore.setState({ enabledSourceIds: [sourceId] });
+  catalogMocks.useHiddenCategoryState.mockReturnValue({
+    ids: new Set<string>(),
+    originIds: new Set<string>(),
+    isResolved: false,
+  });
+  const status = vi.spyOn(tauriApi, 'chatGptStatus').mockResolvedValue({
+    activeClient: 'client',
+    accounts: [{ clientId: 'client', label: 'Test', planPermission: true }],
+  });
+  const read = vi.spyOn(tauriApi, 'recommendationsCached').mockResolvedValue(null);
+  try {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const { result, rerender } = renderHook(() => useSeriesRecommendations([], true, true), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.permission).toBe(true));
+    expect(result.current.canPrepare).toBe(false);
+
+    catalogMocks.useHiddenCategoryState.mockReturnValue({
+      ids: new Set<string>(['hidden-1']),
+      originIds: new Set<string>(['hidden-1']),
+      isResolved: true,
+    });
+    rerender();
+    expect(result.current.canPrepare).toBe(true);
+  } finally {
+    useAuthStore.setState({ profiles: previousProfiles, runtimes: previousRuntimes });
+    useSourceStore.setState({ enabledSourceIds: previousEnabled });
+    catalogMocks.useHiddenCategoryState.mockReturnValue({
+      ids: new Set<string>(),
+      originIds: new Set<string>(),
+      isResolved: true,
+    });
+    status.mockRestore();
+    read.mockRestore();
   }
 });

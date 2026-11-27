@@ -28,7 +28,7 @@ pub fn log(label: &str, duration_ms: Option<u128>, detail: &str) {
     eprintln!("[perf] t={}ms {label}{duration} {detail}", since_start_ms());
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn perf_log(label: String, at: u64, duration_ms: Option<u64>, detail: Option<String>) {
     log(
         &format!("js:{label}"),

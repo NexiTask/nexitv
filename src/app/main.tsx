@@ -28,13 +28,17 @@ async function renderApp() {
   if (import.meta.env.MODE === 'desktop-e2e') {
     await import('@wdio/tauri-plugin');
   }
-  await initializeTmdbApiKey().catch((error) => {
+  // Load the optional TMDB API key from the OS keyring in parallel so the
+  // initial UI render never waits on a Secret Service / Keychain IPC call.
+  void initializeTmdbApiKey().catch((error) => {
     console.warn('Could not initialize the TMDB credential vault', error);
   });
   const language = useSettingsStore.getState().language;
-  await ensureUiMessages(language).catch((error) => {
-    console.warn(`Could not preload the ${language} interface catalog`, error);
-  });
+  if (language !== 'en') {
+    await ensureUiMessages(language).catch((error) => {
+      console.warn(`Could not preload the ${language} interface catalog`, error);
+    });
+  }
   root.render(
     <StrictMode>
       <App />

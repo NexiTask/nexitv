@@ -140,10 +140,11 @@ export function LibraryMetadataSettingsSection() {
             type="password"
             aria-label="TMDB API key"
             autoComplete="off"
-            disabled={!settings.tmdbEnabled}
+            disabled={!settings.tmdbEnabled || settings.tmdbApiKeyLoading}
             value={settings.tmdbApiKey}
             onChange={(event) => settings.updateSetting('tmdbApiKey', event.target.value)}
             onBlur={() => {
+              if (settings.tmdbApiKeyLoading) return;
               void storeTmdbApiKey(settings.tmdbApiKey).catch((error: unknown) => {
                 notify.error(
                   'TMDB Key Not Saved',

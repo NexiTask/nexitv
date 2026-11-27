@@ -125,12 +125,46 @@ describe('typed Tauri IPC wrapper', () => {
       'catalog_cache_load',
       { sourceId: 'xtream-one', kind: 'series', scope: 'sources-abc' },
     ],
+    [
+      'catalogCacheRefresh',
+      [
+        {
+          sourceId: 'xtream-one',
+          kind: 'series',
+          scope: 'sources-abc',
+          serverUrls: ['https://provider.test'],
+          username: 'viewer',
+          password: 'secret',
+        },
+      ],
+      'catalog_cache_refresh',
+      {
+        request: {
+          sourceId: 'xtream-one',
+          kind: 'series',
+          scope: 'sources-abc',
+          serverUrls: ['https://provider.test'],
+          username: 'viewer',
+          password: 'secret',
+        },
+      },
+    ],
     ['catalogCacheDelete', ['xtream-one'], 'catalog_cache_delete', { sourceId: 'xtream-one' }],
     [
       'catalogIndexPageStatus',
       ['vod', [{ sourceId: 'xtream-one', scope: 'sources-abc' }]],
       'catalog_index_page_status',
       { kind: 'vod', sources: [{ sourceId: 'xtream-one', scope: 'sources-abc' }] },
+    ],
+    [
+      'catalogIndexItemsByIds',
+      ['series', [{ sourceId: 'xtream-one', scope: 'sources-abc' }], ['xtream-one:series:42']],
+      'catalog_index_items_by_ids',
+      {
+        kind: 'series',
+        sources: [{ sourceId: 'xtream-one', scope: 'sources-abc' }],
+        itemIds: ['xtream-one:series:42'],
+      },
     ],
     [
       'catalogIndexPageRows',

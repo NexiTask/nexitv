@@ -77,7 +77,7 @@ fn download_directory(app: &tauri::AppHandle, configured: Option<&str>) -> Resul
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn download_default_directory(app: tauri::AppHandle) -> Result<String, String> {
     download_directory(&app, None).map(|path| path.to_string_lossy().into_owned())
 }

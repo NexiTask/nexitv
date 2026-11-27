@@ -1,11 +1,19 @@
-import { useMemo } from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
-import { useCategories, useVisibleCatalog } from '@/modules/catalog/public/data/useCategories';
+import { useCallback, useMemo } from 'react';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { catalogQueryOptions } from '@/modules/catalog/public/data/useCatalog';
+import {
+  useCategories,
+  useHiddenCategoryState,
+  useVisibleCatalog,
+} from '@/modules/catalog/public/data/useCategories';
 import { imdbFactsQueryOptions, withImdbFacts } from '@/modules/catalog/public/data/useImdbFacts';
+import { useIndexedItemsByIds } from '@/modules/catalog/public/data/useIndexedCatalog';
 import { useUpcomingReleases } from '@/modules/guide/public/data/useUpcomingReleases';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
+import { useEnabledSources } from '@/modules/sources/public/hooks/useEnabledSources';
 import { desktopApi } from '@/platform/desktop';
-import { tauriApi } from '@/platform/tauri';
+import { tauriApi, type SeriesRecommendationRequest } from '@/platform/tauri';
+import { buildRecommendationRequestAsync } from './recommendationRequestBuilder';
 import { collectSeriesRecommendations } from './seriesRecommendations';
 import { useLibraryStore, type HistoryItem } from '../store/useLibraryStore';
 
@@ -16,9 +24,11 @@ export const seriesRecommendationQueryKey = (clientId: string | null) =>
 export function useSeriesRecommendations(
   next: HistoryItem[],
   enabled: boolean,
-  prepareEmpty = false,
+  includeCategories = false,
 ) {
   const desktop = desktopApi.isDesktop();
+  const queryClient = useQueryClient();
+  const sources = useEnabledSources();
   const accounts = useQuery({
     queryKey: chatGptAccountQueryKey,
     queryFn: tauriApi.chatGptStatus,
@@ -50,7 +60,17 @@ export function useSeriesRecommendations(
     }
     return ids;
   }, [snapshot.data]);
-  const loadCandidates = enabled && desktop && (prepareEmpty || savedSeriesIds.size > 0);
+  const savedSeriesIdList = useMemo(() => [...savedSeriesIds], [savedSeriesIds]);
+  const hasSavedPicks = savedSeriesIdList.length > 0;
+  const loadCandidates = enabled && desktop && hasSavedPicks;
+  // Look up only the handful of cached pick ids from the SQLite index instead
+  // of pulling the entire 90k+ series list into webview memory on page open.
+  const indexedPicks = useIndexedItemsByIds('series', savedSeriesIdList, loadCandidates, {
+    excludeHidden: true,
+  });
+  const needsFullCatalog =
+    loadCandidates &&
+    (!indexedPicks.eligible || (indexedPicks.settled && indexedPicks.items === null));
   const favorites = useLibraryStore((state) => state.favorites);
   const saved = useLibraryStore((state) => state.savedItems);
   const collections = useLibraryStore((state) => state.collections);
@@ -58,63 +78,157 @@ export function useSeriesRecommendations(
   const trackedSeries = useLibraryStore((state) => state.trackedSeries);
   const started = useLibraryStore((state) => state.startedSeries);
   const hideAdult = useSettingsStore((state) => state.catalogHideAdult);
-  const catalogue = useVisibleCatalog('series', { enabled: loadCandidates });
-  const categoryList = useCategories('series', { enabled: loadCandidates });
+  const catalogue = useVisibleCatalog('series', { enabled: needsFullCatalog });
+  const categoryList = useCategories('series', {
+    enabled: enabled && desktop && includeCategories,
+  });
+  const hiddenCategories = useHiddenCategoryState('series', {
+    enabled: enabled && desktop && includeCategories,
+  });
   const upcoming = useUpcomingReleases({
-    enabled: loadCandidates,
+    enabled: enabled && desktop && (includeCategories || hasSavedPicks),
     cachedOnly: true,
   });
   const today = new Date().toLocaleDateString('sv-SE');
+  const indexedItems = indexedPicks.items;
 
-  const data = useMemo(
-    () =>
-      collectSeriesRecommendations({
-        catalogue: loadCandidates
-          ? catalogue.data.filter(
-              (item) =>
-                (!hideAdult || !item.adult) && (prepareEmpty || savedSeriesIds.has(item.id)),
-            )
-          : [],
-        favorites: loadCandidates ? favorites : [],
-        saved: loadCandidates ? [...saved, ...collections.flatMap(({ items }) => items)] : [],
-        history: loadCandidates ? history : [],
-        trackedSeries: loadCandidates ? trackedSeries : {},
-        started: loadCandidates ? started : [],
-        next: loadCandidates ? next : [],
-        upcoming: loadCandidates ? (upcoming.data ?? []) : [],
-        categories: new Map(
-          categoryList.data?.map(({ category_id, category_name }) => [category_id, category_name]),
-        ),
-        today,
-      }),
-    [
-      loadCandidates,
-      prepareEmpty,
-      savedSeriesIds,
-      catalogue.data,
-      hideAdult,
-      favorites,
-      saved,
-      collections,
-      history,
-      trackedSeries,
-      started,
-      next,
-      upcoming.data,
-      categoryList.data,
+  const data = useMemo(() => {
+    const sourceCatalogue = needsFullCatalog ? catalogue.data : (indexedItems ?? []);
+    return collectSeriesRecommendations({
+      catalogue: loadCandidates
+        ? sourceCatalogue.filter(
+            (item) => (!hideAdult || !item.adult) && savedSeriesIds.has(item.id),
+          )
+        : [],
+      favorites: loadCandidates ? favorites : [],
+      saved: loadCandidates ? [...saved, ...collections.flatMap(({ items }) => items)] : [],
+      history: loadCandidates ? history : [],
+      trackedSeries: loadCandidates ? trackedSeries : {},
+      started: loadCandidates ? started : [],
+      next: loadCandidates ? next : [],
+      upcoming: loadCandidates ? (upcoming.data ?? []) : [],
+      categories: new Map(
+        categoryList.data?.map(({ category_id, category_name }) => [category_id, category_name]),
+      ),
       today,
-    ],
-  );
+    });
+  }, [
+    loadCandidates,
+    savedSeriesIds,
+    needsFullCatalog,
+    catalogue.data,
+    indexedItems,
+    hideAdult,
+    favorites,
+    saved,
+    collections,
+    history,
+    trackedSeries,
+    started,
+    next,
+    upcoming.data,
+    categoryList.data,
+    today,
+  ]);
   const cards = useMemo(
     () => (enabled ? data.groupPicks(snapshot.data?.picks ?? []) : []),
     [enabled, data, snapshot.data],
   );
+  const usingIndexedPicks = !needsFullCatalog && indexedItems !== null;
   const imdb = useQueries({
-    queries: cards.map(({ item }) => imdbFactsQueryOptions('series', item.id)),
+    queries: cards.map(({ item }) => ({
+      ...imdbFactsQueryOptions('series', item.id),
+      // Rows fetched through `useIndexedItemsByIds` already include IMDb facts
+      // (or confirmed null), so skip redundant per-card lookups for them.
+      enabled: Boolean(item.id) && !item.imdbId && !usingIndexedPicks,
+    })),
   });
-  const ratedCards = cards.map((card, index) => {
-    const facts = imdb[index]?.data;
-    return facts ? { ...card, item: withImdbFacts(card.item, facts) } : card;
-  });
-  return { accounts, activeId, permission, snapshot, catalogue, data, cards: ratedCards };
+  const ratedCards = useMemo(
+    () =>
+      cards.map((card, index) => {
+        const facts = imdb[index]?.data;
+        return facts ? { ...card, item: withImdbFacts(card.item, facts) } : card;
+      }),
+    [cards, imdb],
+  );
+
+  // Load the full series catalogue and assemble the ChatGPT payload on demand
+  // (off the UI thread in a Web Worker) only when the user starts a refresh.
+  const buildRequest = useCallback(async (): Promise<SeriesRecommendationRequest> => {
+    const queryOptions = catalogQueryOptions('series', sources, queryClient);
+    const hadCachedCatalog = queryClient.getQueryData(queryOptions.queryKey) !== undefined;
+    const rawCatalogue = sources.isAvailable
+      ? await queryClient.fetchQuery({
+          ...queryOptions,
+          ...(hadCachedCatalog ? {} : { gcTime: 0 }),
+        })
+      : catalogue.data;
+    const fullCatalogue = sources.isAvailable
+      ? rawCatalogue.filter(
+          (item) => !item.categoryId || !hiddenCategories.ids.has(item.categoryId),
+        )
+      : rawCatalogue;
+    const filteredCatalogue = fullCatalogue.filter((item) => !hideAdult || !item.adult);
+    const request = await buildRecommendationRequestAsync({
+      catalogue: filteredCatalogue,
+      favorites,
+      saved: [...saved, ...collections.flatMap(({ items }) => items)],
+      history,
+      trackedSeries,
+      started,
+      next,
+      upcoming: upcoming.data ?? [],
+      categories: new Map(
+        categoryList.data?.map(({ category_id, category_name }) => [category_id, category_name]),
+      ),
+      today,
+    });
+    if (request.catalogue.length === 0) {
+      throw new Error('No eligible series are available in your catalogue right now.');
+    }
+    return request;
+  }, [
+    sources,
+    queryClient,
+    hiddenCategories.ids,
+    catalogue.data,
+    hideAdult,
+    favorites,
+    saved,
+    collections,
+    history,
+    trackedSeries,
+    started,
+    next,
+    upcoming.data,
+    categoryList.data,
+    today,
+  ]);
+
+  const isLoading = Boolean(
+    enabled &&
+    desktop &&
+    (accounts.isPending ||
+      (activeId !== null && snapshot.isPending) ||
+      (hasSavedPicks &&
+        ((!needsFullCatalog && !indexedPicks.settled) ||
+          (needsFullCatalog && catalogue.isLoading)))),
+  );
+  const canPrepare = Boolean(
+    (!includeCategories || hiddenCategories.isResolved) &&
+    (sources.isAvailable || catalogue.data.length > 0 || data.hasCandidates),
+  );
+
+  return {
+    accounts,
+    activeId,
+    permission,
+    snapshot,
+    catalogue,
+    data,
+    cards: ratedCards,
+    isLoading,
+    canPrepare,
+    buildRequest,
+  };
 }

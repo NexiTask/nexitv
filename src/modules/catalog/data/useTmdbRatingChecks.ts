@@ -77,15 +77,17 @@ export function useTmdbRatingChecks(
   mediaType: 'movie' | 'tv',
   options: TmdbRatingCheckOptions = {},
 ): RatingLookups {
-  const { categoryNameMap } = options;
+  const { categoryNameMap, enabled = true } = options;
+  const tmdb = useTmdbLookupSettings();
+  const active = enabled && tmdb.enabled;
   const pool = useMemo(
-    () => items.filter((item) => providerRatingValue(item.rating) !== undefined),
-    [items],
+    () => (active ? items.filter((item) => providerRatingValue(item.rating) !== undefined) : []),
+    [active, items],
   );
   const source = useMemo<RatingHeadSource>(
     () => ({
-      scope: getItemSetQueryScope(pool.map((item) => item.id)),
-      hasCandidates: pool.length > 0,
+      scope: active ? getItemSetQueryScope(pool.map((item) => item.id)) : '',
+      hasCandidates: active && pool.length > 0,
       head: (lookups, genreFilter, limit) => {
         // In a genre, a title is a candidate when it belongs to the genre by
         // what is known, or when it is unchecked and nothing names its genre
@@ -100,7 +102,7 @@ export function useTmdbRatingChecks(
         return sortCatalogItems([...candidates], 'rating', lookups).slice(0, limit);
       },
     }),
-    [pool, categoryNameMap],
+    [active, pool, categoryNameMap],
   );
   return useTmdbRatingChecksFrom(source, mediaType, options);
 }

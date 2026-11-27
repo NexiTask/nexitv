@@ -164,4 +164,17 @@ describe('ChannelsDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'Close Channels' }));
     expect(usePlayerStore.getState().showChannelsDrawer).toBe(false);
   });
+
+  it('shows a loading indicator instead of an empty state while channels are loading', () => {
+    vi.mocked(useLiveStreams).mockReturnValue({
+      data: [],
+      isLoading: true,
+      isFetching: true,
+    } as unknown as ReturnType<typeof useLiveStreams>);
+
+    renderDrawer();
+
+    expect(screen.getByText('Loading channels…')).toBeTruthy();
+    expect(screen.queryByText('No channels found.')).toBeNull();
+  });
 });

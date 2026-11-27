@@ -264,6 +264,42 @@ describe('library store', () => {
     expect(useLibraryStore.getState().history).toHaveLength(200);
     expect(useLibraryStore.getState().history[0]!.id).toBe('movie-249');
   });
+
+  it('defers JSON.stringify until the debounce flush instead of serializing on every update', () => {
+    window.dispatchEvent(new Event('beforeunload'));
+    vi.useFakeTimers();
+    const stringifySpy = vi.spyOn(JSON, 'stringify');
+    try {
+      useLibraryStore.getState().updateHistory(progress({ currentTime: 60 }));
+      useLibraryStore.getState().updateHistory(progress({ currentTime: 63 }));
+      useLibraryStore.getState().updateHistory(progress({ currentTime: 66 }));
+
+      expect(stringifySpy).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(5_000);
+      expect(stringifySpy).toHaveBeenCalledTimes(1);
+      const saved = JSON.parse(localStorage.getItem('iptv-library-storage')!);
+      expect(saved.state.history[0].currentTime).toBe(66);
+
+      // Visibility hide flushes pending updates immediately without waiting for the 5s window.
+      useLibraryStore.getState().updateHistory(progress({ currentTime: 90 }));
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'hidden',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(stringifySpy).toHaveBeenCalledTimes(2);
+      const flushed = JSON.parse(localStorage.getItem('iptv-library-storage')!);
+      expect(flushed.state.history[0].currentTime).toBe(90);
+    } finally {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'visible',
+      });
+      stringifySpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('recently played channels', () => {

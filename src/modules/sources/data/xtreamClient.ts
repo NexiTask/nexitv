@@ -41,6 +41,7 @@ export const getStreamUrl = (
 
 import { useDebugStore, debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 import { promoteXtreamServer } from '../services/xtreamServerEvents';
+export { promoteXtreamServer };
 import { notify } from '@/shared/notifications/useNotificationStore';
 import { getErrorMessage } from '@/shared/lib/error';
 import { desktopApi } from '@/platform/desktop';

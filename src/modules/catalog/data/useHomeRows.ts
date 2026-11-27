@@ -13,6 +13,38 @@ import { CATALOG_FRESH_MS } from './catalogFreshness';
 
 export const INDEX_ROWS_ROOT = 'catalog_index_rows';
 
+// One shared Tauri event listener across all Home pools instead of 5 separate
+// IPC listener registrations on every Home mount.
+const indexUpdateSubscribers = new Set<(kind: string) => void>();
+let sharedUnlisten: (() => void) | null = null;
+let sharedListenerPending = false;
+
+function subscribeIndexUpdates(callback: (kind: string) => void): () => void {
+  indexUpdateSubscribers.add(callback);
+  if (!sharedUnlisten && !sharedListenerPending) {
+    sharedListenerPending = true;
+    void desktopApi
+      .onCatalogIndexUpdated((kind) => {
+        for (const subscriber of indexUpdateSubscribers) subscriber(kind);
+      })
+      .then((stop) => {
+        sharedListenerPending = false;
+        if (indexUpdateSubscribers.size === 0) stop();
+        else sharedUnlisten = stop;
+      })
+      .catch(() => {
+        sharedListenerPending = false;
+      });
+  }
+  return () => {
+    indexUpdateSubscribers.delete(callback);
+    if (indexUpdateSubscribers.size === 0 && sharedUnlisten) {
+      sharedUnlisten();
+      sharedUnlisten = null;
+    }
+  };
+}
+
 export interface IndexPool {
   /**
    * Candidates for a Home row, in index order, with hidden categories left
@@ -86,21 +118,12 @@ export function useIndexPool(
 
   useEffect(() => {
     if (!desktop) return;
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    void desktopApi
-      .onCatalogIndexUpdated((kind) => {
+    return subscribeIndexUpdates((kind) => {
+      if (kind === type) {
         void client.invalidateQueries({ queryKey: [INDEX_ROWS_ROOT, kind] });
-      })
-      .then((stop) => {
-        if (cancelled) stop();
-        else unlisten = stop;
-      });
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [client, desktop]);
+      }
+    });
+  }, [client, desktop, type]);
 
   const query = useQuery({
     queryKey: [INDEX_ROWS_ROOT, type, order, limit, sources.queryScope, hiddenKey],

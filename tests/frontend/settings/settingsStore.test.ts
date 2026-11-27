@@ -74,9 +74,12 @@ describe('settings store', () => {
     expect(useSettingsStore.getState().themePreference).toBe('dark');
   });
 
-  it('never persists the TMDB API key in localStorage', () => {
+  it('never persists the TMDB API key or its loading flag in localStorage', () => {
     useSettingsStore.getState().updateSetting('tmdbApiKey', 'super-secret-tmdb-key');
-    expect(localStorage.getItem('iptv-settings-storage')).not.toContain('super-secret-tmdb-key');
+    useSettingsStore.getState().setTmdbApiKeyLoading(true);
+    const persisted = localStorage.getItem('iptv-settings-storage') ?? '';
+    expect(persisted).not.toContain('super-secret-tmdb-key');
+    expect(persisted).not.toContain('tmdbApiKeyLoading');
   });
 
   it('clamps finite native volume and keeps the last audible value through mute', () => {

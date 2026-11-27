@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MediaItem } from '@/modules/catalog/public/model/media';
 import { uiLanguageDefinition } from '@/shared/i18n/config';
@@ -54,10 +54,20 @@ interface UpcomingSnapshot {
   releases: UpcomingRelease[];
 }
 
+let cachedSnapshots: { raw: string | null; entries: UpcomingSnapshot[] } | undefined;
+
 function readSnapshots(): UpcomingSnapshot[] {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(SNAPSHOT_STORAGE_KEY) ?? '[]');
-    return Array.isArray(parsed) ? (parsed as UpcomingSnapshot[]) : [];
+    const raw = localStorage.getItem(SNAPSHOT_STORAGE_KEY);
+    if (cachedSnapshots && cachedSnapshots.raw === raw) return cachedSnapshots.entries;
+    if (!raw) {
+      cachedSnapshots = { raw: null, entries: [] };
+      return cachedSnapshots.entries;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    const entries = Array.isArray(parsed) ? (parsed as UpcomingSnapshot[]) : [];
+    cachedSnapshots = { raw, entries };
+    return entries;
   } catch {
     return [];
   }
@@ -65,11 +75,16 @@ function readSnapshots(): UpcomingSnapshot[] {
 
 function writeSnapshot(snapshot: UpcomingSnapshot): void {
   try {
-    const rest = readSnapshots().filter((entry) => entry.key !== snapshot.key);
-    localStorage.setItem(
-      SNAPSHOT_STORAGE_KEY,
-      JSON.stringify([snapshot, ...rest].slice(0, MAX_SNAPSHOTS)),
+    const existing = readSnapshots();
+    const current = existing.find((entry) => entry.key === snapshot.key);
+    if (current && current.day === snapshot.day && current.savedAt === snapshot.savedAt) return;
+    const next = [snapshot, ...existing.filter((entry) => entry.key !== snapshot.key)].slice(
+      0,
+      MAX_SNAPSHOTS,
     );
+    const raw = JSON.stringify(next);
+    localStorage.setItem(SNAPSHOT_STORAGE_KEY, raw);
+    cachedSnapshots = { raw, entries: next };
   } catch {
     // Persisting is a start-up convenience; the live query still works without it.
   }
@@ -154,13 +169,18 @@ export function useUpcomingReleases(hookOptions: UpcomingReleaseOptions = {}) {
   const historyDays = useSettingsStore((state) => state.upcomingHistoryDays);
   const queryClient = useQueryClient();
 
-  const requestedFavoriteIds = hookOptions.favoriteIds ? new Set(hookOptions.favoriteIds) : null;
-  const trackedFavorites = favorites.filter(
-    (item) =>
-      (item.type === 'series' || item.type === 'vod') &&
-      item.title.trim() &&
-      (!requestedFavoriteIds || requestedFavoriteIds.has(item.id)),
-  );
+  const favoriteIdsKey = hookOptions.favoriteIds?.join('|') ?? null;
+  const trackedFavorites = useMemo(() => {
+    const requestedFavoriteIds = hookOptions.favoriteIds ? new Set(hookOptions.favoriteIds) : null;
+    return favorites.filter(
+      (item) =>
+        (item.type === 'series' || item.type === 'vod') &&
+        item.title.trim() &&
+        (!requestedFavoriteIds || requestedFavoriteIds.has(item.id)),
+    );
+    // favoriteIdsKey tracks the caller's id list across inline array literals.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [favorites, favoriteIdsKey]);
   const language =
     tmdbLanguage === 'auto' ? uiLanguageDefinition(appLanguage).locale : tmdbLanguage;
   const enabled =
@@ -174,19 +194,26 @@ export function useUpcomingReleases(hookOptions: UpcomingReleaseOptions = {}) {
     includeAdult: tmdbIncludeAdult,
     imageSize: tmdbImageSize,
   };
-  const scope = favoriteScope(trackedFavorites);
+  const scope = useMemo(() => favoriteScope(trackedFavorites), [trackedFavorites]);
   const calendarDay = calendarDayKey(new Date());
   // The snapshot key leaves out the calendar day so yesterday's schedule can
   // still fill the screen instantly while today's is fetched.
-  const snapshotKey = JSON.stringify([
-    scope,
-    language,
-    tmdbIncludeAdult,
-    tmdbImageSize,
-    exactTimesEnabled,
-    historyDays,
-  ]);
-  const snapshot = enabled ? readSnapshots().find((entry) => entry.key === snapshotKey) : undefined;
+  const snapshotKey = useMemo(
+    () =>
+      JSON.stringify([
+        scope,
+        language,
+        tmdbIncludeAdult,
+        tmdbImageSize,
+        exactTimesEnabled,
+        historyDays,
+      ]),
+    [scope, language, tmdbIncludeAdult, tmdbImageSize, exactTimesEnabled, historyDays],
+  );
+  const snapshot = useMemo(
+    () => (enabled ? readSnapshots().find((entry) => entry.key === snapshotKey) : undefined),
+    [enabled, snapshotKey],
+  );
 
   const query = useQuery({
     queryKey: queryKeys.tmdbUpcoming(

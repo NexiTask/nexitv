@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, CalendarClock, Clapperboard, Film, ListFilter, RefreshCw } from 'lucide-react';
+import {
+  Calendar,
+  CalendarClock,
+  Clapperboard,
+  Film,
+  ListFilter,
+  LoaderCircle,
+  RefreshCw,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { MediaItem, MediaOpenContext } from '@/modules/catalog/public/model/media';
 import { useUpcomingReleases } from '../data/useUpcomingReleases';
@@ -33,6 +41,7 @@ export function UpcomingSchedule({
   const favorites = useLibraryStore((state) => state.favorites);
   const tmdbEnabled = useSettingsStore((state) => state.tmdbEnabled);
   const tmdbApiKey = useSettingsStore((state) => state.tmdbApiKey);
+  const tmdbApiKeyLoading = useSettingsStore((state) => state.tmdbApiKeyLoading);
   const upcomingEnabled = useSettingsStore((state) => state.upcomingEnabled);
   const upcomingCalendarEnabled = useSettingsStore((state) => state.upcomingCalendarEnabled);
   const countdownEnabled = useSettingsStore((state) => state.upcomingCountdownEnabled);
@@ -92,6 +101,7 @@ export function UpcomingSchedule({
   const trackedFavorites = favorites.filter(
     (item) => item.type === 'series' || item.type === 'vod',
   );
+  const waitingForTmdbKey = tmdbEnabled && tmdbApiKeyLoading && !tmdbApiKey.trim();
   const canLoadSchedule =
     upcomingEnabled && tmdbEnabled && Boolean(tmdbApiKey.trim()) && trackedFavorites.length > 0;
   const updatedLabel =
@@ -139,7 +149,7 @@ export function UpcomingSchedule({
           actionLabel={t('Open Settings')}
           onAction={() => navigate('/settings?section=coming-up')}
         />
-      ) : !tmdbEnabled || !tmdbApiKey.trim() ? (
+      ) : !waitingForTmdbKey && (!tmdbEnabled || !tmdbApiKey.trim()) ? (
         <EmptyState
           icon={CalendarClock}
           title={t('Connect TMDB to see your schedule')}
@@ -157,12 +167,21 @@ export function UpcomingSchedule({
             'Add movies or series to Favorites and NexiTV will keep their upcoming and recent release dates here.',
           )}
         />
-      ) : schedule.isLoading && !schedule.data ? (
-        <EmptyState
-          icon={CalendarClock}
-          title={t('Building your release schedule')}
-          description={t('Checking release dates for your favorite movies and series…')}
-        />
+      ) : (waitingForTmdbKey || schedule.isLoading) && !schedule.data ? (
+        <div className={styles.loadingState} aria-busy="true" aria-live="polite">
+          <div className={styles.loadingBanner}>
+            <LoaderCircle size={16} className={styles.spinning} aria-hidden="true" />
+            <div>
+              <strong>{t('Building your release schedule')}</strong>
+              <p>{t('Checking release dates for your favorite movies and series…')}</p>
+            </div>
+          </div>
+          <div className={styles.loadingRows} aria-hidden="true">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div key={index} className={styles.loadingRow} />
+            ))}
+          </div>
+        </div>
       ) : schedule.isError && !schedule.data ? (
         <EmptyState
           icon={CalendarClock}

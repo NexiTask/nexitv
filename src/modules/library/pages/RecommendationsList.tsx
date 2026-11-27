@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Sparkles } from 'lucide-react';
+import { LoaderCircle, Sparkles } from 'lucide-react';
 import { CatalogPageHeader } from '@/modules/catalog/public/components/CatalogPageHeader';
 import { MediaCard } from '@/modules/catalog/public/components/MediaCard';
 import type { MediaItem } from '@/modules/catalog/public/model/media';
@@ -12,6 +12,7 @@ import { getErrorMessage } from '@/shared/lib/error';
 import { trackDataActivity } from '@/shared/lib/dataActivity';
 import { Button } from '@/shared/ui/Button';
 import { EmptyState } from '@/shared/ui/EmptyState';
+import { GridSkeleton } from '@/shared/ui/Skeleton';
 import { RecommendationTrailers } from '../components/RecommendationTrailers';
 import type { HistoryItem } from '../store/useLibraryStore';
 import { useAutomatedRecommendations } from '../data/useAutomatedRecommendations';
@@ -44,18 +45,30 @@ export function RecommendationsList({
   const desktop = desktopApi.isDesktop();
   const smartEnabled = useSettingsStore((state) => state.recommendationsEnabled);
   const automated = useAutomatedRecommendations(next, true);
-  const { accounts, activeId, permission, snapshot, catalogue, data, cards } =
-    useSeriesRecommendations(next, smartEnabled, true);
-  const { createRequest, matchingGenres, hasCandidates } = data;
+  const {
+    accounts,
+    activeId,
+    permission,
+    snapshot,
+    catalogue,
+    data,
+    cards,
+    isLoading,
+    canPrepare,
+    buildRequest,
+  } = useSeriesRecommendations(next, smartEnabled, true);
+  const { matchingGenres } = data;
   const generate = useMutation({
     mutationKey: generateKey,
     mutationFn: (clientId: string) =>
       trackDataActivity(
         'recommendations',
-        (_progress, reportDetail) =>
-          tauriApi.recommendationsGenerate(clientId, createRequest(), (stage) =>
+        async (_progress, reportDetail) => {
+          const request = await buildRequest();
+          return tauriApi.recommendationsGenerate(clientId, request, (stage) =>
             reportDetail({ phase: 'generate-recommendations', stage }),
-          ),
+          );
+        },
         { phase: 'generate-recommendations', stage: 'preparing' },
       ),
     onSuccess: (result, clientId) =>
@@ -63,9 +76,7 @@ export function RecommendationsList({
     onError: () => void queryClient.invalidateQueries({ queryKey: chatGptAccountQueryKey }),
   });
   const generating = useIsMutating({ mutationKey: generateKey }) > 0;
-  const canGenerate = Boolean(
-    permission && !generating && !snapshot.isFetching && !catalogue.isLoading && hasCandidates,
-  );
+  const canGenerate = Boolean(permission && !generating && !snapshot.isFetching && canPrepare);
   const results = cards.map((card) => {
     const match = card.genreMatch ? matchingGenres(card.item) : undefined;
     const reason = match?.genres.length
@@ -81,6 +92,8 @@ export function RecommendationsList({
     return { ...card, reason: card.reason ?? reason };
   });
   const recommendations = mixSeriesRecommendations(results, automated);
+  const showInitialLoading =
+    smartEnabled && recommendations.length === 0 && (isLoading || generating);
 
   return (
     <>
@@ -109,7 +122,11 @@ export function RecommendationsList({
                 disabled={!canGenerate}
                 onClick={() => activeId && generate.mutate(activeId)}
               >
-                <Sparkles size={16} aria-hidden="true" />
+                {generating ? (
+                  <LoaderCircle size={16} className={styles.spinner} aria-hidden="true" />
+                ) : (
+                  <Sparkles size={16} aria-hidden="true" />
+                )}
                 <span>
                   {generating
                     ? t('Generating…')
@@ -122,7 +139,7 @@ export function RecommendationsList({
           )
         }
       />
-      <div className={styles.content}>
+      <div className={styles.content} aria-busy={isLoading || generating}>
         {smartEnabled && (
           <p className={styles.notice}>
             {t(
@@ -139,6 +156,12 @@ export function RecommendationsList({
               )}
             </p>
           )}
+        {smartEnabled && generating && recommendations.length > 0 && (
+          <div className={styles.loadingBanner} aria-live="polite">
+            <LoaderCircle size={16} className={styles.spinner} aria-hidden="true" />
+            <span>{t('Refreshing recommendations in the background…')}</span>
+          </div>
+        )}
         {recommendations.length > 0 ? (
           <RecommendationTrailers
             items={recommendations.map(({ card }) => card.item)}
@@ -173,18 +196,26 @@ export function RecommendationsList({
               </>
             )}
           </RecommendationTrailers>
+        ) : showInitialLoading ? (
+          <div className={styles.loadingSection} aria-live="polite">
+            <div className={styles.loadingBanner}>
+              <LoaderCircle size={16} className={styles.spinner} aria-hidden="true" />
+              <span>
+                {generating ? t('Finding series for you…') : t('Loading recommendations…')}
+              </span>
+            </div>
+            <GridSkeleton count={8} />
+          </div>
         ) : (
           <EmptyState
             icon={Sparkles}
-            title={generating ? 'Finding series for you' : 'No recommendations to show'}
+            title="No recommendations to show"
             description={
               !smartEnabled
                 ? 'Save a series to your library to see it here before you start watching.'
-                : snapshot.isFetching || catalogue.isLoading
-                  ? 'Loading series and saved recommendations…'
-                  : snapshot.data
-                    ? 'Refresh to get picks from your current sources and viewing activity.'
-                    : 'Generate recommendations from your favorites, viewing activity, and available series.'
+                : snapshot.data
+                  ? 'Refresh to get picks from your current sources and viewing activity.'
+                  : 'Generate recommendations from your favorites, viewing activity, and available series.'
             }
           />
         )}

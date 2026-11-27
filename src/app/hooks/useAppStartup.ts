@@ -49,10 +49,27 @@ export function useAppStartup() {
       .catch(() => undefined);
   }, [initializeAuth, initializeSources, refreshStaleSources]);
 
+  const LEGACY_M3U_DB_CLEANED_KEY = 'movena-legacy-m3u-db-cleaned-v1';
+
   useEffect(() => {
-    void import('@/modules/m3u-editor/services/m3uEditorStorage')
-      .then(({ deleteLegacyM3uEditorDatabase }) => deleteLegacyM3uEditorDatabase())
-      .catch(() => undefined);
+    try {
+      if (localStorage.getItem(LEGACY_M3U_DB_CLEANED_KEY) === '1') return;
+    } catch {
+      // Storage unavailable; still attempt cleanup lazily.
+    }
+    const timer = window.setTimeout(() => {
+      void import('@/modules/m3u-editor/services/m3uEditorStorage')
+        .then(({ deleteLegacyM3uEditorDatabase }) => deleteLegacyM3uEditorDatabase())
+        .then(() => {
+          try {
+            localStorage.setItem(LEGACY_M3U_DB_CLEANED_KEY, '1');
+          } catch {
+            // Best effort.
+          }
+        })
+        .catch(() => undefined);
+    }, 5_000);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return {

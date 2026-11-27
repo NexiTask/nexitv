@@ -1,4 +1,5 @@
-import { tauriApi, type CatalogCacheKind } from '@/platform/tauri';
+import { tauriApi, type CatalogCacheKind, type CatalogRefreshResult } from '@/platform/tauri';
+import type { XtreamCredentials } from '@/modules/sources/public/model/xtream';
 import { desktopApi } from '@/platform/desktop';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
 import { trackDataActivity } from '@/shared/lib/dataActivity';
@@ -67,6 +68,54 @@ export async function storeProviderList(
     await store;
   } finally {
     if (activeStores.get(key) === store) activeStores.delete(key);
+  }
+}
+
+/**
+ * Stream an Xtream catalogue directly into the desktop cache and SQLite index
+ * in Rust without parsing or serialising the full JSON array in the webview.
+ */
+export async function refreshProviderListNative(
+  sourceId: string,
+  kind: CatalogCacheKind,
+  scope: string,
+  credentials: XtreamCredentials,
+): Promise<CatalogRefreshResult> {
+  const key = `${sourceId}:${kind}`;
+  clearTimeout(pendingStores.get(key));
+  pendingStores.delete(key);
+  const prior = activeStores.get(key);
+  const serverUrls = Array.from(
+    new Set([credentials.url, ...(credentials.alternativeUrls ?? [])].filter(Boolean)),
+  );
+  let result!: CatalogRefreshResult;
+  const task = (async () => {
+    if (prior) await prior.catch(() => undefined);
+    result = await perfAsync(
+      `refresh:native:${kind}`,
+      () =>
+        trackDataActivity(
+          'catalog',
+          () =>
+            tauriApi.catalogCacheRefresh({
+              sourceId,
+              kind,
+              scope,
+              serverUrls,
+              username: credentials.username,
+              password: credentials.password,
+            }),
+          { phase: 'fetch-catalog', kind },
+        ),
+      (answer) => `items=${answer.itemCount}`,
+    );
+  })();
+  activeStores.set(key, task);
+  try {
+    await task;
+    return result;
+  } finally {
+    if (activeStores.get(key) === task) activeStores.delete(key);
   }
 }
 

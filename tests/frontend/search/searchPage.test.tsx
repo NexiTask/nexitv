@@ -302,4 +302,30 @@ describe('search page controls', () => {
     expect(await screen.findByRole('button', { name: 'Dune Francais' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Dune Deutsch' })).toBeNull();
   });
+
+  it('keeps current results visible and shows a non-blocking searching indicator while refining a query', async () => {
+    const user = userEvent.setup();
+    vi.mocked(useVodStreams).mockReturnValue(
+      vodQuery([
+        { id: 'd1', title: 'Dune', posterUrl: '', type: 'vod' },
+        { id: 'd2', title: 'Dune Part Two', posterUrl: '', type: 'vod' },
+      ]),
+    );
+
+    render(
+      <MemoryRouter initialEntries={['/search?q=Dune&type=movies']}>
+        <SearchPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Dune' })).toBeTruthy();
+
+    await user.type(
+      screen.getByRole('textbox', { name: 'Search movies, series, or live channels' }),
+      ' Part',
+    );
+
+    expect(screen.getByText('Searching…')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Dune' })).toBeTruthy();
+  });
 });

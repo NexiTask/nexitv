@@ -190,14 +190,18 @@ export function VirtualizedGrid({
               }}
             >
               {rowItems.map((item, colIndex) => {
-                // A row still loading keeps its place, so nothing shifts when it arrives.
+                // A row still loading keeps its place with a subtle skeleton so nothing shifts when it arrives.
                 if (!item) {
                   return (
                     <div
                       key={`pending-${startIndex + colIndex}`}
                       className={styles.itemWrapper}
                       aria-hidden="true"
-                    />
+                    >
+                      <div
+                        className={`${styles.pendingTile} ${isListMode ? styles.pendingListTile : isLiveTv ? styles.pendingLiveTile : ''}`}
+                      />
+                    </div>
                   );
                 }
                 const isFirstCol = colIndex === 0;

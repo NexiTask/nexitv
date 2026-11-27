@@ -241,12 +241,34 @@
 }
 
 .catalogMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   flex-shrink: 0;
   color: var(--text-muted);
   font-size: var(--font-size-small);
   font-weight: var(--font-weight-medium);
   line-height: var(--line-height-normal);
   white-space: nowrap;
+}
+
+.metaUpdating {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-secondary);
+}
+
+.metaSpinner {
+  flex-shrink: 0;
+  color: var(--accent-foreground);
+  animation: routeSpin var(--duration-loop-normal) linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metaSpinner {
+    animation: none;
+  }
 }
 
 .catalogInset {

@@ -221,4 +221,18 @@ describe('EPG TV Guide Features', () => {
     expect(screen.queryByText('BBC One')).toBeNull();
     useLibraryStore.setState({ recentChannels: [] });
   });
+
+  it('renders skeleton rows while channels are loading without showing an empty state', () => {
+    vi.mocked(useLiveStreams).mockReturnValue({
+      data: [],
+      isLoading: true,
+      isFetching: true,
+    } as unknown as ReturnType<typeof useLiveStreams>);
+
+    const { container } = renderEpg();
+
+    expect(screen.getByText('Loading channels')).toBeTruthy();
+    expect(screen.queryByText('No Channels Here')).toBeNull();
+    expect(container.querySelectorAll('[class*="channelSkeleton"]').length).toBeGreaterThan(0);
+  });
 });

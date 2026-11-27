@@ -238,9 +238,9 @@ export function createI18n(language: UiLanguage): I18nApi {
       return t(message, { count, ...values });
     },
     number: (value, options) => cachedNumberFormat(locale, options).format(value),
-    date: (value, options) => new Intl.DateTimeFormat(locale, options).format(value),
+    date: (value, options) => cachedDateTimeFormat(locale, options).format(value),
     time: (value, options) =>
-      new Intl.DateTimeFormat(locale, {
+      cachedDateTimeFormat(locale, {
         hour: '2-digit',
         minute: '2-digit',
         ...options,
@@ -250,6 +250,7 @@ export function createI18n(language: UiLanguage): I18nApi {
 }
 
 const NUMBER_FORMATS = new Map<string, Intl.NumberFormat>();
+const DATE_TIME_FORMATS = new Map<string, Intl.DateTimeFormat>();
 
 /** Building an Intl.NumberFormat is slow; a card grid asks for the same few. */
 function cachedNumberFormat(locale: string, options?: Intl.NumberFormatOptions): Intl.NumberFormat {
@@ -258,6 +259,20 @@ function cachedNumberFormat(locale: string, options?: Intl.NumberFormatOptions):
   if (!format) {
     format = new Intl.NumberFormat(locale, options);
     NUMBER_FORMATS.set(key, format);
+  }
+  return format;
+}
+
+/** Constructing Intl.DateTimeFormat per card is slow in WebKitGTK; reuse by options key. */
+function cachedDateTimeFormat(
+  locale: string,
+  options?: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  const key = `${locale}|${options ? JSON.stringify(options) : ''}`;
+  let format = DATE_TIME_FORMATS.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, options);
+    DATE_TIME_FORMATS.set(key, format);
   }
   return format;
 }

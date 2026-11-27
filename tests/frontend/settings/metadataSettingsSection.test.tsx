@@ -3,9 +3,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as renderUi, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LibraryMetadataSettingsSection } from '@/modules/settings/components/LibraryMetadataSettingsSection';
 import { useSettingsStore } from '@/modules/settings/store/useSettingsStore';
+import { tauriApi } from '@/platform/tauri';
 
 // The content filter reads the provider's categories.
 function render(ui: ReactElement) {
@@ -70,5 +71,19 @@ describe('library and metadata settings', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Bollywood' }));
     expect(useSettingsStore.getState().catalogHiddenKeywords).toEqual([]);
+  });
+
+  it('disables the TMDB API key input and skips vault writes while loading from the keyring', () => {
+    const deleteSpy = vi.spyOn(tauriApi, 'sourceSecretDelete').mockResolvedValue(undefined);
+    useSettingsStore.setState({ tmdbApiKey: '', tmdbApiKeyLoading: true });
+    try {
+      render(<LibraryMetadataSettingsSection />);
+      const input = screen.getByLabelText('TMDB API key');
+      expect(input.hasAttribute('disabled')).toBe(true);
+      fireEvent.blur(input);
+      expect(deleteSpy).not.toHaveBeenCalled();
+    } finally {
+      deleteSpy.mockRestore();
+    }
   });
 });

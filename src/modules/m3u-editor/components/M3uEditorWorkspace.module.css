@@ -1470,3 +1470,28 @@
   text-align: center;
   font-size: var(--font-size-body);
 }
+
+.loadingInline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  color: var(--text-secondary);
+}
+
+.spinner {
+  flex-shrink: 0;
+  color: var(--accent-foreground);
+  animation: m3uEditorSpin var(--duration-loop-normal) linear infinite;
+}
+
+@keyframes m3uEditorSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

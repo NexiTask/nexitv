@@ -256,6 +256,27 @@ describe('multi-Xtream source state and credential boundary', () => {
     storageSpy.mockRestore();
   });
 
+  it('skips deleting the legacy vault password during startup when no legacy storage exists', async () => {
+    const added = await useAuthStore.getState().addSource({
+      name: 'Main',
+      url: 'https://primary.test',
+      username: 'alice',
+      password: 'secret-one',
+    });
+    vi.clearAllMocks();
+    repository.loadXtreamCredentials.mockResolvedValue({
+      url: 'https://primary.test',
+      username: 'alice',
+      password: 'secret-one',
+    });
+    useAuthStore.setState({ profiles: [], runtimes: {}, isInitializing: true });
+
+    await useAuthStore.getState().initialize();
+
+    expect(useAuthStore.getState().profiles[0]?.id).toBe(added.id);
+    expect(vault.deleteProviderPassword).not.toHaveBeenCalled();
+  });
+
   it('does not promote runtime credentials when the vault update fails', async () => {
     const source = await useAuthStore.getState().addSource({
       url: 'https://one.test',

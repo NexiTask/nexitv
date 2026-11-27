@@ -19,9 +19,31 @@ interface PendingParse {
 // the parse. Provider playlists large enough to create visible long tasks are
 // kept entirely off the webview thread.
 const WORKER_PARSE_THRESHOLD = 100_000;
+/** Idle delay before terminating the parser worker so it does not hold a thread and heap forever. */
+const WORKER_IDLE_MS = 10_000;
 const pendingParses = new Map<number, PendingParse>();
 let parserWorker: Worker | null = null;
+let workerIdleTimer: ReturnType<typeof setTimeout> | null = null;
 let nextRequestId = 1;
+
+function cancelIdleTermination(): void {
+  if (workerIdleTimer !== null) {
+    clearTimeout(workerIdleTimer);
+    workerIdleTimer = null;
+  }
+}
+
+function scheduleIdleTermination(): void {
+  if (!parserWorker || pendingParses.size > 0) return;
+  cancelIdleTermination();
+  workerIdleTimer = setTimeout(() => {
+    workerIdleTimer = null;
+    if (pendingParses.size === 0 && parserWorker) {
+      parserWorker.terminate();
+      parserWorker = null;
+    }
+  }, WORKER_IDLE_MS);
+}
 
 function rejectPending(error: Error): void {
   for (const pending of pendingParses.values()) pending.reject(error);
@@ -29,6 +51,7 @@ function rejectPending(error: Error): void {
 }
 
 function getParserWorker(): Worker | null {
+  cancelIdleTermination();
   if (parserWorker) return parserWorker;
   if (typeof Worker === 'undefined') return null;
 
@@ -42,8 +65,10 @@ function getParserWorker(): Worker | null {
       pendingParses.delete(event.data.id);
       if (event.data.playlist) pending.resolve(event.data.playlist);
       else pending.reject(new Error(event.data.error || 'The playlist could not be parsed.'));
+      scheduleIdleTermination();
     });
     worker.addEventListener('error', () => {
+      cancelIdleTermination();
       rejectPending(new Error('The playlist parser stopped unexpectedly.'));
       worker.terminate();
       if (parserWorker === worker) parserWorker = null;
@@ -57,6 +82,7 @@ function getParserWorker(): Worker | null {
 
 /** Clears adapter state between isolated tests without exposing worker details to callers. */
 export function resetM3uParserWorkerForTests(): void {
+  cancelIdleTermination();
   parserWorker?.terminate();
   parserWorker = null;
   pendingParses.clear();

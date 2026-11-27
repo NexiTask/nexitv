@@ -88,6 +88,21 @@ export interface M3uDocument {
 /** The provider lists an Xtream catalogue is built from. */
 export type CatalogCacheKind = 'live' | 'vod' | 'series';
 
+export interface CatalogRefreshRequest {
+  sourceId: string;
+  kind: CatalogCacheKind;
+  scope: string;
+  serverUrls: string[];
+  username: string;
+  password: string;
+}
+
+export interface CatalogRefreshResult {
+  activeUrl: string;
+  itemCount: number;
+  savedAt: number;
+}
+
 export type CatalogIndexOrder = 'added' | 'rating' | 'provider';
 
 export interface CatalogIndexSource {
@@ -101,6 +116,19 @@ export interface CatalogIndexRows {
   /** False when some source has neither an index nor a saved copy yet. */
   ready: boolean;
   rows: { sourceId: string; raw: unknown }[];
+}
+
+interface CatalogIndexedItemRow {
+  sourceId: string;
+  ord: number;
+  raw: unknown;
+  imdb?: ImdbFacts | undefined;
+}
+
+interface CatalogIndexedItems {
+  /** False when some source has neither an index nor populated item ids yet. */
+  ready: boolean;
+  rows: CatalogIndexedItemRow[];
 }
 
 /** The catalogue kinds the Movies, Series and Live TV pages are served for. */
@@ -458,6 +486,10 @@ export const tauriApi = {
   catalogCacheLoad: (sourceId: string, kind: CatalogCacheKind, scope: string) =>
     invoke<CatalogCacheEntry | null>('catalog_cache_load', { sourceId, kind, scope }),
 
+  /** Stream a provider catalogue directly into the on-disk cache and SQLite index in Rust. */
+  catalogCacheRefresh: (request: CatalogRefreshRequest) =>
+    invoke<CatalogRefreshResult>('catalog_cache_refresh', { request }),
+
   /** A pre-ordered candidate pool from the catalogue index (hidden categories left out). */
   catalogIndexRows: (
     kind: CatalogCacheKind,
@@ -465,6 +497,13 @@ export const tauriApi = {
     order: CatalogIndexOrder,
     limit: number,
   ) => invoke<CatalogIndexRows>('catalog_index_rows', { kind, sources, order, limit }),
+
+  /** Specific indexed items looked up by their NexiTV `f_id`, with IMDb facts. */
+  catalogIndexItemsByIds: (
+    kind: CatalogPageKind,
+    sources: CatalogPageSource[],
+    itemIds: string[],
+  ) => invoke<CatalogIndexedItems>('catalog_index_items_by_ids', { kind, sources, itemIds }),
 
   /** Whether the Movies or Series page can be served from the catalogue index. */
   catalogIndexPageStatus: (kind: CatalogPageKind, sources: CatalogPageSource[]) =>

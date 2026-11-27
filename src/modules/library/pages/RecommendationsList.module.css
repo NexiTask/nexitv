@@ -9,6 +9,40 @@
   color: var(--text-secondary);
 }
 
+.loadingSection {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.loadingBanner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  margin-bottom: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: var(--font-size-control);
+}
+
+.loadingSection .loadingBanner {
+  margin-bottom: 0;
+}
+
+.spinner {
+  flex-shrink: 0;
+  color: var(--accent-foreground);
+  animation: recommendations-spin var(--duration-loop-normal) linear infinite;
+}
+
+@keyframes recommendations-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .results {
   display: grid;
   grid-template-columns: repeat(auto-fill, min(100%, 180px));

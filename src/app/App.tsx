@@ -126,7 +126,13 @@ function AppShell() {
   if (showOnboarding) {
     return (
       <AppSurface motionPreference={motionPreference} onContextMenu={handleAppBackdropContextMenu}>
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <div className={styles.routeLoading} role="status" aria-label="Loading">
+              <span />
+            </div>
+          }
+        >
           <OnboardingFlow onDone={dismissOnboarding} />
         </Suspense>
         {sharedSurfaces}
@@ -146,7 +152,13 @@ function AppShell() {
       </div>
 
       {activeStream && (
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <div className={styles.routeLoading} role="status" aria-label="Loading player">
+              <span />
+            </div>
+          }
+        >
           <PlayerShell />
         </Suspense>
       )}

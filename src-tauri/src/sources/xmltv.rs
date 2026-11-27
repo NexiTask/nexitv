@@ -521,15 +521,22 @@ pub async fn xmltv_fetch(
     let _ = remove_if_exists(&pending_content);
     let _ = remove_if_exists(&pending_metadata);
 
-    let cached = match load_cached_guide(&app, &cache_key) {
-        Ok(value) => value,
-        Err(_) => {
-            let (content, metadata) = cache_paths(&app, &cache_key, false)?;
-            let _ = remove_if_exists(&content);
-            let _ = remove_if_exists(&metadata);
-            None
-        }
-    };
+    let load_app = app.clone();
+    let load_key = cache_key.clone();
+    let cached =
+        tauri::async_runtime::spawn_blocking(move || -> Result<Option<CachedGuide>, String> {
+            match load_cached_guide(&load_app, &load_key) {
+                Ok(value) => Ok(value),
+                Err(_) => {
+                    let (content, metadata) = cache_paths(&load_app, &load_key, false)?;
+                    let _ = remove_if_exists(&content);
+                    let _ = remove_if_exists(&metadata);
+                    Ok(None)
+                }
+            }
+        })
+        .await
+        .map_err(|error| format!("XMLTV cache task failed: {error}"))??;
     let now = unix_time_ms();
     if let Some(cache) = cached.as_ref() {
         if now.saturating_sub(cache.metadata.fetched_at_ms) < XMLTV_CACHE_FRESH_MS {
@@ -554,17 +561,23 @@ pub async fn xmltv_fetch(
         }
         Ok(Some(validators)) => {
             let parse_path = pending_content.clone();
-            let guide = tauri::async_runtime::spawn_blocking(move || parse_xmltv_path(&parse_path))
-                .await
-                .map_err(|error| format!("XMLTV parsing task failed: {error}"))??;
-            store_metadata(
-                &pending_metadata,
-                &XmltvHttpMetadata {
-                    fetched_at_ms: now,
-                    validators,
-                },
-            )?;
-            promote_pending(&app, &cache_key)?;
+            let promote_app = app.clone();
+            let promote_key = cache_key.clone();
+            let pending_meta = pending_metadata.clone();
+            let guide = tauri::async_runtime::spawn_blocking(move || {
+                let guide = parse_xmltv_path(&parse_path)?;
+                store_metadata(
+                    &pending_meta,
+                    &XmltvHttpMetadata {
+                        fetched_at_ms: now,
+                        validators,
+                    },
+                )?;
+                promote_pending(&promote_app, &promote_key)?;
+                Ok::<_, String>(guide)
+            })
+            .await
+            .map_err(|error| format!("XMLTV parsing task failed: {error}"))??;
             Ok(guide)
         }
         Err(error) => {

@@ -108,6 +108,7 @@ describe('saved next episodes', () => {
     const resumed: HistoryItem = {
       ...queued,
       id: 'show-b',
+      title: 'Show B',
       episodeId: 'episode-9',
       currentTime: 90,
       progressPercentage: 3,
@@ -405,5 +406,36 @@ describe('saved next episodes', () => {
       ]),
     );
     expect(readWatchNextEpisodes().size).toBe(0);
+  });
+
+  it('renders Continue Watching immediately on Home while catalogue pools are still loading', () => {
+    const resuming: HistoryItem = {
+      id: 'movie-resume-1',
+      title: 'In Progress Film',
+      type: 'vod',
+      posterUrl: '',
+      currentTime: 600,
+      duration: 3600,
+      progressPercentage: 17,
+      lastWatchedAt: 100,
+    };
+    useLibraryStore.setState({
+      history: [resuming],
+      trackedSeries: {},
+      watched: [],
+    });
+    const client = new QueryClient();
+    const home = render(
+      createElement(
+        MemoryRouter,
+        null,
+        createElement(QueryClientProvider, { client }, createElement(HomePage)),
+      ),
+    );
+    expect(screen.getByRole('heading', { name: 'Continue Watching' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Open In Progress Film' })).toBeTruthy();
+    // Pending catalogue pools show their own section headings as skeletons without blocking local rows.
+    expect(screen.getByRole('heading', { name: 'Recently Added Movies' })).toBeTruthy();
+    home.unmount();
   });
 });

@@ -127,6 +127,15 @@ fn open_database(path: &std::path::Path) -> Result<rusqlite::Connection, String>
         .pragma_update(None, "journal_mode", "WAL")
         .map_err(|error| format!("IMDb database unavailable: {error}"))?;
     connection
+        .pragma_update(None, "busy_timeout", 5_000)
+        .map_err(|error| format!("IMDb database unavailable: {error}"))?;
+    connection
+        .pragma_update(None, "cache_size", -8_000)
+        .map_err(|error| format!("IMDb database unavailable: {error}"))?;
+    connection
+        .pragma_update(None, "journal_size_limit", 16 * 1024 * 1024)
+        .map_err(|error| format!("IMDb database unavailable: {error}"))?;
+    connection
         .execute_batch(
             "CREATE TABLE IF NOT EXISTS titles (
                 tconst  TEXT PRIMARY KEY,
@@ -218,6 +227,17 @@ fn age_secs(connection: &rusqlite::Connection, name: &str) -> Option<u64> {
 /// NFKD, like the frontend and like catalog_search's normalizer.
 /// Step 0 checked the mirror against the production functions: 0/2000 drift.
 pub(crate) fn title_key(value: &str) -> String {
+    if value.is_ascii() {
+        let mut out = String::with_capacity(value.len());
+        for byte in value.bytes() {
+            if byte == b'&' {
+                out.push_str("and");
+            } else if byte.is_ascii_alphanumeric() {
+                out.push(byte.to_ascii_lowercase() as char);
+            }
+        }
+        return out;
+    }
     static NFKD: std::sync::OnceLock<DecomposingNormalizerBorrowed<'static>> =
         std::sync::OnceLock::new();
     let nfkd = NFKD.get_or_init(DecomposingNormalizerBorrowed::new_nfkd);
@@ -354,7 +374,11 @@ async fn refresh_locked(app: &tauri::AppHandle, manual: bool) -> Result<usize, S
         }
         tokio::time::sleep(FACET_POLL).await;
     }
-    let (keys, tt_ids) = catalog_index::match_universe(&app)?;
+    let universe_app = app.clone();
+    let (keys, tt_ids) =
+        tauri::async_runtime::spawn_blocking(move || catalog_index::match_universe(&universe_app))
+            .await
+            .map_err(|error| format!("IMDb universe scan failed: {error}"))??;
     if keys.is_empty() && tt_ids.is_empty() {
         return Err("The catalogue index has no match keys yet".to_string());
     }
@@ -384,7 +408,10 @@ async fn refresh_locked(app: &tauri::AppHandle, manual: bool) -> Result<usize, S
     .map_err(|error| format!("IMDb parse failed: {error}"))??;
 
     emit_import(&app, "matching", None, None);
-    let matched = backfill(&app)?;
+    let backfill_app = app.clone();
+    let matched = tauri::async_runtime::spawn_blocking(move || backfill(&backfill_app, true))
+        .await
+        .map_err(|error| format!("IMDb backfill failed: {error}"))??;
     with_connection(&app, |connection| {
         meta_set(connection, "last_refresh", now_secs());
         meta_set(connection, "titles", titles as u64);
@@ -481,6 +508,7 @@ fn rematch_locked(app: &tauri::AppHandle) -> Result<usize, String> {
         }
         std::thread::sleep(FACET_POLL);
     }
+    let mut reparsed = false;
     if cached {
         let (keys, tt_ids) = catalog_index::match_universe(app)?;
         let parsed: (HashSet<String>, HashSet<String>) = with_connection(app, |connection| {
@@ -512,9 +540,10 @@ fn rematch_locked(app: &tauri::AppHandle) -> Result<usize, String> {
                 meta_set(connection, "titles", titles as u64);
                 Ok(())
             })?;
+            reparsed = true;
         }
     }
-    backfill(app)
+    backfill(app, reparsed)
 }
 
 /// IMDb's TSV escaping: a literal `\N` is a null field; nothing is quoted.
@@ -685,54 +714,81 @@ fn parse_and_swap(
     Ok(count)
 }
 
-/// One matched index row: the values to store, and the row to store them on.
-type MatchUpdate = (
-    String,
-    i64,
-    i64,
-    Option<i64>,
-    Option<String>,
-    Option<f64>,
-    i64,
-);
+/// One matched index row: the values to store, and the identity + list
+/// generation that guard against concurrent list replacement reusing `rowid`.
+struct MatchUpdate {
+    tconst: String,
+    rowid: i64,
+    source_id: String,
+    kind: String,
+    ord: i64,
+    generation: i64,
+    adult: i64,
+    runtime: Option<i64>,
+    genres: Option<String>,
+    rating: Option<f64>,
+    votes: i64,
+}
 
 /// Fill the `imdb_*` columns for index rows without a match. Exact key + year
 /// only; candidates were pre-filtered to the catalogue's keys at parse time.
-fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
+fn backfill(app: &tauri::AppHandle, resync_all: bool) -> Result<usize, String> {
+    struct BackfillCandidate {
+        rowid: i64,
+        source_id: String,
+        raw_kind: String,
+        ord: i64,
+        generation: i64,
+        media_kind: &'static str,
+        key: String,
+        year: Option<i64>,
+    }
+
     let start = Instant::now();
     // Taken before matching, so a list that changes mid-pass is seen again.
     let lists = catalog_index::lists_fingerprint(app)?;
     let mut matched = 0usize;
     let mut cursor: i64 = 0;
     loop {
-        let batch: Vec<(i64, &'static str, String, Option<i64>)> =
-            catalog_index::with_reader(app, |connection| {
-                let mapped = connection
-                    .prepare(
-                        "SELECT rowid, kind, f_match_key, CAST(f_year AS INTEGER) FROM items
-                         WHERE rowid > ?1 AND kind IN ('vod', 'series')
-                           AND imdb_tconst IS NULL AND f_match_key IS NOT NULL
-                         ORDER BY rowid LIMIT ?2",
-                    )?
-                    .query_map(params![cursor, BACKFILL_BATCH], |row| {
-                        let kind: String = row.get(1)?;
-                        Ok((
-                            row.get(0)?,
-                            if kind == "series" { "series" } else { "movie" },
-                            row.get(2)?,
-                            row.get(3)?,
-                        ))
-                    })?
-                    .collect::<rusqlite::Result<Vec<_>>>()?;
-                Ok(mapped)
-            })?;
+        let batch: Vec<BackfillCandidate> = catalog_index::with_reader(app, |connection| {
+            let mapped = connection
+                .prepare(
+                    "SELECT i.rowid, i.source_id, i.kind, i.ord, l.generation,
+                                i.f_match_key, CAST(i.f_year AS INTEGER)
+                         FROM items i
+                         JOIN lists l ON l.source_id = i.source_id AND l.kind = i.kind
+                         WHERE i.rowid > ?1 AND i.kind IN ('vod', 'series')
+                           AND i.imdb_tconst IS NULL AND i.f_match_key IS NOT NULL
+                         ORDER BY i.rowid LIMIT ?2",
+                )?
+                .query_map(params![cursor, BACKFILL_BATCH], |row| {
+                    let raw_kind: String = row.get(2)?;
+                    let media_kind = if raw_kind == "series" {
+                        "series"
+                    } else {
+                        "movie"
+                    };
+                    Ok(BackfillCandidate {
+                        rowid: row.get(0)?,
+                        source_id: row.get(1)?,
+                        raw_kind,
+                        ord: row.get(3)?,
+                        generation: row.get(4)?,
+                        media_kind,
+                        key: row.get(5)?,
+                        year: row.get(6)?,
+                    })
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            Ok(mapped)
+        })?;
         if batch.is_empty() {
             break;
         }
-        cursor = batch.last().expect("batch is not empty").0;
+        cursor = batch.last().expect("batch is not empty").rowid;
 
         // One indexed lookup per distinct key per batch.
-        let mut keys: Vec<String> = batch.iter().map(|(_, _, key, _)| key.clone()).collect();
+        let mut keys: Vec<String> = batch.iter().map(|row| row.key.clone()).collect();
         keys.sort_unstable();
         keys.dedup();
         let mut candidates_by_key: HashMap<String, Vec<Candidate>> = HashMap::new();
@@ -768,48 +824,67 @@ fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
 
         let updates: Vec<MatchUpdate> = batch
             .iter()
-            .filter_map(|(rowid, kind, key, year)| {
-                let found = candidates_by_key.get(key)?;
-                let (candidate, _) = pick_candidate(found, kind, *year);
-                candidate.map(|candidate| {
-                    (
-                        candidate.tconst.clone(),
-                        *rowid,
-                        candidate.adult as i64,
-                        candidate.runtime,
-                        candidate.genres.clone(),
-                        candidate.rating,
-                        candidate.votes,
-                    )
+            .filter_map(|row| {
+                let found = candidates_by_key.get(&row.key)?;
+                let (candidate, _) = pick_candidate(found, row.media_kind, row.year);
+                candidate.map(|candidate| MatchUpdate {
+                    tconst: candidate.tconst.clone(),
+                    rowid: row.rowid,
+                    source_id: row.source_id.clone(),
+                    kind: row.raw_kind.clone(),
+                    ord: row.ord,
+                    generation: row.generation,
+                    adult: candidate.adult as i64,
+                    runtime: candidate.runtime,
+                    genres: candidate.genres.clone(),
+                    rating: candidate.rating,
+                    votes: candidate.votes,
                 })
             })
             .collect();
-        matched += updates.len();
-        catalog_index::with_connection(app, |connection| {
+        let written = catalog_index::with_connection(app, |connection| {
             let transaction = connection.transaction()?;
+            let mut changed = 0usize;
             {
                 let mut update = transaction.prepare(
                     "UPDATE items SET imdb_tconst = ?1, imdb_adult = ?2, imdb_runtime = ?3,
                         imdb_genres = ?4, imdb_rating = ?5, imdb_votes = ?6
-                     WHERE rowid = ?7",
+                     WHERE rowid = ?7 AND source_id = ?8 AND kind = ?9 AND ord = ?10
+                       AND EXISTS (
+                           SELECT 1 FROM lists
+                           WHERE source_id = ?8 AND kind = ?9 AND generation = ?11
+                       )",
                 )?;
-                for (tconst, rowid, adult, runtime, genres, rating, votes) in &updates {
-                    update.execute(params![
-                        tconst, adult, runtime, genres, rating, votes, rowid,
+                for item in &updates {
+                    changed += update.execute(params![
+                        item.tconst,
+                        item.adult,
+                        item.runtime,
+                        item.genres,
+                        item.rating,
+                        item.votes,
+                        item.rowid,
+                        item.source_id,
+                        item.kind,
+                        item.ord,
+                        item.generation,
                     ])?;
                 }
             }
             transaction.commit()?;
-            Ok(())
+            Ok(changed)
         })?;
+        matched += written;
     }
-    let refreshed = resync_matched(app)?;
+    let refreshed = resync_matched(app, resync_all)?;
     with_connection(app, |connection| {
         meta_set(connection, "last_backfill", now_secs());
         meta_set(connection, "lists_hash", lists);
         Ok(())
     })?;
-    catalog_index::invalidate_imdb_facets();
+    if matched > 0 || refreshed > 0 {
+        catalog_index::invalidate_imdb_facets();
+    }
     crate::perf::log(
         "imdb:backfill",
         Some(start.elapsed().as_millis()),
@@ -818,22 +893,28 @@ fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
     Ok(matched)
 }
 
-/// Bring every already-identified row up to the stored dumps: a weekly
-/// refresh moves ratings and votes, a provider-embedded `tt…` id arrives with
-/// no rating at all, and a re-ingest carries only what was stored before.
-/// Rows whose title left the dumps keep their last values. Returns the rows
-/// that changed.
-fn resync_matched(app: &tauri::AppHandle) -> Result<usize, String> {
+/// Bring already-identified rows up to the stored dumps: a weekly refresh
+/// moves ratings and votes (`resync_all = true`), while a rematch on unchanged
+/// dumps only needs to fill provider-embedded `tt…` ids that arrived without a
+/// rating (`resync_all = false`). Rows whose title left the dumps keep their
+/// last values. Returns the rows that changed.
+fn resync_matched(app: &tauri::AppHandle, resync_all: bool) -> Result<usize, String> {
+    let query = if resync_all {
+        "SELECT rowid, imdb_tconst FROM items
+         WHERE rowid > ?1 AND kind IN ('vod', 'series') AND imdb_tconst IS NOT NULL
+         ORDER BY rowid LIMIT ?2"
+    } else {
+        "SELECT rowid, imdb_tconst FROM items
+         WHERE rowid > ?1 AND kind IN ('vod', 'series')
+           AND imdb_tconst IS NOT NULL AND imdb_rating IS NULL
+         ORDER BY rowid LIMIT ?2"
+    };
     let mut changed = 0usize;
     let mut cursor: i64 = 0;
     loop {
         let batch: Vec<(i64, String)> = catalog_index::with_reader(app, |connection| {
             connection
-                .prepare(
-                    "SELECT rowid, imdb_tconst FROM items
-                     WHERE rowid > ?1 AND kind IN ('vod', 'series') AND imdb_tconst IS NOT NULL
-                     ORDER BY rowid LIMIT ?2",
-                )?
+                .prepare(query)?
                 .query_map(params![cursor, BACKFILL_BATCH], |row| {
                     Ok((row.get(0)?, row.get(1)?))
                 })?
@@ -844,7 +925,16 @@ fn resync_matched(app: &tauri::AppHandle) -> Result<usize, String> {
         }
         cursor = batch.last().expect("batch is not empty").0;
 
-        let mut updates: Vec<MatchUpdate> = Vec::with_capacity(batch.len());
+        struct ResyncUpdate {
+            tconst: String,
+            rowid: i64,
+            adult: i64,
+            runtime: Option<i64>,
+            genres: Option<String>,
+            rating: Option<f64>,
+            votes: i64,
+        }
+        let mut updates: Vec<ResyncUpdate> = Vec::with_capacity(batch.len());
         with_connection(app, |connection| {
             let mut statement = connection
                 .prepare_cached(
@@ -865,15 +955,15 @@ fn resync_matched(app: &tauri::AppHandle) -> Result<usize, String> {
                     .optional()
                     .map_err(database_error)?;
                 if let Some((adult, runtime, genres, rating, votes)) = found {
-                    updates.push((
-                        tconst.clone(),
-                        *rowid,
+                    updates.push(ResyncUpdate {
+                        tconst: tconst.clone(),
+                        rowid: *rowid,
                         adult,
                         runtime,
                         genres,
                         rating,
                         votes,
-                    ));
+                    });
                 }
             }
             Ok(())
@@ -891,9 +981,15 @@ fn resync_matched(app: &tauri::AppHandle) -> Result<usize, String> {
                          OR imdb_genres IS NOT ?3 OR imdb_rating IS NOT ?4
                          OR imdb_votes IS NOT ?5)",
                 )?;
-                for (tconst, rowid, adult, runtime, genres, rating, votes) in &updates {
+                for item in &updates {
                     changed += update.execute(params![
-                        adult, runtime, genres, rating, votes, rowid, tconst,
+                        item.adult,
+                        item.runtime,
+                        item.genres,
+                        item.rating,
+                        item.votes,
+                        item.rowid,
+                        item.tconst,
                     ])?;
                 }
             }
@@ -968,22 +1064,7 @@ fn status(app: &tauri::AppHandle) -> Result<RefreshStatus, String> {
                 .unwrap_or(true),
         ))
     })?;
-    let (matched, total) = catalog_index::with_reader(app, |connection| {
-        Ok((
-            connection.query_row(
-                "SELECT COUNT(*) FROM items
-                 WHERE kind IN ('vod', 'series') AND imdb_tconst IS NOT NULL",
-                [],
-                |row| row.get::<_, i64>(0),
-            )?,
-            connection.query_row(
-                "SELECT COUNT(*) FROM items WHERE kind IN ('vod', 'series')",
-                [],
-                |row| row.get::<_, i64>(0),
-            )?,
-        ))
-    })?;
-    let (matched, total) = (matched as u64, total as u64);
+    let (matched, total) = catalog_index::imdb_counts(app)?;
     let import_progress = *IMPORT_PROGRESS
         .lock()
         .unwrap_or_else(|error| error.into_inner());
@@ -1016,7 +1097,9 @@ pub fn imdb_refresh_set_enabled(app: tauri::AppHandle, enabled: bool) -> Result<
 #[tauri::command(async)]
 pub async fn imdb_refresh_start(app: tauri::AppHandle) -> Result<RefreshStatus, String> {
     run_refresh(app.clone(), true).await?;
-    status(&app)
+    tauri::async_runtime::spawn_blocking(move || status(&app))
+        .await
+        .map_err(|error| format!("IMDb status check failed: {error}"))?
 }
 
 /// The recurring process: shortly after startup and then on a slow tick,

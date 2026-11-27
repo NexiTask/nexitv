@@ -14,6 +14,7 @@ import {
   Undo2,
   Redo2,
   History,
+  LoaderCircle,
 } from 'lucide-react';
 import {
   parseM3u,
@@ -21,6 +22,7 @@ import {
   type M3uPlaylist,
   type M3uEntry,
 } from '@/modules/sources/public/data/m3uClient';
+import { parseM3uAsync } from '../services/m3uParser';
 import { tauriApi } from '@/platform/tauri';
 import { useSourceStore } from '@/modules/sources/public/store/useSourceStore';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
@@ -83,6 +85,9 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
   const [rawEditorViewState, setRawEditorViewState] =
     useState<M3uRawEditorViewState>(emptyRawEditorViewState);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadingCount, setLoadingCount] = useState(0);
+  const isLoadingPlaylist = loadingCount > 0;
+  const [isFetchingUrl, setIsFetchingUrl] = useState(false);
   const [healthStatuses, setHealthStatuses] = useState<M3uHealthStatuses>({});
   const [loadUrlModal, setLoadUrlModal] = useState(false);
   const [remoteUrlInput, setRemoteUrlInput] = useState('');
@@ -93,6 +98,9 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
   const loadedSourceRef = useRef<{ id: string; revision: number } | null>(null);
   const draftLoadGenerationRef = useRef(0);
   const draftSaveWarningRef = useRef(false);
+
+  const beginPlaylistLoad = useCallback(() => setLoadingCount((count) => count + 1), []);
+  const endPlaylistLoad = useCallback(() => setLoadingCount((count) => Math.max(0, count - 1)), []);
 
   const persistedSource = m3uProfiles.some((profile) => profile.id === selectedSourceId);
   const currentParseOptions = useCallback(() => {
@@ -148,22 +156,27 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
           localStorage.removeItem(legacyDraftKey(sourceId));
           if (generation !== draftLoadGenerationRef.current) return;
           if (draft) {
-            const restored = playlistSnapshot(
-              parseM3u(draft.content, {
+            beginPlaylistLoad();
+            try {
+              const parsedDraft = await parseM3uAsync(draft.content, {
                 sourceId,
                 baseUrl: runtime.baseUrl,
                 headers: runtime.connection?.headers,
-              }),
-            );
-            setSnapshot(restored);
-            setBaseline(sourceSnapshot);
-            setPast([]);
-            setFuture([]);
-            setIsDirty(true);
-            setRawDirty(false);
-            setHealthStatuses({});
-            notify.info('Draft Restored', 'Recovered unsaved playlist changes from this device.');
-            return;
+              });
+              if (generation !== draftLoadGenerationRef.current) return;
+              const restored = playlistSnapshot(parsedDraft);
+              setSnapshot(restored);
+              setBaseline(sourceSnapshot);
+              setPast([]);
+              setFuture([]);
+              setIsDirty(true);
+              setRawDirty(false);
+              setHealthStatuses({});
+              notify.info('Draft Restored', 'Recovered unsaved playlist changes from this device.');
+              return;
+            } finally {
+              endPlaylistLoad();
+            }
           }
         } catch {
           localStorage.removeItem(legacyDraftKey(sourceId));
@@ -173,7 +186,7 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
       if (generation !== draftLoadGenerationRef.current) return;
       resetSession(sourceSnapshot);
     },
-    [autosaveDrafts, m3uRuntimes, resetSession],
+    [autosaveDrafts, beginPlaylistLoad, endPlaylistLoad, m3uRuntimes, resetSession],
   );
 
   useEffect(() => {
@@ -237,15 +250,15 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
     return () => window.removeEventListener('beforeunload', beforeUnload);
   }, [isDirty, rawDirty]);
 
-  const commitSnapshot = useCallback(
-    (next: PlaylistSnapshot) => {
-      setPast((items) => [...items.slice(-49), snapshot]);
-      setSnapshot(next);
-      setFuture([]);
-      setIsDirty(true);
-    },
-    [snapshot],
-  );
+  const commitSnapshot = useCallback((next: PlaylistSnapshot) => {
+    draftLoadGenerationRef.current += 1;
+    setSnapshot((current) => {
+      setPast((items) => [...items.slice(-49), current]);
+      return next;
+    });
+    setFuture([]);
+    setIsDirty(true);
+  }, []);
 
   const handleUpdateEntries = useCallback(
     (entries: M3uEntry[]) => {
@@ -272,36 +285,37 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
     setIsDirty(true);
   };
 
+  const keyDownHandlerRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
+  keyDownHandlerRef.current = (event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    const editingText =
+      target instanceof HTMLElement && target.matches('input, textarea, [contenteditable="true"]');
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      setShowCommands(true);
+      return;
+    }
+    if (!(event.ctrlKey || event.metaKey) || editingText) return;
+    if (event.key.toLowerCase() === 'z' && !event.shiftKey) {
+      event.preventDefault();
+      handleUndo();
+    } else if (
+      event.key.toLowerCase() === 'y' ||
+      (event.key.toLowerCase() === 'z' && event.shiftKey)
+    ) {
+      event.preventDefault();
+      handleRedo();
+    } else if (event.key.toLowerCase() === 's' && isDirty && !rawDirty) {
+      event.preventDefault();
+      if (persistedSource) setConfirmSave(true);
+      else void handleExportFile();
+    }
+  };
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const editingText =
-        target instanceof HTMLElement &&
-        target.matches('input, textarea, [contenteditable="true"]');
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setShowCommands(true);
-        return;
-      }
-      if (!(event.ctrlKey || event.metaKey) || editingText) return;
-      if (event.key.toLowerCase() === 'z' && !event.shiftKey) {
-        event.preventDefault();
-        handleUndo();
-      } else if (
-        event.key.toLowerCase() === 'y' ||
-        (event.key.toLowerCase() === 'z' && event.shiftKey)
-      ) {
-        event.preventDefault();
-        handleRedo();
-      } else if (event.key.toLowerCase() === 's' && isDirty && !rawDirty) {
-        event.preventDefault();
-        if (persistedSource) setConfirmSave(true);
-        else void handleExportFile();
-      }
-    };
+    const handleKeyDown = (event: KeyboardEvent) => keyDownHandlerRef.current(event);
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  });
+  }, []);
 
   const stats = useMemo(() => {
     let live = 0;
@@ -318,16 +332,17 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
   }, [snapshot.entries]);
 
   const changeSummary = useMemo(() => {
+    if (!confirmSave) return { added: 0, removed: 0, changed: 0 };
     const before = new Map(baseline.entries.map((entry) => [entry.id, entry]));
     const after = new Map(snapshot.entries.map((entry) => [entry.id, entry]));
     const added = snapshot.entries.filter((entry) => !before.has(entry.id)).length;
     const removed = baseline.entries.filter((entry) => !after.has(entry.id)).length;
     const changed = snapshot.entries.filter((entry) => {
       const original = before.get(entry.id);
-      return original && JSON.stringify(original) !== JSON.stringify(entry);
+      return original && original !== entry && JSON.stringify(original) !== JSON.stringify(entry);
     }).length;
     return { added, removed, changed };
-  }, [baseline.entries, snapshot.entries]);
+  }, [baseline.entries, confirmSave, snapshot.entries]);
 
   const requestAction = (action: PendingAction) => {
     if (isDirty || rawDirty) setPendingAction(action);
@@ -391,6 +406,8 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
   };
 
   const handleOpenFile = async () => {
+    const generation = ++draftLoadGenerationRef.current;
+    beginPlaylistLoad();
     try {
       const path = await desktopApi.openPath({
         multiple: false,
@@ -398,36 +415,48 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
       });
       if (!path || Array.isArray(path)) return;
       const document = await tauriApi.m3uReadFile(path);
-      finishImport(
-        parseM3u(document.content, { sourceId: 'm3u-import', baseUrl: document.baseUrl }),
-        'custom-file',
-        document.fileName || 'Local file',
-      );
+      const playlist = await parseM3uAsync(document.content, {
+        sourceId: 'm3u-import',
+        baseUrl: document.baseUrl,
+      });
+      if (generation !== draftLoadGenerationRef.current) return;
+      finishImport(playlist, 'custom-file', document.fileName || 'Local file');
     } catch (error: unknown) {
+      if (generation !== draftLoadGenerationRef.current) return;
       notify.error(
         'File Error',
         getErrorMessage(error, 'Playlist file loading failed without an error message.'),
       );
+    } finally {
+      endPlaylistLoad();
     }
   };
 
   const handleFetchUrl = async () => {
     const url = remoteUrlInput.trim();
-    if (!url) return;
+    if (!url || isFetchingUrl) return;
+    const generation = ++draftLoadGenerationRef.current;
+    setIsFetchingUrl(true);
+    beginPlaylistLoad();
     try {
       const document = await tauriApi.m3uFetch({ url });
-      finishImport(
-        parseM3u(document.content, { sourceId: 'm3u-import', baseUrl: document.baseUrl }),
-        'custom-url',
-        new URL(url).host,
-      );
+      const playlist = await parseM3uAsync(document.content, {
+        sourceId: 'm3u-import',
+        baseUrl: document.baseUrl,
+      });
+      if (generation !== draftLoadGenerationRef.current) return;
+      finishImport(playlist, 'custom-url', new URL(url).host);
       setLoadUrlModal(false);
       setRemoteUrlInput('');
     } catch (error: unknown) {
+      if (generation !== draftLoadGenerationRef.current) return;
       notify.error(
         'URL Fetch Failed',
         getErrorMessage(error, 'Playlist URL fetch failed without an error message.'),
       );
+    } finally {
+      setIsFetchingUrl(false);
+      endPlaylistLoad();
     }
   };
 
@@ -567,8 +596,17 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
           <div>
             <h1 className={styles.workspaceTitle}>{t('M3U Playlist Editor')}</h1>
             <p className={styles.workspaceSubtitle}>
-              {isDirty ? t('Unsaved draft') : t('All changes saved')} · {number(stats.total)}{' '}
-              {t('items')}
+              {isLoadingPlaylist ? (
+                <span className={styles.loadingInline} aria-live="polite">
+                  <LoaderCircle size={13} className={styles.spinner} aria-hidden="true" />
+                  <span>{t('Loading playlist…')}</span>
+                </span>
+              ) : (
+                <>
+                  {isDirty ? t('Unsaved draft') : t('All changes saved')} · {number(stats.total)}{' '}
+                  {t('items')}
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -745,9 +783,12 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
               variant="primary"
               type="button"
               onClick={() => void handleFetchUrl()}
-              disabled={!remoteUrlInput.trim()}
+              disabled={!remoteUrlInput.trim() || isFetchingUrl}
             >
-              {t('Load Playlist')}
+              {isFetchingUrl && (
+                <LoaderCircle size={14} className={styles.spinner} aria-hidden="true" />
+              )}
+              {t(isFetchingUrl ? 'Loading…' : 'Load Playlist')}
             </Button>
           </div>
         </DialogShell>
@@ -789,21 +830,28 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
           currentContent={currentM3uContent}
           entryCount={snapshot.entries.length}
           onRestore={(content) => {
-            try {
-              commitSnapshot(playlistSnapshot(parseM3u(content, currentParseOptions())));
-              notify.success(
-                'Version Restored',
-                'The selected checkpoint is now an unsaved editor draft.',
-              );
-            } catch (error: unknown) {
-              notify.error(
-                'Restore Failed',
-                getErrorMessage(
-                  error,
-                  'Playlist checkpoint parsing failed without an error message.',
-                ),
-              );
-            }
+            const restoreGeneration = draftLoadGenerationRef.current;
+            beginPlaylistLoad();
+            void parseM3uAsync(content, currentParseOptions())
+              .then((parsed) => {
+                if (restoreGeneration !== draftLoadGenerationRef.current) return;
+                commitSnapshot(playlistSnapshot(parsed));
+                notify.success(
+                  'Version Restored',
+                  'The selected checkpoint is now an unsaved editor draft.',
+                );
+              })
+              .catch((error: unknown) => {
+                if (restoreGeneration !== draftLoadGenerationRef.current) return;
+                notify.error(
+                  'Restore Failed',
+                  getErrorMessage(
+                    error,
+                    'Playlist checkpoint parsing failed without an error message.',
+                  ),
+                );
+              })
+              .finally(endPlaylistLoad);
           }}
           onClose={() => setShowHistory(false)}
         />

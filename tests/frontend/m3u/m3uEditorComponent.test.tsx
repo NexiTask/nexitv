@@ -180,6 +180,57 @@ describe('M3U Editor UI components', () => {
     expect(screen.getByText(/Unsaved draft/)).toBeTruthy();
   });
 
+  it('ignores a stale async draft restore if the user switches sources before parsing finishes', async () => {
+    const parserModule = await import('@/modules/m3u-editor/services/m3uParser');
+    let resolveDraft!: (
+      playlist: ReturnType<typeof import('@/modules/sources/data/m3uClient').parseM3u>,
+    ) => void;
+    const parseSpy = vi.spyOn(parserModule, 'parseM3uAsync').mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveDraft = resolve;
+        }),
+    );
+    localStorage.setItem(
+      `movena-m3u-editor-draft-v1:${sampleProfile.id}`,
+      JSON.stringify({
+        content: '#EXTM3U\n#EXTINF:-1,Stale Draft\nhttps://stream.test/stale.m3u8',
+        savedAt: Date.now(),
+      }),
+    );
+    try {
+      const user = userEvent.setup();
+      render(<M3uEditor initialSourceId={sampleProfile.id} />);
+      expect(await screen.findByText('Loading playlist…')).toBeTruthy();
+
+      await user.click(screen.getByRole('button', { name: 'Select source to edit' }));
+      await user.click(await screen.findByRole('option', { name: 'Blank playlist' }));
+
+      resolveDraft({
+        entries: [
+          {
+            id: 'stale-1',
+            sourceId: sampleProfile.id,
+            title: 'Stale Draft',
+            url: 'https://stream.test/stale.m3u8',
+            type: 'live',
+            duration: -1,
+            groupTitle: 'Drafts',
+            categoryId: 'cat-drafts',
+            headers: {},
+          },
+        ],
+        epgUrls: [],
+        warnings: [],
+      });
+
+      await waitFor(() => expect(screen.queryByText('Loading playlist…')).toBeNull());
+      expect(screen.queryByText('Stale Draft')).toBeNull();
+    } finally {
+      parseSpy.mockRestore();
+    }
+  });
+
   it('runs batch title cleanup and updates entries', () => {
     const onUpdateEntries = vi.fn();
     render(
