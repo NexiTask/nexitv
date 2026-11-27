@@ -11,6 +11,7 @@
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 
 use serde::{Deserialize, Serialize};
 
@@ -78,6 +79,24 @@ pub(crate) struct SourceFacets {
     pub generation: i64,
     pub rows: Vec<FacetRow>,
     pub categories: Vec<Box<str>>,
+    /// Lazily computed live-channel folding for this source alone, reused
+    /// across page, stats, search, and scroll-chunk calls for the same generation.
+    folding: OnceLock<Folding>,
+}
+
+impl SourceFacets {
+    pub(crate) fn new(generation: i64, rows: Vec<FacetRow>, categories: Vec<Box<str>>) -> Self {
+        Self {
+            generation,
+            rows,
+            categories,
+            folding: OnceLock::new(),
+        }
+    }
+
+    fn folding(&self) -> &Folding {
+        self.folding.get_or_init(|| fold(&[self]))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -204,7 +223,7 @@ pub(crate) struct PageResult {
     pub genre_counts: [u32; GENRE_COUNT],
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Entry {
     source: u32,
     row: u32,
@@ -221,12 +240,42 @@ struct CategoryFacts {
 /// `foldLiveChannels`: rows sharing a group key become one channel, placed
 /// where the group first appears and shown as its best-ranked variant (the
 /// first one on a tie).
+#[derive(Debug)]
 struct Folding {
     /// The channel each group shows, in group order.
     order: Vec<Entry>,
     /// Groups of more than one variant: shown entry -> (members in provider
     /// order, whether the folded channel declares 4K).
     groups: HashMap<(u32, u32), (Vec<Entry>, bool)>,
+    /// Encoded primary key -> encoded member keys in provider order, for O(1)
+    /// scroll-chunk lookups in `fold_groups`.
+    key_groups: HashMap<u32, Vec<u32>>,
+}
+
+enum FoldingRef<'a> {
+    Borrowed(&'a Folding),
+    Owned(Folding),
+}
+
+impl FoldingRef<'_> {
+    fn as_ref(&self) -> &Folding {
+        match self {
+            Self::Borrowed(folding) => folding,
+            Self::Owned(folding) => folding,
+        }
+    }
+}
+
+fn entry_key(sources: &[&SourceFacets], entry: Entry) -> u32 {
+    (entry.source << ORD_BITS) | sources[entry.source as usize].rows[entry.row as usize].ord
+}
+
+fn folding_for<'a>(sources: &'a [&'a SourceFacets]) -> FoldingRef<'a> {
+    if sources.len() == 1 {
+        FoldingRef::Borrowed(sources[0].folding())
+    } else {
+        FoldingRef::Owned(fold(sources))
+    }
 }
 
 fn fold(sources: &[&SourceFacets]) -> Folding {
@@ -254,6 +303,7 @@ fn fold(sources: &[&SourceFacets]) -> Folding {
     let mut folding = Folding {
         order: Vec::with_capacity(groups.len()),
         groups: HashMap::new(),
+        key_groups: HashMap::new(),
     };
     for members in groups {
         let mut primary = members[0];
@@ -266,6 +316,12 @@ fn fold(sources: &[&SourceFacets]) -> Folding {
         if members.len() > 1 {
             let ultra_hd = row(&primary).flags & FLAG_TITLE_UHD != 0
                 || members.iter().any(|m| row(m).flags & FLAG_BADGE_UHD != 0);
+            let primary_key = entry_key(sources, primary);
+            let member_keys = members
+                .iter()
+                .map(|&member| entry_key(sources, member))
+                .collect();
+            folding.key_groups.insert(primary_key, member_keys);
             folding
                 .groups
                 .insert((primary.source, primary.row), (members, ultra_hd));
@@ -276,7 +332,7 @@ fn fold(sources: &[&SourceFacets]) -> Folding {
 
 struct Context<'a> {
     sources: &'a [&'a SourceFacets],
-    folding: Option<Folding>,
+    folding: Option<FoldingRef<'a>>,
     query: &'a CatalogQuery,
     categories: Vec<CategoryFacts>,
     favorites: HashSet<&'a str>,
@@ -378,7 +434,7 @@ impl<'a> Context<'a> {
             .collect();
         Context {
             sources,
-            folding: query.fold.then(|| fold(sources)),
+            folding: query.fold.then(|| folding_for(sources)),
             query,
             categories,
             favorites: query.favorite_ids.iter().map(String::as_str).collect(),
@@ -452,7 +508,7 @@ impl<'a> Context<'a> {
         if let Some((_, ultra_hd)) = self
             .folding
             .as_ref()
-            .and_then(|folding| folding.groups.get(&(entry.source, entry.row)))
+            .and_then(|folding| folding.as_ref().groups.get(&(entry.source, entry.row)))
         {
             return *ultra_hd;
         }
@@ -519,7 +575,7 @@ impl<'a> Context<'a> {
 
     fn all(&self) -> Box<dyn Iterator<Item = Entry> + '_> {
         if let Some(folding) = &self.folding {
-            return Box::new(folding.order.iter().copied());
+            return Box::new(folding.as_ref().order.iter().copied());
         }
         Box::new(
             self.sources
@@ -1037,26 +1093,13 @@ pub(crate) fn fold_groups(
     query: &CatalogQuery,
     keys: &[u32],
 ) -> HashMap<u32, Vec<u32>> {
-    if !query.fold {
+    if !query.fold || keys.is_empty() {
         return HashMap::new();
     }
-    let context = Context::new(sources, query, false);
-    let Some(folding) = &context.folding else {
-        return HashMap::new();
-    };
-    let wanted: HashSet<u32> = keys.iter().copied().collect();
-    folding
-        .groups
-        .iter()
-        .filter_map(|(&(source, row), (members, _))| {
-            let key = context.key(Entry { source, row });
-            wanted.contains(&key).then(|| {
-                (
-                    key,
-                    members.iter().map(|&member| context.key(member)).collect(),
-                )
-            })
-        })
+    let folding = folding_for(sources);
+    let groups = &folding.as_ref().key_groups;
+    keys.iter()
+        .filter_map(|&key| groups.get(&key).map(|members| (key, members.clone())))
         .collect()
 }
 
@@ -1138,11 +1181,7 @@ mod tests {
                 }
             })
             .collect();
-        SourceFacets {
-            generation: 1,
-            rows,
-            categories,
-        }
+        SourceFacets::new(1, rows, categories)
     }
 
     fn keys(result: &PageResult) -> Vec<u32> {
@@ -1489,6 +1528,32 @@ mod tests {
         assert!(fold_groups(&[&facets], &q, &[2]).is_empty());
         q.category = None;
         assert_eq!(keys(&page(&[&facets], &q)), vec![0, 1, 2, 3]);
+        assert!(
+            facets.folding.get().is_some(),
+            "single-source folding must be cached on SourceFacets"
+        );
+    }
+
+    #[test]
+    fn multi_source_fold_groups_combines_variants_across_sources() {
+        let first = source(vec![Title {
+            fold_key: Some("c::de::one"),
+            fold_rank: 50,
+            ..title("one-hd")
+        }]);
+        let second = source(vec![Title {
+            fold_key: Some("c::de::one"),
+            fold_rank: 90,
+            ..title("one-4k")
+        }]);
+        let mut q = query("default");
+        q.fold = true;
+        let second_key = 1u32 << ORD_BITS;
+        assert_eq!(keys(&page(&[&first, &second], &q)), vec![second_key]);
+        assert_eq!(
+            fold_groups(&[&first, &second], &q, &[second_key]),
+            HashMap::from([(second_key, vec![0, second_key])])
+        );
     }
 
     #[test]

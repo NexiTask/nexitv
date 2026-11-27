@@ -252,6 +252,7 @@ const DEFAULT_SETTINGS = {
   liveStreamFormat: 'ts' as LiveStreamFormat,
   language: 'en' as const,
   tmdbApiKey: '',
+  tmdbApiKeyLoading: false,
   tmdbEnabled: false,
   tmdbLanguage: 'auto' as const,
   tmdbImageSize: 'w500' as const,
@@ -521,6 +522,7 @@ export function migrateSettingsState(persistedState: unknown): SettingsState {
     liveStreamFormat: state.liveStreamFormat === 'm3u8' ? 'm3u8' : 'ts',
     language: isUiLanguage(state.language) ? state.language : 'en',
     tmdbApiKey: typeof state.tmdbApiKey === 'string' ? state.tmdbApiKey.slice(0, 256) : '',
+    tmdbApiKeyLoading: false,
     tmdbEnabled: typeof state.tmdbEnabled === 'boolean' ? state.tmdbEnabled : false,
     tmdbLanguage:
       state.tmdbLanguage === 'auto' || isUiLocale(state.tmdbLanguage) ? state.tmdbLanguage : 'auto',
@@ -765,6 +767,7 @@ export const useSettingsStore = create<SettingsState>()(
           return { channelLogoAspectOverrides: overrides };
         }),
 
+      setTmdbApiKeyLoading: (loading) => set({ tmdbApiKeyLoading: loading }),
       importSettings: (settings) => set(() => settings),
       resetSettings: () => set(DEFAULT_SETTINGS),
     }),
@@ -776,7 +779,11 @@ export const useSettingsStore = create<SettingsState>()(
         if (version < 19) settings.homeSections = migrateLegacyHomeOrder(settings.homeSections);
         return settings;
       },
-      partialize: ({ tmdbApiKey: _tmdbApiKey, ...persistedState }) => persistedState,
+      partialize: ({
+        tmdbApiKey: _tmdbApiKey,
+        tmdbApiKeyLoading: _tmdbApiKeyLoading,
+        ...persistedState
+      }) => persistedState,
     },
   ),
 );

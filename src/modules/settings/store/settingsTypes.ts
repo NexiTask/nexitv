@@ -116,6 +116,8 @@ export interface SettingsState {
   liveStreamFormat: LiveStreamFormat; // container requested for Xtream live channels
   language: UiLanguage;
   tmdbApiKey: string;
+  /** Runtime-only flag while the OS credential vault is resolving the saved TMDB key. */
+  tmdbApiKeyLoading: boolean;
   tmdbEnabled: boolean;
   tmdbLanguage: TmdbLanguage;
   tmdbImageSize: TmdbImageSize;
@@ -268,11 +270,14 @@ export interface SettingsState {
       | 'setBadgeVisibility'
       | 'setSmartLogoAspectMode'
       | 'setChannelLogoAspectOverride'
+      | 'tmdbApiKeyLoading'
+      | 'setTmdbApiKeyLoading'
     >,
   >(
     key: K,
     value: SettingsState[K],
   ) => void;
+  setTmdbApiKeyLoading: (loading: boolean) => void;
   rememberPlayerVolume: (volume: number) => void;
   toggleCategoryPref: (kind: keyof CategoryPrefs, type: CatalogType, id: string) => void;
   setCollapsedCategories: (type: CatalogType, ids: string[]) => void;

@@ -23,11 +23,16 @@ export async function deleteTmdbApiKey(): Promise<void> {
  * plaintext copy disappears from localStorage.
  */
 export async function initializeTmdbApiKey(): Promise<void> {
-  const legacyKey = useSettingsStore.getState().tmdbApiKey.trim();
-  let storedKey = await loadTmdbApiKey();
-  if (!storedKey && legacyKey) {
-    await storeTmdbApiKey(legacyKey);
-    storedKey = legacyKey;
+  useSettingsStore.getState().setTmdbApiKeyLoading(true);
+  try {
+    const legacyKey = useSettingsStore.getState().tmdbApiKey.trim();
+    let storedKey = await loadTmdbApiKey();
+    if (!storedKey && legacyKey) {
+      await storeTmdbApiKey(legacyKey);
+      storedKey = legacyKey;
+    }
+    useSettingsStore.getState().updateSetting('tmdbApiKey', storedKey ?? '');
+  } finally {
+    useSettingsStore.getState().setTmdbApiKeyLoading(false);
   }
-  useSettingsStore.getState().updateSetting('tmdbApiKey', storedKey ?? '');
 }

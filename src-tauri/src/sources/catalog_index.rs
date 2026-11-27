@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use rusqlite::{params, Connection, OptionalExtension};
@@ -55,10 +55,15 @@ const MAX_PLAUSIBLE_PROVIDER_RATING: f64 = 9.5;
 /// does not permanently retain ~150-200 MB of Rust RAM across the session.
 const FACET_CACHE_IDLE_TTL: Duration = Duration::from_secs(300);
 
+/// Concurrent read-only SQLite connections so Home, search, scroll chunks, and
+/// IMDb backfill do not serialize behind a single reader mutex.
+const MAX_READERS: usize = 4;
+
 static CONNECTION: Mutex<Option<Connection>> = Mutex::new(None);
-/// Page reads use their own connection, so they are not queued behind an
-/// ingest; WAL shows them the last committed state.
-static READER: Mutex<Option<Connection>> = Mutex::new(None);
+/// Fast-path flag once the writer connection has ensured the schema exists.
+static WRITER_INITIALIZED: AtomicBool = AtomicBool::new(false);
+/// Page reads draw from a small read-only pool; WAL shows them the last committed state.
+static READER_POOL: OnceLock<ReaderPool> = OnceLock::new();
 /// Facets loaded for queries, per (source, kind), valid for one generation.
 type FacetCache = HashMap<(String, String), (Instant, Arc<SourceFacets>)>;
 static FACETS: Mutex<Option<FacetCache>> = Mutex::new(None);
@@ -153,28 +158,129 @@ fn open(path: &PathBuf) -> rusqlite::Result<Connection> {
     Ok(connection)
 }
 
+struct ReaderPoolState {
+    idle: Vec<Connection>,
+    active: usize,
+    path: Option<PathBuf>,
+}
+
+struct ReaderPool {
+    state: Mutex<ReaderPoolState>,
+    available: Condvar,
+    max_readers: usize,
+}
+
+impl ReaderPool {
+    fn new(max_readers: usize) -> Self {
+        Self {
+            state: Mutex::new(ReaderPoolState {
+                idle: Vec::with_capacity(max_readers),
+                active: 0,
+                path: None,
+            }),
+            available: Condvar::new(),
+            max_readers,
+        }
+    }
+
+    fn checkout(&self, path: &PathBuf) -> Result<Connection, String> {
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if state.path.as_ref() != Some(path) {
+            state.idle.clear();
+            state.path = Some(path.clone());
+        }
+        loop {
+            if let Some(connection) = state.idle.pop() {
+                state.active += 1;
+                return Ok(connection);
+            }
+            if state.active < self.max_readers {
+                state.active += 1;
+                drop(state);
+                match open_reader(path) {
+                    Ok(connection) => return Ok(connection),
+                    Err(error) => {
+                        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+                        state.active = state.active.saturating_sub(1);
+                        self.available.notify_one();
+                        return Err(error);
+                    }
+                }
+            }
+            state = self
+                .available
+                .wait(state)
+                .unwrap_or_else(|e| e.into_inner());
+            if state.path.as_ref() != Some(path) {
+                state.idle.clear();
+                state.path = Some(path.clone());
+            }
+        }
+    }
+
+    fn release(&self, path: &PathBuf, connection: Option<Connection>) {
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        state.active = state.active.saturating_sub(1);
+        let reusable = !std::thread::panicking()
+            && state.path.as_ref() == Some(path)
+            && state.idle.len() < self.max_readers;
+        if let Some(connection) = connection.filter(|_| reusable) {
+            state.idle.push(connection);
+        }
+        self.available.notify_one();
+    }
+
+    fn with_connection_at<T>(
+        &self,
+        path: &PathBuf,
+        f: impl FnOnce(&Connection) -> rusqlite::Result<T>,
+    ) -> Result<T, String> {
+        struct Guard<'a> {
+            pool: &'a ReaderPool,
+            path: &'a PathBuf,
+            connection: Option<Connection>,
+        }
+        impl Drop for Guard<'_> {
+            fn drop(&mut self) {
+                self.pool.release(self.path, self.connection.take());
+            }
+        }
+        let guard = Guard {
+            pool: self,
+            path,
+            connection: Some(self.checkout(path)?),
+        };
+        f(guard
+            .connection
+            .as_ref()
+            .expect("pooled reader was checked out"))
+        .map_err(|error| format!("Catalog index error: {error}"))
+    }
+}
+
+fn open_reader(path: &PathBuf) -> Result<Connection, String> {
+    Connection::open(path)
+        .and_then(|connection| {
+            connection.pragma_update(None, "query_only", true)?;
+            connection.pragma_update(None, "busy_timeout", 5_000)?;
+            connection.pragma_update(None, "temp_store", "MEMORY")?;
+            connection.pragma_update(None, "cache_size", -8_000)?;
+            Ok(connection)
+        })
+        .map_err(|error| format!("Catalog index unavailable: {error}"))
+}
+
 pub(crate) fn with_reader<T>(
     app: &tauri::AppHandle,
     f: impl FnOnce(&Connection) -> rusqlite::Result<T>,
 ) -> Result<T, String> {
-    let mut guard = READER.lock().unwrap_or_else(|e| e.into_inner());
-    if guard.is_none() {
+    if !WRITER_INITIALIZED.load(Ordering::Acquire) {
         // The writer creates or migrates the schema first.
         with_connection(app, |_| Ok(()))?;
-        let path = database_path(app)?;
-        let connection = Connection::open(&path)
-            .and_then(|connection| {
-                connection.pragma_update(None, "query_only", true)?;
-                connection.pragma_update(None, "busy_timeout", 5_000)?;
-                connection.pragma_update(None, "temp_store", "MEMORY")?;
-                connection.pragma_update(None, "cache_size", -16_000)?;
-                Ok(connection)
-            })
-            .map_err(|error| format!("Catalog index unavailable: {error}"))?;
-        *guard = Some(connection);
     }
-    let connection = guard.as_ref().expect("reader was just opened");
-    f(connection).map_err(|error| format!("Catalog index error: {error}"))
+    let path = database_path(app)?;
+    let pool = READER_POOL.get_or_init(|| ReaderPool::new(MAX_READERS));
+    pool.with_connection_at(&path, f)
 }
 
 /// Set when a schema bump dropped the tables: the caller that opened the
@@ -191,6 +297,7 @@ pub(crate) fn with_connection<T>(
     if opened {
         let path = database_path(app)?;
         *guard = Some(open(&path).map_err(|error| format!("Catalog index unavailable: {error}"))?);
+        WRITER_INITIALIZED.store(true, Ordering::Release);
     }
     let result = f(guard.as_mut().expect("connection was just opened"))
         .map_err(|error| format!("Catalog index error: {error}"));
@@ -1148,11 +1255,7 @@ fn read_source_facets(
     drop(query);
     drop(statement);
     transaction.finish()?;
-    let facets = Arc::new(SourceFacets {
-        generation,
-        rows,
-        categories,
-    });
+    let facets = Arc::new(SourceFacets::new(generation, rows, categories));
     facet_cache_put(source_id, kind, facets.clone());
     Ok(SourceState::Ready(facets))
 }
@@ -2346,6 +2449,55 @@ mod tests {
         assert!(rows[0].contains("Newer A"));
         assert!(rows[1].contains("Newer B"));
         drop(connection);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reader_pool_runs_concurrent_readers_and_reuses_connections() {
+        use std::sync::Barrier;
+
+        let (path, mut connection) = test_database("reader-pool");
+        ingest_json(
+            &mut connection,
+            "xtream-pool",
+            r#"[{"stream_id":1,"name":"One"},{"stream_id":2,"name":"Two"}]"#,
+        );
+        drop(connection);
+
+        let pool = Arc::new(ReaderPool::new(2));
+        let barrier = Arc::new(Barrier::new(2));
+        let mut handles = Vec::new();
+        for _ in 0..2 {
+            let pool = pool.clone();
+            let path = path.clone();
+            let barrier = barrier.clone();
+            handles.push(std::thread::spawn(move || {
+                pool.with_connection_at(&path, |conn| {
+                    // Both readers must be active concurrently to pass the barrier.
+                    barrier.wait();
+                    conn.query_row("SELECT COUNT(*) FROM items", [], |row| row.get::<_, i64>(0))
+                })
+                .unwrap()
+            }));
+        }
+        for handle in handles {
+            assert_eq!(handle.join().unwrap(), 2);
+        }
+        let state = pool.state.lock().unwrap();
+        assert_eq!(state.active, 0);
+        assert_eq!(state.idle.len(), 2);
+        drop(state);
+
+        // Subsequent checkout reuses an idle connection without exceeding pool cap.
+        let count = pool
+            .with_connection_at(&path, |conn| {
+                conn.query_row("SELECT COUNT(*) FROM items", [], |row| row.get::<_, i64>(0))
+            })
+            .unwrap();
+        assert_eq!(count, 2);
+        assert_eq!(pool.state.lock().unwrap().idle.len(), 2);
+
+        drop(pool);
         let _ = std::fs::remove_file(path);
     }
 }
