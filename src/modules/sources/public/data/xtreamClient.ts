@@ -7,6 +7,7 @@ export { getSeriesCategories } from '../../data/xtreamClient';
 export { getSeriesInfo } from '../../data/xtreamClient';
 export { getShortEPG } from '../../data/xtreamClient';
 export { getStreamUrl } from '../../data/xtreamClient';
+export { promoteXtreamServer } from '../../data/xtreamClient';
 export { getVodCategories } from '../../data/xtreamClient';
 export { getVodInfo } from '../../data/xtreamClient';
 export { getVodStreams } from '../../data/xtreamClient';

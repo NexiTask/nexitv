@@ -125,6 +125,30 @@ describe('typed Tauri IPC wrapper', () => {
       'catalog_cache_load',
       { sourceId: 'xtream-one', kind: 'series', scope: 'sources-abc' },
     ],
+    [
+      'catalogCacheRefresh',
+      [
+        {
+          sourceId: 'xtream-one',
+          kind: 'series',
+          scope: 'sources-abc',
+          serverUrls: ['https://provider.test'],
+          username: 'viewer',
+          password: 'secret',
+        },
+      ],
+      'catalog_cache_refresh',
+      {
+        request: {
+          sourceId: 'xtream-one',
+          kind: 'series',
+          scope: 'sources-abc',
+          serverUrls: ['https://provider.test'],
+          username: 'viewer',
+          password: 'secret',
+        },
+      },
+    ],
     ['catalogCacheDelete', ['xtream-one'], 'catalog_cache_delete', { sourceId: 'xtream-one' }],
     [
       'catalogIndexPageStatus',

@@ -88,6 +88,21 @@ export interface M3uDocument {
 /** The provider lists an Xtream catalogue is built from. */
 export type CatalogCacheKind = 'live' | 'vod' | 'series';
 
+export interface CatalogRefreshRequest {
+  sourceId: string;
+  kind: CatalogCacheKind;
+  scope: string;
+  serverUrls: string[];
+  username: string;
+  password: string;
+}
+
+export interface CatalogRefreshResult {
+  activeUrl: string;
+  itemCount: number;
+  savedAt: number;
+}
+
 export type CatalogIndexOrder = 'added' | 'rating' | 'provider';
 
 export interface CatalogIndexSource {
@@ -470,6 +485,10 @@ export const tauriApi = {
   /** A stored catalogue list, or null when there is none for this account or it is too old. */
   catalogCacheLoad: (sourceId: string, kind: CatalogCacheKind, scope: string) =>
     invoke<CatalogCacheEntry | null>('catalog_cache_load', { sourceId, kind, scope }),
+
+  /** Stream a provider catalogue directly into the on-disk cache and SQLite index in Rust. */
+  catalogCacheRefresh: (request: CatalogRefreshRequest) =>
+    invoke<CatalogRefreshResult>('catalog_cache_refresh', { request }),
 
   /** A pre-ordered candidate pool from the catalogue index (hidden categories left out). */
   catalogIndexRows: (

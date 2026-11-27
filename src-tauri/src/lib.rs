@@ -75,6 +75,7 @@ pub fn run() {
             sources::cache::m3u_cache_delete,
             sources::catalog_cache::catalog_cache_store,
             sources::catalog_cache::catalog_cache_load,
+            sources::catalog_cache::catalog_cache_refresh,
             sources::catalog_cache::catalog_cache_delete,
             sources::catalog_index::catalog_index_rows,
             sources::catalog_index::catalog_index_items_by_ids,

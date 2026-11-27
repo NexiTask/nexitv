@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   loadProviderList,
+  refreshProviderListNative,
   rememberProviderList,
   storeProviderList,
 } from '@/modules/catalog/data/catalogDiskCache';
 import { debugLog } from '@/modules/diagnostics/store/useDebugStore';
 
-const native = vi.hoisted(() => ({ catalogCacheStore: vi.fn(), catalogCacheLoad: vi.fn() }));
+const native = vi.hoisted(() => ({
+  catalogCacheStore: vi.fn(),
+  catalogCacheLoad: vi.fn(),
+  catalogCacheRefresh: vi.fn(),
+}));
 const desktop = vi.hoisted(() => ({ value: true }));
 vi.mock('@/platform/tauri', () => ({ tauriApi: native }));
 vi.mock('@/platform/desktop', () => ({ desktopApi: { isDesktop: () => desktop.value } }));
@@ -95,5 +100,37 @@ describe('loadProviderList', () => {
     native.catalogCacheLoad.mockResolvedValue({ content: '[{"num":', savedAt: 1 });
 
     await expect(loadProviderList('xtream-one', 'vod', 'sources-abc')).rejects.toThrow();
+  });
+});
+
+describe('refreshProviderListNative', () => {
+  it('cancels pending delayed stores and invokes catalog_cache_refresh with deduplicated servers', async () => {
+    vi.useFakeTimers();
+    native.catalogCacheRefresh.mockResolvedValue({
+      activeUrl: 'https://backup.test',
+      itemCount: 42,
+      savedAt: 1_800,
+    });
+    rememberProviderList('xtream-one', 'vod', 'sources-abc', [{ stream_id: 1 }]);
+
+    const result = await refreshProviderListNative('xtream-one', 'vod', 'sources-abc', {
+      sourceId: 'xtream-one',
+      url: 'https://primary.test',
+      alternativeUrls: ['https://primary.test', 'https://backup.test'],
+      username: 'viewer',
+      password: 'secret',
+    });
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(result).toEqual({ activeUrl: 'https://backup.test', itemCount: 42, savedAt: 1_800 });
+    expect(native.catalogCacheStore).not.toHaveBeenCalled();
+    expect(native.catalogCacheRefresh).toHaveBeenCalledWith({
+      sourceId: 'xtream-one',
+      kind: 'vod',
+      scope: 'sources-abc',
+      serverUrls: ['https://primary.test', 'https://backup.test'],
+      username: 'viewer',
+      password: 'secret',
+    });
   });
 });

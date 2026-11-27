@@ -19,6 +19,7 @@ const xc = vi.hoisted(() => ({
   getSeriesCategories: vi.fn(),
   getVodCategories: vi.fn(),
   getVodStreams: vi.fn(),
+  promoteXtreamServer: vi.fn(),
   getStreamUrl: vi.fn(
     (credentials: { url: string }, type: string, id: string | number, extension?: string) =>
       `${credentials.url}/${type}/${id}.${extension || 'mp4'}`,
@@ -31,6 +32,7 @@ const disk = vi.hoisted(() => ({
   rememberProviderList: vi.fn(),
   loadProviderList: vi.fn(),
   storeProviderList: vi.fn(),
+  refreshProviderListNative: vi.fn(),
 }));
 const desktop = vi.hoisted(() => ({ value: true }));
 vi.mock('@/modules/catalog/data/catalogDiskCache', () => disk);
@@ -348,10 +350,13 @@ describe('source-scoped catalog and category queries', () => {
         { id: 'xtream-one:live:1', sourceId: 'xtream-one', title: 'Old Channel' },
       ]);
       const live = [{ stream_id: 4, name: 'New Channel' }];
-      const series = [{ series_id: 9, name: 'New Series' }];
       xc.getLiveStreams.mockResolvedValue(live);
       xc.getVodStreams.mockRejectedValue(new Error('Movies temporarily unavailable'));
-      xc.getSeries.mockResolvedValue(series);
+      disk.refreshProviderListNative.mockResolvedValue({
+        activeUrl: credentials.url,
+        itemCount: 1,
+        savedAt: 1_900,
+      });
       const settled = vi.fn();
       const started = vi.fn();
 
@@ -367,11 +372,17 @@ describe('source-scoped catalog and category queries', () => {
       expect(disk.loadProviderList).not.toHaveBeenCalled();
       expect(disk.storeProviderList.mock.calls).toEqual([
         ['xtream-one', 'live', 'xtream-scope', live],
-        ['xtream-one', 'series', 'xtream-scope', series],
       ]);
+      // Uncached pure-Xtream desktop lists stream directly in Rust instead of JS fetch + IPC.
+      expect(xc.getSeries).not.toHaveBeenCalled();
+      expect(disk.refreshProviderListNative).toHaveBeenCalledWith(
+        'xtream-one',
+        'series',
+        'xtream-scope',
+        credentials,
+      );
       expect(client.getQueryData(vodKey)).toEqual(previous);
       expect(client.getQueryData(liveKey)).toMatchObject([{ title: 'New Channel' }]);
-      // Uncached pure-Xtream desktop lists stay in SQLite instead of pinning full arrays in RAM.
       expect(client.getQueryData(queryKeys.catalog('series', 'sources-scope'))).toBeUndefined();
     });
 

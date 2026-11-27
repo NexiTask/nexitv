@@ -6,13 +6,19 @@ import {
   getSeries,
   getStreamUrl,
   getVodStreams,
+  promoteXtreamServer,
   type XtreamLiveStream,
   type XtreamSeries,
   type XtreamVodStream,
 } from '@/modules/sources/public/data/xtreamClient';
 import { desktopApi } from '@/platform/desktop';
 import { debugLog } from '@/modules/diagnostics/public/store/useDebugStore';
-import { loadProviderList, rememberProviderList, storeProviderList } from './catalogDiskCache';
+import {
+  loadProviderList,
+  refreshProviderListNative,
+  rememberProviderList,
+  storeProviderList,
+} from './catalogDiskCache';
 import { CATALOG_FRESH_MS } from './catalogFreshness';
 import { perfAsync, perfSync } from '@/platform/perf';
 import { queryKeys } from '@/modules/sources/public/model/queryKeys';
@@ -207,6 +213,25 @@ export async function refreshProviderCatalogs(
           if (!source.credentials || !source.isAvailable) {
             throw new Error('The saved credential is unavailable');
           }
+          if (desktopApi.isDesktop() && !shouldUpdateCache) {
+            const refreshedNative = await refreshProviderListNative(
+              source.id,
+              type,
+              source.queryScope,
+              source.credentials,
+            );
+            if (refreshedNative.activeUrl && refreshedNative.activeUrl !== source.credentials.url) {
+              promoteXtreamServer(source.id, refreshedNative.activeUrl);
+              notify.info(
+                'Backup Server Active',
+                'NexiTV switched this source to an available provider server.',
+                4500,
+                undefined,
+                'connection',
+              );
+            }
+            return { sourceId: source.id, items: [] };
+          }
           const list = await fetchProviderRefresh(type, source);
           if (list.length === 0) {
             const current = client.getQueryData<CatalogItem[]>(queryKey);
@@ -218,7 +243,7 @@ export async function refreshProviderCatalogs(
             }
           }
           await storeProviderList(source.id, type, source.queryScope, list);
-          const items = shouldUpdateCache ? mapXtreamList(type, source, list) : [];
+          const items = mapXtreamList(type, source, list);
           return { sourceId: source.id, items };
         } finally {
           progress.onListSettled();
