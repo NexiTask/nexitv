@@ -196,6 +196,11 @@ export async function refreshProviderCatalogs(
   for (const type of catalogTypes) {
     progress.onCatalogStarted?.(type);
     const queryKey = queryKeys.catalog(type, sources.queryScope);
+    const shouldUpdateCache =
+      !desktopApi.isDesktop() ||
+      sources.m3uSources.length > 0 ||
+      client.getQueryData(queryKey) !== undefined ||
+      (client.getQueryCache().find({ queryKey, exact: true })?.getObserversCount() ?? 0) > 0;
     const refreshed = await Promise.allSettled(
       targets.map(async (source) => {
         try {
@@ -212,8 +217,8 @@ export async function refreshProviderCatalogs(
               throw new Error('The provider returned an empty catalogue');
             }
           }
-          const items = mapXtreamList(type, source, list);
           await storeProviderList(source.id, type, source.queryScope, list);
+          const items = shouldUpdateCache ? mapXtreamList(type, source, list) : [];
           return { sourceId: source.id, items };
         } finally {
           progress.onListSettled();
@@ -226,7 +231,7 @@ export async function refreshProviderCatalogs(
       failed.set(source.id, source.profile.name);
       return [];
     });
-    if (!lists.length) continue;
+    if (!lists.length || !shouldUpdateCache) continue;
     await client.cancelQueries({ queryKey, exact: true });
     client.setQueryData<CatalogItem[]>(queryKey, (current) => {
       const base =

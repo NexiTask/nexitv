@@ -8,6 +8,7 @@
 //! poster cannot be fetched or decoded here.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{Duration, SystemTime};
 
@@ -177,9 +178,13 @@ async fn thumbnail(cache_dir: PathBuf, url: String, width: u32) -> Result<Vec<u8
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)??;
 
     let _ = tokio::fs::create_dir_all(&cache_dir).await;
-    let temporary = path.with_extension("tmp");
-    if tokio::fs::write(&temporary, &out).await.is_ok() {
-        let _ = tokio::fs::rename(&temporary, &path).await;
+    static TEMP_SEQ: AtomicU64 = AtomicU64::new(1);
+    let seq = TEMP_SEQ.fetch_add(1, Ordering::Relaxed);
+    let temporary = path.with_extension(format!("tmp.{seq}"));
+    if tokio::fs::write(&temporary, &out).await.is_ok()
+        && tokio::fs::rename(&temporary, &path).await.is_err()
+    {
+        let _ = tokio::fs::remove_file(&temporary).await;
     }
     Ok(out)
 }

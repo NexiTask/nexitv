@@ -280,7 +280,22 @@ describe('library store', () => {
       expect(stringifySpy).toHaveBeenCalledTimes(1);
       const saved = JSON.parse(localStorage.getItem('iptv-library-storage')!);
       expect(saved.state.history[0].currentTime).toBe(66);
+
+      // Visibility hide flushes pending updates immediately without waiting for the 5s window.
+      useLibraryStore.getState().updateHistory(progress({ currentTime: 90 }));
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'hidden',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(stringifySpy).toHaveBeenCalledTimes(2);
+      const flushed = JSON.parse(localStorage.getItem('iptv-library-storage')!);
+      expect(flushed.state.history[0].currentTime).toBe(90);
     } finally {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: 'visible',
+      });
       stringifySpy.mockRestore();
       vi.useRealTimers();
     }

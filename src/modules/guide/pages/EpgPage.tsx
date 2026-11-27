@@ -188,7 +188,6 @@ export function EpgPage() {
     refetch: refetchCategories,
   } = useCategories('live');
   const pageError = getCombinedErrorMessage([error, categoriesError], '');
-  const showLoadError = (isError || isCategoriesError) && allChannels.length === 0;
   const errorPresentation = getErrorPresentation(pageError, 'TV Guide');
   const retryPage = () => {
     const retries = [
@@ -277,9 +276,14 @@ export function EpgPage() {
     [channels, getIndexedItem, isIndexed],
   );
   const needsGroup = isIndexed && guideCategory === null;
-  const isLoading = isLegacy
-    ? isLegacyLoading
-    : mode === 'pending' || (!needsGroup && (indexed.isLoading || !indexResult));
+  const isLoading =
+    sources.isLoading ||
+    (isLegacy
+      ? isLegacyLoading
+      : mode === 'pending' || (!needsGroup && (indexed.isLoading || !indexResult)));
+  const showLoadError =
+    ((isLegacy && isError) || isCategoriesError) &&
+    (isIndexed ? !indexResult : allChannels.length === 0);
   const isUpdating =
     !isLoading &&
     (isIndexed
@@ -537,7 +541,7 @@ export function EpgPage() {
           }
         />
 
-        {!sources.isAvailable ? (
+        {!sources.isAvailable && !sources.isLoading ? (
           <EmptyState
             icon={Tv}
             title="No Source Available"

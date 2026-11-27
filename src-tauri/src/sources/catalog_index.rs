@@ -19,9 +19,9 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -51,13 +51,20 @@ const MAX_POOL: u32 = 8_000;
 /// Ratings above this are provider noise; matches the frontend's cap.
 const MAX_PLAUSIBLE_PROVIDER_RATING: f64 = 9.5;
 
+/// Evict idle facet caches after 5 minutes so visiting Movies, Series, and Live
+/// does not permanently retain ~150-200 MB of Rust RAM across the session.
+const FACET_CACHE_IDLE_TTL: Duration = Duration::from_secs(300);
+
 static CONNECTION: Mutex<Option<Connection>> = Mutex::new(None);
 /// Page reads use their own connection, so they are not queued behind an
 /// ingest; WAL shows them the last committed state.
 static READER: Mutex<Option<Connection>> = Mutex::new(None);
 /// Facets loaded for queries, per (source, kind), valid for one generation.
-type FacetCache = HashMap<(String, String), Arc<SourceFacets>>;
+type FacetCache = HashMap<(String, String), (Instant, Arc<SourceFacets>)>;
 static FACETS: Mutex<Option<FacetCache>> = Mutex::new(None);
+/// Cached `(matched, total)` counts for `imdb::status`, invalidated on ingest/backfill/delete.
+static IMDB_COUNTS_VERSION: AtomicU64 = AtomicU64::new(1);
+static IMDB_COUNTS_CACHE: Mutex<Option<(u64, u64, u64)>> = Mutex::new(None);
 /// One index build at a time, so concurrent requests do not build it twice.
 static BUILD: Mutex<()> = Mutex::new(());
 
@@ -137,6 +144,8 @@ fn open(path: &PathBuf) -> rusqlite::Result<Connection> {
             WHERE imdb_rating IS NOT NULL;
          CREATE INDEX IF NOT EXISTS items_facet_id ON items (kind, f_id)
             WHERE f_id IS NOT NULL;
+         CREATE INDEX IF NOT EXISTS items_imdb_tconst ON items (kind, imdb_tconst)
+            WHERE imdb_tconst IS NOT NULL AND f_id IS NOT NULL;
          CREATE INDEX IF NOT EXISTS items_unranked ON items (source_id, kind, ord)
             WHERE f_rank IS NULL;",
     )?;
@@ -401,6 +410,7 @@ fn ingest_into(
             params![source_id, kind, scope, saved_at as i64, skipped],
         )?;
         transaction.commit()?;
+        invalidate_imdb_counts();
         Ok(inserted)
     }
 }
@@ -476,11 +486,51 @@ fn carried_facets(
 }
 
 pub(crate) fn delete_source(app: &tauri::AppHandle, source_id: &str) -> Result<(), String> {
-    with_connection(app, |connection| {
+    let result = with_connection(app, |connection| {
         connection.execute("DELETE FROM items WHERE source_id = ?1", params![source_id])?;
         connection.execute("DELETE FROM lists WHERE source_id = ?1", params![source_id])?;
         Ok(())
-    })
+    });
+    if result.is_ok() {
+        if let Some(cache) = FACETS.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
+            cache.retain(|(cached_source, _), _| cached_source != source_id);
+        }
+        invalidate_imdb_counts();
+    }
+    result
+}
+
+pub(crate) fn invalidate_imdb_counts() {
+    IMDB_COUNTS_VERSION.fetch_add(1, Ordering::Relaxed);
+}
+
+/// Counts `(matched, total)` across `'vod'` and `'series'` items, cached until
+/// an ingest, backfill, or source deletion bumps `IMDB_COUNTS_VERSION`.
+pub(crate) fn imdb_counts(app: &tauri::AppHandle) -> Result<(u64, u64), String> {
+    let version = IMDB_COUNTS_VERSION.load(Ordering::Relaxed);
+    if let Some((cached_version, matched, total)) =
+        *IMDB_COUNTS_CACHE.lock().unwrap_or_else(|e| e.into_inner())
+    {
+        if cached_version == version {
+            return Ok((matched, total));
+        }
+    }
+    let (matched, total) = with_reader(app, |connection| {
+        let matched: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM items
+             WHERE kind IN ('vod', 'series') AND imdb_tconst IS NOT NULL AND f_id IS NOT NULL",
+            [],
+            |row| row.get(0),
+        )?;
+        let total: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM items WHERE kind IN ('vod', 'series')",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok((matched as u64, total as u64))
+    })?;
+    *IMDB_COUNTS_CACHE.lock().unwrap_or_else(|e| e.into_inner()) = Some((version, matched, total));
+    Ok((matched, total))
 }
 
 /// Whether the facet worker still owes match keys for some movie or series
@@ -682,10 +732,17 @@ fn query_index_rows(
         } else {
             ("rating DESC, ord ASC", MAX_POOL)
         };
+        // Select only rowids during the ORDER BY + LIMIT pass so SQLite never
+        // buffers megabytes of raw JSON blobs inside its temporary sorter.
         let raws = if has_hidden {
             let mut statement = connection.prepare_cached(&format!(
-                "SELECT raw FROM items WHERE {VISIBLE_FILTERED} AND rating IS NOT NULL AND rating >= ?4
-                 ORDER BY {tie_order} LIMIT ?5"
+                "SELECT items.raw FROM (
+                    SELECT rowid, rating, f_year, f_rank, ord FROM items
+                    WHERE {VISIBLE_FILTERED} AND rating IS NOT NULL AND rating >= ?4
+                    ORDER BY {tie_order} LIMIT ?5
+                 ) AS picked
+                 JOIN items ON items.rowid = picked.rowid
+                 ORDER BY picked.rating DESC, COALESCE(picked.f_year, 0) DESC, picked.f_rank ASC, picked.ord ASC"
             ))?;
             let rows = statement
                 .query_map(
@@ -696,8 +753,13 @@ fn query_index_rows(
             rows
         } else {
             let mut statement = connection.prepare_cached(&format!(
-                "SELECT raw FROM items WHERE {VISIBLE_ALL} AND rating IS NOT NULL AND rating >= ?3
-                 ORDER BY {tie_order} LIMIT ?4"
+                "SELECT items.raw FROM (
+                    SELECT rowid, rating, f_year, f_rank, ord FROM items
+                    WHERE {VISIBLE_ALL} AND rating IS NOT NULL AND rating >= ?3
+                    ORDER BY {tie_order} LIMIT ?4
+                 ) AS picked
+                 JOIN items ON items.rowid = picked.rowid
+                 ORDER BY picked.rating DESC, COALESCE(picked.f_year, 0) DESC, picked.f_rank ASC, picked.ord ASC"
             ))?;
             let rows = statement
                 .query_map(params![source_id, kind, min_rating, row_limit], |row| {
@@ -789,6 +851,7 @@ pub fn catalog_index_rows(
 #[serde(rename_all = "camelCase")]
 pub struct IndexedItemRow {
     source_id: String,
+    ord: u32,
     raw: Box<RawValue>,
     #[serde(skip_serializing_if = "Option::is_none")]
     imdb: Option<ImdbFacts>,
@@ -827,7 +890,7 @@ fn items_by_ids_from(
     }
     let allowed: std::collections::HashSet<&str> = source_ids.iter().copied().collect();
     let mut statement = transaction.prepare_cached(
-        "SELECT source_id, raw, imdb_tconst, imdb_rating, imdb_votes FROM items
+        "SELECT source_id, ord, raw, imdb_tconst, imdb_rating, imdb_votes FROM items
          WHERE kind = ?1 AND f_id = ?2",
     )?;
     let mut rows = Vec::with_capacity(item_ids.len());
@@ -836,18 +899,20 @@ fn items_by_ids_from(
             .query_map(params![kind, item_id], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    imdb_facts(row.get(2)?, row.get(3)?, row.get(4)?),
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    imdb_facts(row.get(3)?, row.get(4)?, row.get(5)?),
                 ))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
-        for (source_id, raw, imdb) in found {
+        for (source_id, ord, raw, imdb) in found {
             if !allowed.contains(source_id.as_str()) {
                 continue;
             }
-            if let Ok(raw) = RawValue::from_string(raw) {
+            if let (Ok(ord), Ok(raw)) = (u32::try_from(ord), RawValue::from_string(raw)) {
                 rows.push(IndexedItemRow {
                     source_id,
+                    ord,
                     raw,
                     imdb,
                 });
@@ -953,25 +1018,35 @@ enum SourceState {
 }
 
 fn facet_cache_get(source_id: &str, kind: &str, generation: i64) -> Option<Arc<SourceFacets>> {
-    let guard = FACETS.lock().unwrap_or_else(|e| e.into_inner());
-    guard
-        .as_ref()?
-        .get(&(source_id.to_string(), kind.to_string()))
-        .filter(|facets| facets.generation == generation)
-        .cloned()
+    let mut guard = FACETS.lock().unwrap_or_else(|e| e.into_inner());
+    let cache = guard.as_mut()?;
+    let now = Instant::now();
+    cache.retain(|_, (last_used, _)| {
+        now.saturating_duration_since(*last_used) < FACET_CACHE_IDLE_TTL
+    });
+    let entry = cache.get_mut(&(source_id.to_string(), kind.to_string()))?;
+    if entry.1.generation != generation {
+        return None;
+    }
+    entry.0 = now;
+    Some(entry.1.clone())
 }
 
 fn facet_cache_put(source_id: &str, kind: &str, facets: Arc<SourceFacets>) {
     let mut guard = FACETS.lock().unwrap_or_else(|e| e.into_inner());
-    guard
-        .get_or_insert_with(HashMap::new)
-        .insert((source_id.to_string(), kind.to_string()), facets);
+    let now = Instant::now();
+    let cache = guard.get_or_insert_with(HashMap::new);
+    cache.retain(|_, (last_used, _)| {
+        now.saturating_duration_since(*last_used) < FACET_CACHE_IDLE_TTL
+    });
+    cache.insert((source_id.to_string(), kind.to_string()), (now, facets));
 }
 
 /// Drop the cached facets so the next page read reloads them with the IMDb
 /// columns the backfill just filled.
 pub(crate) fn invalidate_imdb_facets() {
     *FACETS.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    invalidate_imdb_counts();
 }
 
 fn list_generation(
@@ -1301,14 +1376,15 @@ fn check_source_status(
         });
     }
     let has_pending: bool = transaction.query_row(
-        "SELECT EXISTS (SELECT 1 FROM items WHERE source_id = ?1 AND kind = ?2 AND f_rank IS NULL)",
+        "SELECT EXISTS (SELECT 1 FROM items
+         WHERE source_id = ?1 AND kind = ?2 AND (f_rank IS NULL OR f_id IS NULL))",
         params![source_id, kind],
         |row| row.get(0),
     )?;
     if has_pending {
         let (pending, total): (u64, u64) = transaction.query_row(
             "SELECT (SELECT COUNT(*) FROM items WHERE source_id = ?1 AND kind = ?2
-                        AND f_rank IS NULL),
+                        AND (f_rank IS NULL OR f_id IS NULL)),
                     (SELECT COUNT(*) FROM items WHERE source_id = ?1 AND kind = ?2)",
             params![source_id, kind],
             |row| Ok((row.get::<_, i64>(0)? as u64, row.get::<_, i64>(1)? as u64)),
@@ -1766,6 +1842,7 @@ pub fn catalog_index_store_facets(
             params![source_id, kind],
         )?;
         transaction.commit()?;
+        invalidate_imdb_counts();
         Ok(true)
     })
 }
@@ -1882,6 +1959,7 @@ pub fn catalog_index_store_ranks(
             params![kind],
         )?;
         transaction.commit()?;
+        invalidate_imdb_counts();
         Ok(true)
     })?;
     crate::perf::log(
@@ -2210,11 +2288,26 @@ mod tests {
         .expect("ready once facets exist");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].source_id, source_a);
+        assert_eq!(rows[0].ord, 1);
         assert_eq!(
             rows[0].imdb.as_ref().map(|f| f.id.as_str()),
             Some("tt1234567")
         );
         assert_eq!(rows[0].imdb.as_ref().and_then(|f| f.rating), Some(8.4));
+        // A row missing f_id must be reported as building, matching read_source_facets.
+        connection
+            .execute(
+                "UPDATE items SET f_id = NULL WHERE source_id = ?1 AND ord = 0",
+                params![source_a],
+            )
+            .unwrap();
+        assert!(matches!(
+            check_source_status(&connection, source_a, "vod").unwrap(),
+            LightSourceState::Building {
+                pending: 1,
+                total: 2
+            }
+        ));
         drop(connection);
         let _ = std::fs::remove_file(path);
     }

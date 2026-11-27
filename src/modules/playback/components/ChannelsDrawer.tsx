@@ -128,6 +128,9 @@ export function ChannelsDrawer() {
   // sources or while the index is being built.
   const indexAvailable = useLiveIndexAvailable();
   const [indexFailed, setIndexFailed] = useState(false);
+  useEffect(() => {
+    if (!shouldShow) setIndexFailed(false);
+  }, [shouldShow]);
   const fromIndex = indexAvailable && !indexFailed;
   const trimmedQuery = query.trim();
   const categoryParams = useMemo<IndexedPageParams>(
@@ -209,17 +212,6 @@ export function ChannelsDrawer() {
     if (!trimmed) return visible;
     return visible.filter((c) => c.title.toLowerCase().includes(trimmed));
   }, [allChannels, activeCategoryId, fromIndex, hiddenCategoryIds, query]);
-  const indexedChannels = useMemo(
-    () =>
-      fromIndex
-        ? Array.from({ length: indexCount }, (_, index) => getIndexItem(index)).filter(
-            (item): item is CatalogItem => Boolean(item),
-          )
-        : [],
-    [fromIndex, getIndexItem, indexCount],
-  );
-  // What the keyboard steps through: every loaded channel of the list.
-  const channels = fromIndex ? indexedChannels : legacyChannels;
   const listCount = fromIndex ? indexCount : legacyChannels.length;
   const channelAt = (index: number) => (fromIndex ? getIndexItem(index) : legacyChannels[index]);
 
@@ -252,11 +244,19 @@ export function ChannelsDrawer() {
 
   useEffect(() => {
     if (!shouldShow || !isLive || !activeStream) return;
+    const loadedChannels = () =>
+      fromIndex
+        ? Array.from({ length: indexCount }, (_, index) => getIndexItem(index)).filter(
+            (item): item is CatalogItem => Boolean(item),
+          )
+        : legacyChannels;
     const playByIndex = (delta: number) => {
-      const current = channels.findIndex(
+      const list = loadedChannels();
+      if (list.length === 0) return;
+      const current = list.findIndex(
         (channel) => (channel.sourceItemId || channel.id).toString() === activeKey,
       );
-      const next = channels[(current + delta + channels.length) % channels.length];
+      const next = list[(current + delta + list.length) % list.length];
       if (!next) return;
       const playable = playableFromMediaItem({ ...next, type: 'live' }, credentials);
       if (playable) playStream(playable);
@@ -276,7 +276,7 @@ export function ChannelsDrawer() {
       numberTimerRef.current = setTimeout(() => {
         const number = numberBufferRef.current;
         numberBufferRef.current = '';
-        const target = channels.find(
+        const target = loadedChannels().find(
           (channel) => String(channel.channelNum ?? '').replace(/^#/, '') === number,
         );
         if (target) {
@@ -290,7 +290,18 @@ export function ChannelsDrawer() {
       window.removeEventListener('keydown', onKeyDown);
       if (numberTimerRef.current) clearTimeout(numberTimerRef.current);
     };
-  }, [activeKey, activeStream, channels, credentials, isLive, playStream, shouldShow]);
+  }, [
+    activeKey,
+    activeStream,
+    credentials,
+    fromIndex,
+    getIndexItem,
+    indexCount,
+    isLive,
+    legacyChannels,
+    playStream,
+    shouldShow,
+  ]);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   const firstRow = virtualRows[0]?.index ?? 0;

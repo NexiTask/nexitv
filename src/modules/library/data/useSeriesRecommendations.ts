@@ -3,7 +3,7 @@ import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { catalogQueryOptions } from '@/modules/catalog/public/data/useCatalog';
 import {
   useCategories,
-  useHiddenCategoryIds,
+  useHiddenCategoryState,
   useVisibleCatalog,
 } from '@/modules/catalog/public/data/useCategories';
 import { imdbFactsQueryOptions, withImdbFacts } from '@/modules/catalog/public/data/useImdbFacts';
@@ -82,7 +82,7 @@ export function useSeriesRecommendations(
   const categoryList = useCategories('series', {
     enabled: enabled && desktop && includeCategories,
   });
-  const hiddenCategoryIds = useHiddenCategoryIds('series', {
+  const hiddenCategories = useHiddenCategoryState('series', {
     enabled: enabled && desktop && includeCategories,
   });
   const upcoming = useUpcomingReleases({
@@ -134,11 +134,13 @@ export function useSeriesRecommendations(
     () => (enabled ? data.groupPicks(snapshot.data?.picks ?? []) : []),
     [enabled, data, snapshot.data],
   );
+  const usingIndexedPicks = !needsFullCatalog && indexedItems !== null;
   const imdb = useQueries({
     queries: cards.map(({ item }) => ({
       ...imdbFactsQueryOptions('series', item.id),
-      // Rows fetched through `useIndexedItemsByIds` already include IMDb facts.
-      enabled: Boolean(item.id) && !item.imdbId,
+      // Rows fetched through `useIndexedItemsByIds` already include IMDb facts
+      // (or confirmed null), so skip redundant per-card lookups for them.
+      enabled: Boolean(item.id) && !item.imdbId && !usingIndexedPicks,
     })),
   });
   const ratedCards = useMemo(
@@ -153,11 +155,19 @@ export function useSeriesRecommendations(
   // Load the full series catalogue and assemble the ChatGPT payload on demand
   // (off the UI thread in a Web Worker) only when the user starts a refresh.
   const buildRequest = useCallback(async (): Promise<SeriesRecommendationRequest> => {
-    const fullCatalogue = sources.isAvailable
-      ? (await queryClient.fetchQuery(catalogQueryOptions('series', sources, queryClient))).filter(
-          (item) => !item.categoryId || !hiddenCategoryIds.has(item.categoryId),
-        )
+    const queryOptions = catalogQueryOptions('series', sources, queryClient);
+    const hadCachedCatalog = queryClient.getQueryData(queryOptions.queryKey) !== undefined;
+    const rawCatalogue = sources.isAvailable
+      ? await queryClient.fetchQuery({
+          ...queryOptions,
+          ...(hadCachedCatalog ? {} : { gcTime: 0 }),
+        })
       : catalogue.data;
+    const fullCatalogue = sources.isAvailable
+      ? rawCatalogue.filter(
+          (item) => !item.categoryId || !hiddenCategories.ids.has(item.categoryId),
+        )
+      : rawCatalogue;
     const filteredCatalogue = fullCatalogue.filter((item) => !hideAdult || !item.adult);
     const request = await buildRecommendationRequestAsync({
       catalogue: filteredCatalogue,
@@ -180,7 +190,7 @@ export function useSeriesRecommendations(
   }, [
     sources,
     queryClient,
-    hiddenCategoryIds,
+    hiddenCategories.ids,
     catalogue.data,
     hideAdult,
     favorites,
@@ -205,7 +215,8 @@ export function useSeriesRecommendations(
           (needsFullCatalog && catalogue.isLoading)))),
   );
   const canPrepare = Boolean(
-    sources.isAvailable || catalogue.data.length > 0 || data.hasCandidates,
+    (!includeCategories || hiddenCategories.isResolved) &&
+    (sources.isAvailable || catalogue.data.length > 0 || data.hasCandidates),
   );
 
   return {

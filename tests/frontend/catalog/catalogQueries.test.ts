@@ -342,7 +342,11 @@ describe('source-scoped catalog and category queries', () => {
 
     it('refreshes the three provider lists directly and keeps previous data for a failed list', async () => {
       const previous = [{ id: 'xtream-one:vod:7', sourceId: 'xtream-one', title: 'Saved Movie' }];
+      const liveKey = queryKeys.catalog('live', 'sources-scope');
       client.setQueryData(vodKey, previous);
+      client.setQueryData(liveKey, [
+        { id: 'xtream-one:live:1', sourceId: 'xtream-one', title: 'Old Channel' },
+      ]);
       const live = [{ stream_id: 4, name: 'New Channel' }];
       const series = [{ series_id: 9, name: 'New Series' }];
       xc.getLiveStreams.mockResolvedValue(live);
@@ -366,9 +370,9 @@ describe('source-scoped catalog and category queries', () => {
         ['xtream-one', 'series', 'xtream-scope', series],
       ]);
       expect(client.getQueryData(vodKey)).toEqual(previous);
-      expect(client.getQueryData(queryKeys.catalog('live', 'sources-scope'))).toMatchObject([
-        { title: 'New Channel' },
-      ]);
+      expect(client.getQueryData(liveKey)).toMatchObject([{ title: 'New Channel' }]);
+      // Uncached pure-Xtream desktop lists stay in SQLite instead of pinning full arrays in RAM.
+      expect(client.getQueryData(queryKeys.catalog('series', 'sources-scope'))).toBeUndefined();
     });
 
     it('keeps each provider list for the next start under its account scope', async () => {

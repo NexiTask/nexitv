@@ -36,19 +36,19 @@ const catalogMocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('@/platform/desktop', () => ({ desktopApi: { isDesktop: () => true } }));
+vi.mock('@/platform/desktop', () => ({
+  desktopApi: {
+    isDesktop: () => true,
+    onCatalogIndexUpdated: vi.fn(() => Promise.resolve(() => {})),
+    onImdbRefreshed: vi.fn(() => Promise.resolve(() => {})),
+  },
+}));
 vi.mock('@/modules/catalog/public/data/useCategories', () => ({
   useVisibleCatalog: catalogMocks.useVisibleCatalog,
   useCategories: catalogMocks.useCategories,
   useHiddenCategoryIds: () => new Set<string>(),
+  useHiddenCategoryState: catalogMocks.useHiddenCategoryState,
 }));
-vi.mock('@/modules/catalog/data/useCategories', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/modules/catalog/data/useCategories')>();
-  return {
-    ...actual,
-    useHiddenCategoryState: catalogMocks.useHiddenCategoryState,
-  };
-});
 vi.mock('@/modules/guide/public/data/useUpcomingReleases', () => ({
   useUpcomingReleases: () => ({ data: [] }),
 }));
@@ -266,6 +266,7 @@ it('looks up Home recommendation picks by id from the index without loading the 
     rows: [
       {
         sourceId,
+        ord: 0,
         raw: { series_id: 42, name: 'Indexed Pick', cover: '', last_modified: '1700000000' },
         imdb: { id: 'tt7654321', rating: 8.8, votes: 25000 },
       },
@@ -342,6 +343,81 @@ it('shows a non-blocking loading indicator on RecommendationsList while saved pi
     expect(await screen.findByRole('heading', { name: 'No recommendations to show' })).toBeTruthy();
   } finally {
     useLibraryStore.setState({ savedItems: previousSaved });
+    status.mockRestore();
+    read.mockRestore();
+  }
+});
+
+it('waits until hidden-category exclusions resolve before enabling recommendation generation', async () => {
+  const sourceId = 'xtream-hidden-gate';
+  const previousProfiles = useAuthStore.getState().profiles;
+  const previousRuntimes = useAuthStore.getState().runtimes;
+  const previousEnabled = useSourceStore.getState().enabledSourceIds;
+  useAuthStore.setState({
+    profiles: [
+      {
+        id: sourceId,
+        kind: 'xtream',
+        name: 'Provider',
+        locationLabel: 'provider.test',
+        username: 'viewer',
+        userInfo: { auth: 1 } as never,
+        serverInfo: {} as never,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ],
+    runtimes: {
+      [sourceId]: {
+        credentials: {
+          sourceId,
+          url: 'https://provider.test',
+          username: 'viewer',
+          password: 'secret',
+        },
+        status: 'ready',
+        error: null,
+        revision: 1,
+      },
+    },
+  });
+  useSourceStore.setState({ enabledSourceIds: [sourceId] });
+  catalogMocks.useHiddenCategoryState.mockReturnValue({
+    ids: new Set<string>(),
+    originIds: new Set<string>(),
+    isResolved: false,
+  });
+  const status = vi.spyOn(tauriApi, 'chatGptStatus').mockResolvedValue({
+    activeClient: 'client',
+    accounts: [{ clientId: 'client', label: 'Test', planPermission: true }],
+  });
+  const read = vi.spyOn(tauriApi, 'recommendationsCached').mockResolvedValue(null);
+  try {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const { result, rerender } = renderHook(() => useSeriesRecommendations([], true, true), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.permission).toBe(true));
+    expect(result.current.canPrepare).toBe(false);
+
+    catalogMocks.useHiddenCategoryState.mockReturnValue({
+      ids: new Set<string>(['hidden-1']),
+      originIds: new Set<string>(['hidden-1']),
+      isResolved: true,
+    });
+    rerender();
+    expect(result.current.canPrepare).toBe(true);
+  } finally {
+    useAuthStore.setState({ profiles: previousProfiles, runtimes: previousRuntimes });
+    useSourceStore.setState({ enabledSourceIds: previousEnabled });
+    catalogMocks.useHiddenCategoryState.mockReturnValue({
+      ids: new Set<string>(),
+      originIds: new Set<string>(),
+      isResolved: true,
+    });
     status.mockRestore();
     read.mockRestore();
   }

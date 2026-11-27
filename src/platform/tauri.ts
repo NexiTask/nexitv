@@ -105,6 +105,7 @@ export interface CatalogIndexRows {
 
 interface CatalogIndexedItemRow {
   sourceId: string;
+  ord: number;
   raw: unknown;
   imdb?: ImdbFacts | undefined;
 }

@@ -152,7 +152,13 @@ function AppShell() {
       </div>
 
       {activeStream && (
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <div className={styles.routeLoading} role="status" aria-label="Loading player">
+              <span />
+            </div>
+          }
+        >
           <PlayerShell />
         </Suspense>
       )}

@@ -16,15 +16,22 @@ const PERSIST_DEBOUNCE_MS = 5000;
 const MAX_HISTORY_ITEMS = 200;
 const MAX_RECENT_CHANNELS = 30;
 
-function createDebouncedStorage<T>(): PersistStorage<T> {
+function createDebouncedStorage<T>(sanitize?: (state: T) => T): PersistStorage<T> {
   let pendingValue: StorageValue<T> | null = null;
   let pendingKey: string | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   function flush() {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
     if (pendingKey !== null && pendingValue !== null) {
       try {
-        localStorage.setItem(pendingKey, JSON.stringify(pendingValue));
+        const valueToPersist = sanitize
+          ? { ...pendingValue, state: sanitize(pendingValue.state) }
+          : pendingValue;
+        localStorage.setItem(pendingKey, JSON.stringify(valueToPersist));
       } catch {
         // Storage full — silently drop. The next successful write will
         // persist the latest state.
@@ -32,12 +39,17 @@ function createDebouncedStorage<T>(): PersistStorage<T> {
     }
     pendingKey = null;
     pendingValue = null;
-    timer = null;
   }
 
-  // Ensure pending data is flushed on page unload (tab close, refresh).
+  // Ensure pending data is flushed on unload, hide, or Tauri window close.
   if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', flush);
+    window.addEventListener('pagehide', flush);
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flush();
+    });
   }
 
   return {
@@ -890,8 +902,10 @@ export const useLibraryStore = create<LibraryState>()(
         };
       },
       migrate: migrateLibraryState,
-      storage: createDebouncedStorage<LibraryState>(),
-      partialize: (state) => ({ ...state, ...sanitizedLibraryData(state) }),
+      storage: createDebouncedStorage<LibraryState>((state) => ({
+        ...state,
+        ...sanitizedLibraryData(state),
+      })),
     },
   ),
 );

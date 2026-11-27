@@ -46,6 +46,8 @@ const WAIT_FOR_BUILD_MS = 15_000;
 const ORD_BITS = 23;
 /** Rows fetched beyond the visible window, so scrolling rarely meets a gap. */
 const ROW_PREFETCH = 60;
+/** Cap per-page cached mapped rows so scrolling huge catalogues bounds WebView RAM. */
+const MAX_CACHED_ROWS = 2_500;
 const KEY_SOURCE_SHIFT = 2 ** ORD_BITS;
 
 export type CatalogPageMode = 'pending' | 'index' | 'legacy';
@@ -85,7 +87,14 @@ function useIndexInvalidation(kind: CatalogPageKind | null) {
     if (!kind || !desktopApi.isDesktop()) return;
     const invalidate = (changed: string) => {
       if (changed !== kind) return;
-      for (const root of [STATUS_ROOT, PAGE_ROOT, STATS_ROOT, SEARCH_ROOT]) {
+      for (const root of [
+        STATUS_ROOT,
+        PAGE_ROOT,
+        STATS_ROOT,
+        SEARCH_ROOT,
+        ITEMS_BY_IDS_ROOT,
+        INDEX_ROWS_ROOT,
+      ]) {
         void client.invalidateQueries({ queryKey: [root, kind] });
       }
     };
@@ -94,8 +103,8 @@ function useIndexInvalidation(kind: CatalogPageKind | null) {
     let unlistenImdb: (() => void) | undefined;
     let cancelled = false;
     void desktopApi
-      .onCatalogIndexUpdated(invalidate)
-      .then((stop) => {
+      .onCatalogIndexUpdated?.(invalidate)
+      ?.then((stop) => {
         if (cancelled) stop();
         else unlisten = stop;
       })
@@ -103,10 +112,10 @@ function useIndexInvalidation(kind: CatalogPageKind | null) {
     // An IMDb refresh or backfill changes what the pages filter and sort by;
     // only its completion matters here.
     void desktopApi
-      .onImdbRefreshed((stage) => {
+      .onImdbRefreshed?.((stage) => {
         if (stage === 'done') invalidate(kind);
       })
-      .then((stop) => {
+      ?.then((stop) => {
         if (cancelled) stop();
         else unlistenImdb = stop;
       })
@@ -397,6 +406,15 @@ export function useIndexedKeyRows(
             return;
           }
           for (const [key, item] of mapKeyRows(type, xtream, answer.rows)) items.set(key, item);
+          if (items.size > MAX_CACHED_ROWS) {
+            const overflow = items.size - MAX_CACHED_ROWS;
+            let removed = 0;
+            for (const key of items.keys()) {
+              items.delete(key);
+              removed += 1;
+              if (removed >= overflow) break;
+            }
+          }
           setRowsVersion((version) => version + 1);
         })
         .catch(() => undefined)
@@ -564,8 +582,9 @@ export function useCatalogFacetBuilds(delayMs = 3_000): void {
     const syncKind = async (kind: CatalogPageKind, forceBuild = false) => {
       const status = await prepareCatalogPage(kind, requestSources).catch(() => null);
       if (status) client.setQueryData([STATUS_ROOT, kind, queryScope], status);
-      // Only spawn the facet worker when rows actually lack facets or ranks.
-      if (!forceBuild && status?.state !== 'building') return;
+      // Only spawn the facet worker when rows actually lack facets or ranks
+      // (including when one source is unavailable while another still has pending rows).
+      if (!forceBuild && status?.state !== 'building' && (status?.pending ?? 0) === 0) return;
       await buildCatalogFacets(kind, buildSources);
       const updated = await prepareCatalogPage(kind, requestSources).catch(() => null);
       if (updated) client.setQueryData([STATUS_ROOT, kind, queryScope], updated);
@@ -718,6 +737,7 @@ export function useIndexedItemsByIds(
   const sources = useEnabledSources();
   const eligible = enabled && indexCandidate(type, sources);
   const excludeHidden = options?.excludeHidden ?? false;
+  useIndexInvalidation(eligible ? type : null);
   const hidden = useHiddenCategoryState(type, { enabled: eligible && excludeHidden });
   const requestSources = useMemo(() => pageSources(sources), [sources]);
   const sortedIds = useMemo(() => [...new Set(itemIds)].sort(), [itemIds]);
@@ -743,6 +763,7 @@ export function useIndexedItemsByIds(
           type,
           source,
           list.map((row) => row.raw),
+          list.map((row) => row.ord),
         );
         list.forEach((row, index) => {
           const item = items[index]!;
@@ -752,7 +773,7 @@ export function useIndexedItemsByIds(
       return mapped;
     },
     enabled: eligible && !sources.isLoading,
-    staleTime: Infinity,
+    staleTime: (q) => (q.state.data === null ? 0 : Infinity),
     retry: false,
   });
 
