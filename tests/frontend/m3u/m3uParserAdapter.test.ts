@@ -70,4 +70,32 @@ describe('M3U worker adapter', () => {
     );
     expect(WorkerMock.latest).not.toBe(failedWorker);
   });
+
+  it('terminates the parser worker after it stays idle and recreates it on demand', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('Worker', WorkerMock);
+    try {
+      const first = parseM3uAsync(
+        `#EXTM3U\n#EXTINF:-1,Channel\nhttps://media.test/live\n${' '.repeat(100_000)}`,
+      );
+      const firstWorker = WorkerMock.latest!;
+      const firstId = (firstWorker.postMessage.mock.calls[0]![0] as { id: number }).id;
+      firstWorker.emit('message', {
+        id: firstId,
+        playlist: { entries: [], epgUrls: [], warnings: [] },
+      });
+      await expect(first).resolves.toMatchObject({ entries: [] });
+      expect(firstWorker.terminate).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(10_000);
+      expect(firstWorker.terminate).toHaveBeenCalledOnce();
+
+      void parseM3uAsync(
+        `#EXTM3U\n#EXTINF:-1,Channel\nhttps://media.test/live\n${' '.repeat(100_000)}`,
+      );
+      expect(WorkerMock.latest).not.toBe(firstWorker);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

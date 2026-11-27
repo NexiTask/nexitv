@@ -1,6 +1,14 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { CalendarClock, ChevronLeft, ChevronRight, Minus, Plus, Tv } from 'lucide-react';
+import {
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  LoaderCircle,
+  Minus,
+  Plus,
+  Tv,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { CategorySidebar } from '@/modules/catalog/public/components/CategorySidebar';
@@ -85,6 +93,8 @@ const NOW_INSET = 160;
 
 const NO_OVERRIDES: Record<string, never> = {};
 const NO_LOOKUPS = new Map<string, never>();
+const CHANNEL_SEARCH_DEBOUNCE_MS = 120;
+const SKELETON_ROW_COUNT = 8;
 
 // ── Page ──────────────────────────────────────────────────────
 
@@ -107,6 +117,19 @@ export function EpgPage() {
     programme: EpgProgramme;
   } | null>(null);
   const [channelSearchQuery, setChannelSearchQuery] = useState('');
+  const [settledChannelSearch, setSettledChannelSearch] = useState('');
+  useEffect(() => {
+    const trimmed = channelSearchQuery.trim();
+    if (!trimmed) {
+      setSettledChannelSearch('');
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setSettledChannelSearch(channelSearchQuery),
+      CHANNEL_SEARCH_DEBOUNCE_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [channelSearchQuery]);
   const [guideRetries, setGuideRetries] = useState<ReadonlyMap<string, () => Promise<unknown>>>(
     () => new Map(),
   );
@@ -222,11 +245,11 @@ export function EpgPage() {
       sort: 'default',
       fold: streamFoldingEnabled,
       recentChannelIds,
-      titleFilter: channelSearchQuery,
+      titleFilter: settledChannelSearch,
     }),
     [
       categories,
-      channelSearchQuery,
+      settledChannelSearch,
       favorites,
       guideCategory,
       hiddenCategoryIds,
@@ -257,6 +280,11 @@ export function EpgPage() {
   const isLoading = isLegacy
     ? isLegacyLoading
     : mode === 'pending' || (!needsGroup && (indexed.isLoading || !indexResult));
+  const isUpdating =
+    !isLoading &&
+    (isIndexed
+      ? indexed.isFetching || channelSearchQuery.trim() !== settledChannelSearch.trim()
+      : isFetching);
 
   useEffect(() => {
     if (!isLegacy) return;
@@ -490,9 +518,22 @@ export function EpgPage() {
           title="Live TV"
           titleActions={<LiveTvViewToggle view="guide" />}
           meta={
-            isLoading
-              ? t('Loading channels')
-              : t('{count} channels', { count: number(channelCount) })
+            isLoading ? (
+              <span className={appStyles.metaUpdating}>
+                <LoaderCircle size={13} className={appStyles.metaSpinner} aria-hidden="true" />
+                <span>{t('Loading channels')}</span>
+              </span>
+            ) : (
+              <>
+                <span>{t('{count} channels', { count: number(channelCount) })}</span>
+                {(isUpdating || xmltvLoading) && (
+                  <span className={appStyles.metaUpdating} aria-live="polite">
+                    <LoaderCircle size={13} className={appStyles.metaSpinner} aria-hidden="true" />
+                    <span>{xmltvLoading ? t('Loading guide…') : t('Updating…')}</span>
+                  </span>
+                )}
+              </>
+            )
           }
         />
 
@@ -619,10 +660,14 @@ export function EpgPage() {
             >
               <div
                 className={styles.canvas}
+                aria-busy={isLoading || isUpdating}
                 style={
                   {
                     width: CHANNEL_WIDTH + timelineWidth,
-                    height: rows.getTotalSize() + RULER_HEIGHT,
+                    height:
+                      (isLoading && channelCount === 0
+                        ? SKELETON_ROW_COUNT * ROW_HEIGHT
+                        : rows.getTotalSize()) + RULER_HEIGHT,
                     '--ruler-height': `${RULER_HEIGHT}px`,
                   } as React.CSSProperties
                 }
@@ -664,34 +709,74 @@ export function EpgPage() {
                   />
                 ))}
 
-                {rows.getVirtualItems().map((row) => {
-                  const channel = channelAt(row.index);
-                  if (!channel) return null;
-                  return (
-                    <EpgRow
-                      key={channel.id}
-                      channel={channel}
-                      xmltv={xmltv}
-                      xmltvLoading={xmltvLoading}
-                      top={row.start + RULER_HEIGHT}
-                      windowStart={windowStart}
-                      windowEnd={windowEnd}
-                      offsetOf={offsetOf}
-                      now={now}
-                      selectedId={selected?.programme.id ?? null}
-                      selectedChannelId={selected?.channel.id ?? null}
-                      alternate={row.index % 2 === 1}
-                      onSelect={(programme) => setSelected({ channel, programme })}
-                      onPlay={playChannel}
-                      onProgrammeEnd={reportProgrammeEnd}
-                      onGuideError={reportGuideError}
-                      requestEnabled={!rows.isScrolling}
-                      customTitleRules={customTitleRules}
-                      timelineScrollLeft={timelineViewport.scrollLeft}
-                      timelineViewportWidth={timelineViewport.width}
-                    />
-                  );
-                })}
+                {isLoading && channelCount === 0
+                  ? Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+                      <div
+                        key={`skeleton-${index}`}
+                        className={`${styles.row} ${index % 2 === 1 ? styles.rowAlternate : ''}`}
+                        style={{ top: index * ROW_HEIGHT + RULER_HEIGHT, height: ROW_HEIGHT }}
+                        aria-hidden="true"
+                      >
+                        <div className={styles.channelSkeleton}>
+                          <span className={styles.channelLogoSkeleton} />
+                          <span className={styles.channelTextSkeleton}>
+                            <span className={styles.channelNameSkeleton} />
+                            <span className={styles.channelNumSkeleton} />
+                          </span>
+                        </div>
+                        <div className={styles.lane}>
+                          <div className={styles.lanePlaceholder} />
+                        </div>
+                      </div>
+                    ))
+                  : rows.getVirtualItems().map((row) => {
+                      const channel = channelAt(row.index);
+                      if (!channel) {
+                        return (
+                          <div
+                            key={`pending-${row.index}`}
+                            className={`${styles.row} ${row.index % 2 === 1 ? styles.rowAlternate : ''}`}
+                            style={{ top: row.start + RULER_HEIGHT, height: ROW_HEIGHT }}
+                            aria-hidden="true"
+                          >
+                            <div className={styles.channelSkeleton}>
+                              <span className={styles.channelLogoSkeleton} />
+                              <span className={styles.channelTextSkeleton}>
+                                <span className={styles.channelNameSkeleton} />
+                                <span className={styles.channelNumSkeleton} />
+                              </span>
+                            </div>
+                            <div className={styles.lane}>
+                              <div className={styles.lanePlaceholder} />
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <EpgRow
+                          key={channel.id}
+                          channel={channel}
+                          xmltv={xmltv}
+                          xmltvLoading={xmltvLoading}
+                          top={row.start + RULER_HEIGHT}
+                          windowStart={windowStart}
+                          windowEnd={windowEnd}
+                          offsetOf={offsetOf}
+                          now={now}
+                          selectedId={selected?.programme.id ?? null}
+                          selectedChannelId={selected?.channel.id ?? null}
+                          alternate={row.index % 2 === 1}
+                          onSelect={(programme) => setSelected({ channel, programme })}
+                          onPlay={playChannel}
+                          onProgrammeEnd={reportProgrammeEnd}
+                          onGuideError={reportGuideError}
+                          requestEnabled={!rows.isScrolling}
+                          customTitleRules={customTitleRules}
+                          timelineScrollLeft={timelineViewport.scrollLeft}
+                          timelineViewportWidth={timelineViewport.width}
+                        />
+                      );
+                    })}
 
                 {now >= windowStart && now <= windowEnd && (
                   <div className={styles.nowLine} style={{ left: CHANNEL_WIDTH + offsetOf(now) }}>

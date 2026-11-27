@@ -801,4 +801,61 @@ describe('CatalogPage served from the catalogue index', () => {
     expect(await screen.findByText('Legacy Film')).toBeTruthy();
     expect(page).not.toHaveBeenCalled();
   });
+
+  it('keeps existing results visible and shows a non-blocking updating indicator while switching filters', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(tauriApi, 'catalogIndexPageStatus').mockResolvedValue({
+      state: 'ready',
+      pending: 0,
+      total: 2,
+    });
+    let resolveSecondPage!: (page: ReturnType<typeof decodeCatalogPage>) => void;
+    const firstPage = decodeCatalogPage(
+      encodePage(
+        {
+          ready: true,
+          status: null,
+          generation: '4',
+          total: 2,
+          categoryTotal: 2,
+          genreCounts: [2],
+          head: [
+            { key: 0, raw: { stream_id: 7, name: 'First Film', category_id: 1 } },
+            { key: 1, raw: { stream_id: 8, name: 'Second Film', category_id: 1 } },
+          ],
+        },
+        [0, 1],
+      ),
+    );
+    vi.spyOn(tauriApi, 'catalogIndexPage')
+      .mockResolvedValueOnce(firstPage)
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSecondPage = resolve;
+        }),
+      );
+    vi.spyOn(tauriApi, 'catalogIndexPageStats').mockResolvedValue({
+      categoryCounts: { 'xtream-one:category:1': 2 },
+      visibleTotal: 2,
+      favorites: 0,
+      recent: 0,
+      topRated: 0,
+      fourK: 0,
+    });
+
+    renderPage();
+    expect(await screen.findByText('First Film')).toBeTruthy();
+
+    await user.click(
+      within(screen.getByRole('group', { name: 'Filter by genre' })).getByRole('button', {
+        name: /Action/,
+      }),
+    );
+
+    expect(await screen.findByText('Updating…')).toBeTruthy();
+    expect(screen.getByText('First Film')).toBeTruthy();
+
+    resolveSecondPage(firstPage);
+    await waitFor(() => expect(screen.queryByText('Updating…')).toBeNull());
+  });
 });

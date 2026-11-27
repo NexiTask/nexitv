@@ -14,6 +14,7 @@ import {
   Undo2,
   Redo2,
   History,
+  LoaderCircle,
 } from 'lucide-react';
 import {
   parseM3u,
@@ -21,6 +22,7 @@ import {
   type M3uPlaylist,
   type M3uEntry,
 } from '@/modules/sources/public/data/m3uClient';
+import { parseM3uAsync } from '../services/m3uParser';
 import { tauriApi } from '@/platform/tauri';
 import { useSourceStore } from '@/modules/sources/public/store/useSourceStore';
 import { useSettingsStore } from '@/modules/settings/public/store/useSettingsStore';
@@ -83,6 +85,8 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
   const [rawEditorViewState, setRawEditorViewState] =
     useState<M3uRawEditorViewState>(emptyRawEditorViewState);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingPlaylist, setIsLoadingPlaylist] = useState(false);
+  const [isFetchingUrl, setIsFetchingUrl] = useState(false);
   const [healthStatuses, setHealthStatuses] = useState<M3uHealthStatuses>({});
   const [loadUrlModal, setLoadUrlModal] = useState(false);
   const [remoteUrlInput, setRemoteUrlInput] = useState('');
@@ -148,22 +152,27 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
           localStorage.removeItem(legacyDraftKey(sourceId));
           if (generation !== draftLoadGenerationRef.current) return;
           if (draft) {
-            const restored = playlistSnapshot(
-              parseM3u(draft.content, {
+            setIsLoadingPlaylist(true);
+            try {
+              const parsedDraft = await parseM3uAsync(draft.content, {
                 sourceId,
                 baseUrl: runtime.baseUrl,
                 headers: runtime.connection?.headers,
-              }),
-            );
-            setSnapshot(restored);
-            setBaseline(sourceSnapshot);
-            setPast([]);
-            setFuture([]);
-            setIsDirty(true);
-            setRawDirty(false);
-            setHealthStatuses({});
-            notify.info('Draft Restored', 'Recovered unsaved playlist changes from this device.');
-            return;
+              });
+              if (generation !== draftLoadGenerationRef.current) return;
+              const restored = playlistSnapshot(parsedDraft);
+              setSnapshot(restored);
+              setBaseline(sourceSnapshot);
+              setPast([]);
+              setFuture([]);
+              setIsDirty(true);
+              setRawDirty(false);
+              setHealthStatuses({});
+              notify.info('Draft Restored', 'Recovered unsaved playlist changes from this device.');
+              return;
+            } finally {
+              if (generation === draftLoadGenerationRef.current) setIsLoadingPlaylist(false);
+            }
           }
         } catch {
           localStorage.removeItem(legacyDraftKey(sourceId));
@@ -391,6 +400,7 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
   };
 
   const handleOpenFile = async () => {
+    setIsLoadingPlaylist(true);
     try {
       const path = await desktopApi.openPath({
         multiple: false,
@@ -398,29 +408,33 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
       });
       if (!path || Array.isArray(path)) return;
       const document = await tauriApi.m3uReadFile(path);
-      finishImport(
-        parseM3u(document.content, { sourceId: 'm3u-import', baseUrl: document.baseUrl }),
-        'custom-file',
-        document.fileName || 'Local file',
-      );
+      const playlist = await parseM3uAsync(document.content, {
+        sourceId: 'm3u-import',
+        baseUrl: document.baseUrl,
+      });
+      finishImport(playlist, 'custom-file', document.fileName || 'Local file');
     } catch (error: unknown) {
       notify.error(
         'File Error',
         getErrorMessage(error, 'Playlist file loading failed without an error message.'),
       );
+    } finally {
+      setIsLoadingPlaylist(false);
     }
   };
 
   const handleFetchUrl = async () => {
     const url = remoteUrlInput.trim();
-    if (!url) return;
+    if (!url || isFetchingUrl) return;
+    setIsFetchingUrl(true);
+    setIsLoadingPlaylist(true);
     try {
       const document = await tauriApi.m3uFetch({ url });
-      finishImport(
-        parseM3u(document.content, { sourceId: 'm3u-import', baseUrl: document.baseUrl }),
-        'custom-url',
-        new URL(url).host,
-      );
+      const playlist = await parseM3uAsync(document.content, {
+        sourceId: 'm3u-import',
+        baseUrl: document.baseUrl,
+      });
+      finishImport(playlist, 'custom-url', new URL(url).host);
       setLoadUrlModal(false);
       setRemoteUrlInput('');
     } catch (error: unknown) {
@@ -428,6 +442,9 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
         'URL Fetch Failed',
         getErrorMessage(error, 'Playlist URL fetch failed without an error message.'),
       );
+    } finally {
+      setIsFetchingUrl(false);
+      setIsLoadingPlaylist(false);
     }
   };
 
@@ -567,8 +584,17 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
           <div>
             <h1 className={styles.workspaceTitle}>{t('M3U Playlist Editor')}</h1>
             <p className={styles.workspaceSubtitle}>
-              {isDirty ? t('Unsaved draft') : t('All changes saved')} · {number(stats.total)}{' '}
-              {t('items')}
+              {isLoadingPlaylist ? (
+                <span className={styles.loadingInline} aria-live="polite">
+                  <LoaderCircle size={13} className={styles.spinner} aria-hidden="true" />
+                  <span>{t('Loading playlist…')}</span>
+                </span>
+              ) : (
+                <>
+                  {isDirty ? t('Unsaved draft') : t('All changes saved')} · {number(stats.total)}{' '}
+                  {t('items')}
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -745,9 +771,12 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
               variant="primary"
               type="button"
               onClick={() => void handleFetchUrl()}
-              disabled={!remoteUrlInput.trim()}
+              disabled={!remoteUrlInput.trim() || isFetchingUrl}
             >
-              {t('Load Playlist')}
+              {isFetchingUrl && (
+                <LoaderCircle size={14} className={styles.spinner} aria-hidden="true" />
+              )}
+              {t(isFetchingUrl ? 'Loading…' : 'Load Playlist')}
             </Button>
           </div>
         </DialogShell>
@@ -789,21 +818,25 @@ export function M3uEditor({ initialSourceId, initialMode, onClose }: M3uEditorPr
           currentContent={currentM3uContent}
           entryCount={snapshot.entries.length}
           onRestore={(content) => {
-            try {
-              commitSnapshot(playlistSnapshot(parseM3u(content, currentParseOptions())));
-              notify.success(
-                'Version Restored',
-                'The selected checkpoint is now an unsaved editor draft.',
-              );
-            } catch (error: unknown) {
-              notify.error(
-                'Restore Failed',
-                getErrorMessage(
-                  error,
-                  'Playlist checkpoint parsing failed without an error message.',
-                ),
-              );
-            }
+            setIsLoadingPlaylist(true);
+            void parseM3uAsync(content, currentParseOptions())
+              .then((parsed) => {
+                commitSnapshot(playlistSnapshot(parsed));
+                notify.success(
+                  'Version Restored',
+                  'The selected checkpoint is now an unsaved editor draft.',
+                );
+              })
+              .catch((error: unknown) => {
+                notify.error(
+                  'Restore Failed',
+                  getErrorMessage(
+                    error,
+                    'Playlist checkpoint parsing failed without an error message.',
+                  ),
+                );
+              })
+              .finally(() => setIsLoadingPlaylist(false));
           }}
           onClose={() => setShowHistory(false)}
         />

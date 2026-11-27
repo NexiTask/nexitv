@@ -699,3 +699,50 @@
   text-transform: none; /* Reset uppercase header styling */
   letter-spacing: normal;
 }
+
+.channelSkeleton {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  flex-shrink: 0;
+  width: var(--channel-width);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-strong);
+}
+
+.channelLogoSkeleton {
+  width: 44px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+
+.channelTextSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.channelNameSkeleton,
+.channelNumSkeleton {
+  display: block;
+  border-radius: var(--radius-full);
+  background: var(--surface-subtle);
+}
+
+.channelNameSkeleton {
+  width: 72%;
+  height: 12px;
+}
+
+.channelNumSkeleton {
+  width: 34%;
+  height: 10px;
+}

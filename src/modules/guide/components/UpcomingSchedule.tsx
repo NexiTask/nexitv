@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, CalendarClock, Clapperboard, Film, ListFilter, RefreshCw } from 'lucide-react';
+import {
+  Calendar,
+  CalendarClock,
+  Clapperboard,
+  Film,
+  ListFilter,
+  LoaderCircle,
+  RefreshCw,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { MediaItem, MediaOpenContext } from '@/modules/catalog/public/model/media';
 import { useUpcomingReleases } from '../data/useUpcomingReleases';
@@ -158,11 +166,20 @@ export function UpcomingSchedule({
           )}
         />
       ) : schedule.isLoading && !schedule.data ? (
-        <EmptyState
-          icon={CalendarClock}
-          title={t('Building your release schedule')}
-          description={t('Checking release dates for your favorite movies and series…')}
-        />
+        <div className={styles.loadingState} aria-busy="true" aria-live="polite">
+          <div className={styles.loadingBanner}>
+            <LoaderCircle size={16} className={styles.spinning} aria-hidden="true" />
+            <div>
+              <strong>{t('Building your release schedule')}</strong>
+              <p>{t('Checking release dates for your favorite movies and series…')}</p>
+            </div>
+          </div>
+          <div className={styles.loadingRows} aria-hidden="true">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div key={index} className={styles.loadingRow} />
+            ))}
+          </div>
+        </div>
       ) : schedule.isError && !schedule.data ? (
         <EmptyState
           icon={CalendarClock}

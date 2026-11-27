@@ -264,6 +264,8 @@ export interface IndexedPageParams {
 export interface IndexedPage {
   result: CatalogPageResult | undefined;
   isLoading: boolean;
+  /** True while a new query/filter/category page is loading in the background. */
+  isFetching: boolean;
   isError: boolean;
   /** The item at a list position, once its row has been loaded. */
   getItem: (index: number) => MediaItem | undefined;
@@ -309,6 +311,7 @@ export function useIndexedCatalogPage(
   return {
     result,
     isLoading: enabled && !result && page.isPending,
+    isFetching: enabled && page.isFetching,
     isError: page.isError && !result,
     ...rows,
   };

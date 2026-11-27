@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { LoaderCircle, X } from 'lucide-react';
 import { Select } from '@/shared/ui/Select';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { getXtreamCredentials, useAuthStore } from '@/modules/sources/public/store/useAuthStore';
@@ -162,9 +162,12 @@ export function EpisodesDrawer() {
           </div>
 
           {/* Episodes list */}
-          <div className={`${drawerStyles.list} subtle-scrollbar`}>
+          <div className={`${drawerStyles.list} subtle-scrollbar`} aria-busy={isLoading}>
             {isLoading ? (
-              <div className={styles.episodesLoading}>{t('Loading episodes...')}</div>
+              <div className={styles.episodesLoading} aria-live="polite">
+                <LoaderCircle size={16} className={styles.spinner} aria-hidden="true" />
+                <span>{t('Loading episodes...')}</span>
+              </div>
             ) : currentEpisodes.length === 0 ? (
               <div className={styles.episodesEmpty}>{t('No episodes found.')}</div>
             ) : (

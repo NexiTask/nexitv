@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist, type PersistStorage } from 'zustand/middleware';
+import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware';
 
 /**
  * Debounced localStorage wrapper for Zustand persist.
@@ -9,22 +9,22 @@ import { persist, type PersistStorage } from 'zustand/middleware';
  * `sanitizedLibraryData` → `JSON.stringify` → `localStorage.setItem` cycle
  * on the entire library state, causing frame drops on large histories.
  *
- * This wrapper coalesces writes so at most one flush happens per
- * `DEBOUNCE_MS` window, while reads remain immediate.
+ * This wrapper coalesces writes — including `JSON.stringify` — so at most one
+ * serialize + flush happens per `DEBOUNCE_MS` window, while reads remain immediate.
  */
 const PERSIST_DEBOUNCE_MS = 5000;
 const MAX_HISTORY_ITEMS = 200;
 const MAX_RECENT_CHANNELS = 30;
 
 function createDebouncedStorage<T>(): PersistStorage<T> {
-  let pendingValue: string | null = null;
+  let pendingValue: StorageValue<T> | null = null;
   let pendingKey: string | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   function flush() {
     if (pendingKey !== null && pendingValue !== null) {
       try {
-        localStorage.setItem(pendingKey, pendingValue);
+        localStorage.setItem(pendingKey, JSON.stringify(pendingValue));
       } catch {
         // Storage full — silently drop. The next successful write will
         // persist the latest state.
@@ -56,7 +56,7 @@ function createDebouncedStorage<T>(): PersistStorage<T> {
     },
     setItem(name, value) {
       pendingKey = name;
-      pendingValue = JSON.stringify(value);
+      pendingValue = value;
       if (timer === null) {
         timer = setTimeout(flush, PERSIST_DEBOUNCE_MS);
       }

@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Search as SearchIcon, SearchX, X, Film, Clapperboard, Tv, LayoutGrid } from 'lucide-react';
+import {
+  Search as SearchIcon,
+  SearchX,
+  X,
+  Film,
+  Clapperboard,
+  Tv,
+  LayoutGrid,
+  LoaderCircle,
+} from 'lucide-react';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { useSearchParams } from 'react-router-dom';
 import { VirtualizedGrid } from '@/modules/catalog/public/components/VirtualizedGrid';
@@ -120,6 +129,8 @@ export function SearchPage() {
   };
 
   const hasQuery = searchQuery.trim().length > 0;
+  const isUpdating =
+    hasQuery && !isLoading && (searchQuery.trim() !== settledQuery.trim() || search.isPending);
   const catalogError = search.error;
   const showLoadError = Boolean(catalogError) && resultCount === 0;
   const errorPresentation = getErrorPresentation(catalogError, 'Search results');
@@ -133,9 +144,19 @@ export function SearchPage() {
             hasQuery && isLoading ? (
               <TextLineSkeleton width={140} />
             ) : hasQuery ? (
-              tn('{count} result found', '{count} results found', resultCount, {
-                count: number(resultCount),
-              })
+              <>
+                <span>
+                  {tn('{count} result found', '{count} results found', resultCount, {
+                    count: number(resultCount),
+                  })}
+                </span>
+                {isUpdating && (
+                  <span className={styles.metaUpdating} aria-live="polite">
+                    <LoaderCircle size={13} className={styles.metaSpinner} aria-hidden="true" />
+                    <span>{t('Searching…')}</span>
+                  </span>
+                )}
+              </>
             ) : (
               t('Search across movies, series, and live channels')
             )
@@ -179,7 +200,7 @@ export function SearchPage() {
           />
         </div>
 
-        <div className={searchStyles.results}>
+        <div className={searchStyles.results} aria-busy={isLoading || isUpdating}>
           {!sources.isAvailable ? (
             <EmptyState
               icon={Tv}

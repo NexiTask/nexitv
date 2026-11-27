@@ -1,4 +1,4 @@
-import { ListVideo } from 'lucide-react';
+import { ListVideo, LoaderCircle } from 'lucide-react';
 import { CatalogPageHeader } from '@/modules/catalog/public/components/CatalogPageHeader';
 import { CatalogViewToggle } from '@/modules/catalog/public/components/CatalogViewToggle';
 import type { MediaItem } from '@/modules/catalog/public/model/media';
@@ -30,11 +30,26 @@ export function WatchNextList({
       <CatalogPageHeader
         title="Watch Next"
         meta={
-          isLoading && !items.length
-            ? undefined
-            : tn('{count} episode', '{count} episodes', items.length, {
-                count: number(items.length),
-              })
+          isLoading && !items.length ? (
+            <span className={styles.metaUpdating}>
+              <LoaderCircle size={13} className={styles.metaSpinner} aria-hidden="true" />
+              <span>{t('Loading episodes...')}</span>
+            </span>
+          ) : (
+            <>
+              <span>
+                {tn('{count} episode', '{count} episodes', items.length, {
+                  count: number(items.length),
+                })}
+              </span>
+              {isLoading && (
+                <span className={styles.metaUpdating} aria-live="polite">
+                  <LoaderCircle size={13} className={styles.metaSpinner} aria-hidden="true" />
+                  <span>{t('Checking for new episodes…')}</span>
+                </span>
+              )}
+            </>
+          )
         }
         actions={
           <>
@@ -45,7 +60,7 @@ export function WatchNextList({
       />
 
       {items.length > 0 ? (
-        <div className={styles.catalogContent}>
+        <div className={styles.catalogContent} aria-busy={isLoading}>
           <VirtualizedGrid
             items={items.map((item) => ({
               ...item,
