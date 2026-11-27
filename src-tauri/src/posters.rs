@@ -97,6 +97,8 @@ fn prune(cache_dir: PathBuf) {
         return;
     }
     std::thread::spawn(move || {
+        // Keep the cache walk off the startup disk I/O path.
+        std::thread::sleep(Duration::from_secs(30));
         let Ok(entries) = std::fs::read_dir(&cache_dir) else {
             return;
         };

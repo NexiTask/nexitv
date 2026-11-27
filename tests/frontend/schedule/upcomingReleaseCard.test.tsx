@@ -119,15 +119,49 @@ describe('UpcomingReleaseCard', () => {
 
   it('renders sleek countdown badges when countdown is enabled', () => {
     useSettingsStore.setState({ upcomingCountdownEnabled: true });
-    render(
-      <MemoryRouter>
-        <UpcomingReleaseCard variant="schedule" onOpen={vi.fn()} />
-      </MemoryRouter>,
-    );
+    const intervalSpy = vi.spyOn(window, 'setInterval');
+    try {
+      render(
+        <MemoryRouter>
+          <UpcomingReleaseCard variant="schedule" onOpen={vi.fn()} />
+        </MemoryRouter>,
+      );
 
-    const countdowns = screen.getAllByLabelText('Release countdown');
-    expect(countdowns.length).toBeGreaterThan(0);
-    expect(screen.getByText('First Show')).toBeTruthy();
+      const countdowns = screen.getAllByLabelText('Release countdown');
+      expect(countdowns.length).toBeGreaterThan(0);
+      expect(screen.getByText('First Show')).toBeTruthy();
+      // Far-future releases only show days and hours, so no 1-second timer is needed.
+      expect(intervalSpy).toHaveBeenCalledWith(expect.any(Function), 60_000);
+    } finally {
+      intervalSpy.mockRestore();
+    }
+  });
+
+  it('ticks every second only when an upcoming release is within 24 hours', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2030, 0, 1, 14, 0, 0));
+    useSettingsStore.setState({ upcomingCountdownEnabled: true });
+    const tomorrowMorning = new Date(2030, 0, 2, 2, 0, 0);
+    useUpcomingReleasesMock.mockReturnValue({
+      data: [
+        { ...releases[0], airDate: '2030-01-02', exactAirTime: tomorrowMorning.toISOString() },
+      ],
+      isEnabled: true,
+      isLoading: false,
+      isError: false,
+    });
+    const intervalSpy = vi.spyOn(window, 'setInterval');
+    try {
+      render(
+        <MemoryRouter>
+          <UpcomingReleaseCard variant="discover" onOpen={vi.fn()} />
+        </MemoryRouter>,
+      );
+      expect(intervalSpy).toHaveBeenCalledWith(expect.any(Function), 1_000);
+    } finally {
+      intervalSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it('renders elapsed items as recently released instead of hiding them', () => {

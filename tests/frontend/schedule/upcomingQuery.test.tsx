@@ -200,4 +200,29 @@ describe('upcoming release query', () => {
       { title: 'Just Aired', airDate, timeSource: 'tmdb' },
     ]);
   });
+
+  it('reuses cached snapshots without rewriting localStorage on unchanged mounts', async () => {
+    const { result, unmount } = renderHook(() => useUpcomingReleases(), {
+      wrapper: wrapperFactory(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    unmount();
+
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+    const parseSpy = vi.spyOn(JSON, 'parse');
+    try {
+      const { result: second, rerender } = renderHook(
+        () => useUpcomingReleases({ cachedOnly: true }),
+        { wrapper: wrapperFactory() },
+      );
+      expect(second.current.data).toHaveLength(2);
+      rerender();
+      rerender();
+      expect(setItemSpy).not.toHaveBeenCalled();
+      expect(parseSpy).not.toHaveBeenCalled();
+    } finally {
+      setItemSpy.mockRestore();
+      parseSpy.mockRestore();
+    }
+  });
 });

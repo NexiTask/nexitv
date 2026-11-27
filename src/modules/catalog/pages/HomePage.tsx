@@ -35,9 +35,9 @@ import { useEnabledSources } from '@/modules/sources/public/hooks/useEnabledSour
 import { useI18n } from '@/shared/i18n/i18n';
 import { UpcomingReleaseCard } from '@/modules/guide/public/components/UpcomingReleaseCard';
 
-const RECENT_POOL = 400;
-const POPULAR_POOL = 1000;
-const LIVE_POOL = 400;
+const RECENT_POOL = 120;
+const POPULAR_POOL = 300;
+const LIVE_POOL = 200;
 const NO_ITEMS: CatalogItem[] = [];
 
 function newestFirst(items: CatalogItem[]): CatalogItem[] {
@@ -81,19 +81,30 @@ export function HomePage() {
     watchNext,
     showRecommendations && recommendationsEnabled,
   );
-  const recommendations = mixSeriesRecommendations(recommendationCards, automatedItems).slice(
-    0,
-    recommendationsHomeLimit,
+  const recommendations = useMemo(
+    () =>
+      mixSeriesRecommendations(recommendationCards, automatedItems).slice(
+        0,
+        recommendationsHomeLimit,
+      ),
+    [recommendationCards, automatedItems, recommendationsHomeLimit],
   );
-  const recommendedItems = recommendations.map(({ card }) => card.item);
-  const recommendationDetails = new Map(
-    recommendations.map(({ source, card }) => [
-      card.item.id,
-      { source, description: source === 'chatgpt' ? card.reason : undefined },
-    ]),
+  const recommendedItems = useMemo(
+    () => recommendations.map(({ card }) => card.item),
+    [recommendations],
+  );
+  const recommendationDetails = useMemo(
+    () =>
+      new Map(
+        recommendations.map(({ source, card }) => [
+          card.item.id,
+          { source, description: source === 'chatgpt' ? card.reason : undefined },
+        ]),
+      ),
+    [recommendations],
   );
   const dismissWatchNextById = useLibraryStore((state) => state.dismissWatchNext);
-  const watchNextItems = watchNext.slice(0, 20);
+  const watchNextItems = useMemo(() => watchNext.slice(0, 20), [watchNext]);
   // Dismissed until the provider lists more episodes of that show.
   const dismissWatchNext = useCallback(
     (item: MediaItem) => dismissWatchNextById(item.id),

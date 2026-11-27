@@ -77,6 +77,28 @@ interface MediaCardProps {
   previewSelected?: boolean | undefined;
 }
 
+const favoriteIdSets = new WeakMap<readonly { id: string }[], Set<string>>();
+const watchedIdSets = new WeakMap<readonly string[], Set<string>>();
+
+function hasFavoriteId(favorites: readonly { id: string }[], id: string): boolean {
+  let set = favoriteIdSets.get(favorites);
+  if (!set) {
+    set = new Set(favorites.map((item) => item.id));
+    favoriteIdSets.set(favorites, set);
+  }
+  return set.has(id);
+}
+
+function hasWatchedId(watched: readonly string[] | undefined, id: string): boolean {
+  if (!watched || watched.length === 0) return false;
+  let set = watchedIdSets.get(watched);
+  if (!set) {
+    set = new Set(watched);
+    watchedIdSets.set(watched, set);
+  }
+  return set.has(id);
+}
+
 function formatChannelNumber(value: string | number | undefined): string {
   if (value === undefined || value === null || value === '') return '—';
   const text = String(value).replace(/^#/, '');
@@ -189,11 +211,10 @@ function MediaCardComponent({
     item.type === 'live' ? (getCachedLogoAspect(item.posterUrl) ?? 'original') : 'original',
   );
 
-  // Fine-grained primitive selectors prevent card re-renders when unrelated store data changes
+  // Fine-grained O(1) selectors prevent card re-renders and linear scans across large libraries
   const isFav =
-    useLibraryStore((s) => s.favorites.some((f) => f.id === item.id)) || Boolean(item.isFavorite);
-  const isW =
-    useLibraryStore((s) => (s.watched || []).includes(item.id)) || Boolean(item.isWatched);
+    useLibraryStore((s) => hasFavoriteId(s.favorites, item.id)) || Boolean(item.isFavorite);
+  const isW = useLibraryStore((s) => hasWatchedId(s.watched, item.id)) || Boolean(item.isWatched);
   const isDownloaded = useDownloadStore((s) => Boolean(s.downloadedByLibraryId[item.id]));
 
   // Reset imgError state when virtualized grid item changes

@@ -103,6 +103,18 @@ export interface CatalogIndexRows {
   rows: { sourceId: string; raw: unknown }[];
 }
 
+interface CatalogIndexedItemRow {
+  sourceId: string;
+  raw: unknown;
+  imdb?: ImdbFacts | undefined;
+}
+
+interface CatalogIndexedItems {
+  /** False when some source has neither an index nor populated item ids yet. */
+  ready: boolean;
+  rows: CatalogIndexedItemRow[];
+}
+
 /** The catalogue kinds the Movies, Series and Live TV pages are served for. */
 export type CatalogPageKind = 'live' | 'vod' | 'series';
 
@@ -465,6 +477,13 @@ export const tauriApi = {
     order: CatalogIndexOrder,
     limit: number,
   ) => invoke<CatalogIndexRows>('catalog_index_rows', { kind, sources, order, limit }),
+
+  /** Specific indexed items looked up by their NexiTV `f_id`, with IMDb facts. */
+  catalogIndexItemsByIds: (
+    kind: CatalogPageKind,
+    sources: CatalogPageSource[],
+    itemIds: string[],
+  ) => invoke<CatalogIndexedItems>('catalog_index_items_by_ids', { kind, sources, itemIds }),
 
   /** Whether the Movies or Series page can be served from the catalogue index. */
   catalogIndexPageStatus: (kind: CatalogPageKind, sources: CatalogPageSource[]) =>

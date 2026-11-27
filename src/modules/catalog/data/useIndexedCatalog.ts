@@ -13,7 +13,7 @@ import {
   type CatalogSearchResult,
 } from '@/platform/tauri';
 import { perfAsync, perfSync } from '@/platform/perf';
-import { useHiddenOriginCategoryIds } from './useCategories';
+import { useHiddenCategoryState, useHiddenOriginCategoryIds } from './useCategories';
 import type { CatalogFilters } from '@/modules/settings/public/store/useSettingsStore';
 import {
   useEnabledSources,
@@ -39,6 +39,7 @@ const STATUS_ROOT = 'catalog_index_page_status';
 const PAGE_ROOT = 'catalog_index_page';
 const STATS_ROOT = 'catalog_index_page_stats';
 const SEARCH_ROOT = 'catalog_index_search';
+const ITEMS_BY_IDS_ROOT = 'catalog_index_items_by_ids';
 /** Waiting on a build this close to done beats loading the whole catalogue. */
 const WAIT_FOR_BUILD_FRACTION = 0.1;
 const WAIT_FOR_BUILD_MS = 15_000;
@@ -115,7 +116,6 @@ function useIndexInvalidation(kind: CatalogPageKind | null) {
       unlisten?.();
       unlistenImdb?.();
       stopBuilt();
-      unlisten?.();
     };
   }, [client, kind]);
 }
@@ -554,33 +554,45 @@ export function useCatalogFacetBuilds(delayMs = 3_000): void {
 
   useEffect(() => {
     if (!desktopApi.isDesktop()) return;
-    const run = (kind: CatalogPageKind) => {
-      void buildCatalogFacets(kind, buildSources).then(() =>
-        // Warm the facet cache, so the first page visit only filters and sorts.
-        prepareCatalogPage(
-          kind,
-          buildSources.map(({ id, queryScope: scope }) => ({ sourceId: id, scope })),
-        )
-          .then((status) => client.setQueryData([STATUS_ROOT, kind, queryScope], status))
-          .catch(() => undefined),
-      );
+    const requestSources = buildSources.map(({ id, queryScope: scope }) => ({
+      sourceId: id,
+      scope,
+    }));
+    const syncKind = async (kind: CatalogPageKind, forceBuild = false) => {
+      const status = await prepareCatalogPage(kind, requestSources).catch(() => null);
+      if (status) client.setQueryData([STATUS_ROOT, kind, queryScope], status);
+      // Only spawn the facet worker when rows actually lack facets or ranks.
+      if (!forceBuild && status?.state !== 'building') return;
+      await buildCatalogFacets(kind, buildSources);
+      const updated = await prepareCatalogPage(kind, requestSources).catch(() => null);
+      if (updated) client.setQueryData([STATUS_ROOT, kind, queryScope], updated);
     };
+    let cancelled = false;
     const timer = eligible
       ? window.setTimeout(() => {
-          run('vod');
-          run('series');
-          run('live');
+          void (async () => {
+            for (const kind of ['vod', 'series', 'live'] as const) {
+              if (cancelled) return;
+              await syncKind(kind);
+            }
+          })();
         }, delayMs)
       : undefined;
     let unlisten: (() => void) | undefined;
-    let cancelled = false;
     void desktopApi
       .onCatalogIndexUpdated((kind) => {
         if (kind !== 'live' && kind !== 'vod' && kind !== 'series') return;
-        for (const root of [STATUS_ROOT, PAGE_ROOT, STATS_ROOT, SEARCH_ROOT, INDEX_ROWS_ROOT]) {
+        for (const root of [
+          STATUS_ROOT,
+          PAGE_ROOT,
+          STATS_ROOT,
+          SEARCH_ROOT,
+          ITEMS_BY_IDS_ROOT,
+          INDEX_ROWS_ROOT,
+        ]) {
           void client.invalidateQueries({ queryKey: [root, kind], refetchType: 'none' });
         }
-        if (eligible) run(kind);
+        if (eligible) void syncKind(kind, true);
       })
       .then((stop) => {
         if (cancelled) stop();
@@ -679,4 +691,80 @@ export function useIndexedSearch(
 /** Whether the index serves live channels for these sources (no M3U, desktop). */
 export function useLiveIndexAvailable(): boolean {
   return indexCandidate('live', useEnabledSources());
+}
+
+export interface IndexedItemsLookup {
+  /** Whether the index can serve these items instead of loading the full catalogue. */
+  eligible: boolean;
+  /** Mapped items (with IMDb facts attached when present), or null when the index is not ready. */
+  items: CatalogItem[] | null;
+  settled: boolean;
+}
+
+/**
+ * Look up a small set of titles by their NexiTV id directly from the SQLite
+ * index (using the `items_facet_id` index), avoiding loading and mapping an
+ * entire 90k+ catalogue into webview memory just to render a handful of cards.
+ */
+export function useIndexedItemsByIds(
+  type: CatalogPageKind,
+  itemIds: readonly string[],
+  enabled: boolean,
+  options?: { excludeHidden?: boolean | undefined },
+): IndexedItemsLookup {
+  const sources = useEnabledSources();
+  const eligible = enabled && indexCandidate(type, sources);
+  const excludeHidden = options?.excludeHidden ?? false;
+  const hidden = useHiddenCategoryState(type, { enabled: eligible && excludeHidden });
+  const requestSources = useMemo(() => pageSources(sources), [sources]);
+  const sortedIds = useMemo(() => [...new Set(itemIds)].sort(), [itemIds]);
+  const idsKey = sortedIds.join('|');
+
+  const query = useQuery({
+    queryKey: [ITEMS_BY_IDS_ROOT, type, sources.queryScope, idsKey],
+    queryFn: async (): Promise<CatalogItem[] | null> => {
+      if (sortedIds.length === 0) return [];
+      const answer = await tauriApi.catalogIndexItemsByIds(type, requestSources, sortedIds);
+      if (!answer.ready) return null;
+      const bySource = new Map<string, typeof answer.rows>();
+      for (const row of answer.rows) {
+        const list = bySource.get(row.sourceId) ?? [];
+        list.push(row);
+        bySource.set(row.sourceId, list);
+      }
+      const mapped: CatalogItem[] = [];
+      for (const source of sources.availableXtreamSources) {
+        const list = bySource.get(source.id);
+        if (!list || list.length === 0) continue;
+        const items = mapXtreamList(
+          type,
+          source,
+          list.map((row) => row.raw),
+        );
+        list.forEach((row, index) => {
+          const item = items[index]!;
+          mapped.push(row.imdb ? withImdbFacts(item, row.imdb) : item);
+        });
+      }
+      return mapped;
+    },
+    enabled: eligible && !sources.isLoading,
+    staleTime: Infinity,
+    retry: false,
+  });
+
+  const filteredItems = useMemo(() => {
+    if (!query.data) return null;
+    if (!excludeHidden) return query.data;
+    if (!hidden.isResolved) return null;
+    if (hidden.ids.size === 0) return query.data;
+    return query.data.filter((item) => !item.categoryId || !hidden.ids.has(item.categoryId));
+  }, [excludeHidden, hidden.ids, hidden.isResolved, query.data]);
+
+  if (!eligible) return { eligible: false, items: null, settled: true };
+  if (sources.isLoading || query.isPending || (excludeHidden && !hidden.isResolved)) {
+    return { eligible: true, items: null, settled: false };
+  }
+  if (query.isError) return { eligible: true, items: null, settled: true };
+  return { eligible: true, items: filteredItems, settled: true };
 }

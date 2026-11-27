@@ -9,6 +9,9 @@ use icu_normalizer::DecomposingNormalizerBorrowed;
 /// `normalizeText`: NFD, combining diacritics (U+0300–U+036F) removed, then
 /// lower case.
 pub(crate) fn normalize_text(text: &str) -> String {
+    if text.is_ascii() {
+        return text.to_ascii_lowercase();
+    }
     static NFD: OnceLock<DecomposingNormalizerBorrowed<'static>> = OnceLock::new();
     let nfd = NFD.get_or_init(DecomposingNormalizerBorrowed::new_nfd);
     nfd.normalize(text)

@@ -256,6 +256,7 @@ export function UpcomingReleaseCard({
   const countdownEnabled = useSettingsStore((state) => state.upcomingCountdownEnabled);
   const historyDays = useSettingsStore((state) => state.upcomingHistoryDays);
   const [internalNow, setInternalNow] = useState(() => new Date());
+  const [documentVisible, setDocumentVisible] = useState(() => !document.hidden);
   const now = providedNow ?? internalNow;
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -264,12 +265,14 @@ export function UpcomingReleaseCard({
 
   useEffect(() => {
     if (providedNow) return undefined;
-    const timer = window.setInterval(
-      () => setInternalNow(new Date()),
-      countdownEnabled ? 1_000 : 60_000,
-    );
-    return () => window.clearInterval(timer);
-  }, [countdownEnabled, providedNow]);
+    const onVisibility = () => {
+      const visible = !document.hidden;
+      setDocumentVisible(visible);
+      if (visible) setInternalNow(new Date());
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [providedNow]);
 
   const groupedReleases = useMemo(() => {
     const rawReleases = schedule.data ?? [];
@@ -291,6 +294,28 @@ export function UpcomingReleaseCard({
   }, [customReleases, historyDays, now, schedule.data, variant]);
   const displayedReleases = limit && limit > 0 ? groupedReleases.slice(0, limit) : groupedReleases;
   const hasReleases = displayedReleases.length > 0;
+  // Countdowns >24h away only display days and hours, so only releases within
+  // the next 24 hours actually need a 1-second tick.
+  const needsSecondTick =
+    countdownEnabled &&
+    displayedReleases.some((release) => {
+      if (releasePhase(release, now) !== 'upcoming') return false;
+      const target =
+        (release.exactAirTime ? exactTimestampDate(release.exactAirTime) : null) ??
+        localCalendarDate(release.airDate);
+      if (!target) return false;
+      const remaining = countdownParts(target, now);
+      return Boolean(remaining && !remaining.elapsed && remaining.days === 0);
+    });
+
+  useEffect(() => {
+    if (providedNow || !documentVisible || !hasReleases) return undefined;
+    const timer = window.setInterval(
+      () => setInternalNow(new Date()),
+      needsSecondTick ? 1_000 : 60_000,
+    );
+    return () => window.clearInterval(timer);
+  }, [documentVisible, hasReleases, needsSecondTick, providedNow]);
 
   const updateScrollState = () => {
     const el = scrollRef.current;

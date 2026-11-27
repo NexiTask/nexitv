@@ -22,6 +22,10 @@ interface HorizontalCarouselProps {
   onViewDetails?: ((item: MediaItem) => void) | undefined;
 }
 
+const FIRST_CARD_STYLE: React.CSSProperties = { transformOrigin: 'left center' };
+const MIDDLE_CARD_STYLE: React.CSSProperties = { transformOrigin: 'center center' };
+const LAST_CARD_STYLE: React.CSSProperties = { transformOrigin: 'right center' };
+
 export function HorizontalCarousel({
   title,
   items,
@@ -125,24 +129,23 @@ export function HorizontalCarousel({
       <div className={styles.scrollArea} ref={scrollRef} onScroll={updateScrollState}>
         <div className={styles.itemTrack}>
           {items.map((item, index) => {
-            const isFirst = index === 0;
-            const isLast = index === items.length - 1;
-            const transformOrigin = isFirst
-              ? 'left center'
-              : isLast
-                ? 'right center'
-                : 'center center';
+            const cardStyle =
+              index === 0
+                ? FIRST_CARD_STYLE
+                : index === items.length - 1
+                  ? LAST_CARD_STYLE
+                  : MIDDLE_CARD_STYLE;
 
             return (
               <div key={item.id} className={styles.itemWrapper}>
                 <MediaCard
                   item={item}
-                  onClick={() => onItemClick(item)}
+                  onClick={onItemClick}
                   onViewDetails={onViewDetails}
                   previewSelected={
                     previewItemId === undefined ? undefined : previewItemId === item.id
                   }
-                  style={{ transformOrigin }}
+                  style={cardStyle}
                   isLiveTv={isLiveTv}
                   onRemove={onRemoveItem}
                   removeLabel={removeLabel}

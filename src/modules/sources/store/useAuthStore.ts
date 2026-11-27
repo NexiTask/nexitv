@@ -353,7 +353,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             }
           }),
         );
-        if (profiles.length > 0 || legacyMigrated) {
+        const hasLegacyStorage =
+          localStorage.getItem(AUTH_PROFILE_STORAGE_KEY) !== null ||
+          localStorage.getItem(LEGACY_AUTH_STORAGE_KEY) !== null;
+        if (legacyMigrated || (profiles.length > 0 && hasLegacyStorage)) {
           localStorage.removeItem(AUTH_PROFILE_STORAGE_KEY);
           localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
           await deleteProviderPassword();

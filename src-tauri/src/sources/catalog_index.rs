@@ -75,6 +75,10 @@ fn open(path: &PathBuf) -> rusqlite::Result<Connection> {
     let connection = Connection::open(path)?;
     connection.pragma_update(None, "journal_mode", "WAL")?;
     connection.pragma_update(None, "synchronous", "NORMAL")?;
+    connection.pragma_update(None, "busy_timeout", 5_000)?;
+    connection.pragma_update(None, "temp_store", "MEMORY")?;
+    connection.pragma_update(None, "cache_size", -16_000)?;
+    connection.pragma_update(None, "journal_size_limit", 32 * 1024 * 1024)?;
     let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
     if version != SCHEMA_VERSION {
         // Facets are re-derived from the stored provider JSON and the IMDb
@@ -152,6 +156,9 @@ pub(crate) fn with_reader<T>(
         let connection = Connection::open(&path)
             .and_then(|connection| {
                 connection.pragma_update(None, "query_only", true)?;
+                connection.pragma_update(None, "busy_timeout", 5_000)?;
+                connection.pragma_update(None, "temp_store", "MEMORY")?;
+                connection.pragma_update(None, "cache_size", -16_000)?;
                 Ok(connection)
             })
             .map_err(|error| format!("Catalog index unavailable: {error}"))?;
@@ -491,13 +498,16 @@ pub(crate) fn facets_pending(app: &tauri::AppHandle) -> Result<bool, String> {
     })
 }
 
-/// A fingerprint of the catalogue's lists (which sources hold which kinds, and
-/// each list's generation). It changes when a source is added or a list is
-/// re-ingested, which is when rows the IMDb pass has not seen exist.
+/// A fingerprint of the movie and series lists (which sources hold them, and
+/// each list's generation). It changes when a source is added or a movie/series
+/// list is re-ingested, which is when rows the IMDb pass has not seen exist.
 pub(crate) fn lists_fingerprint(app: &tauri::AppHandle) -> Result<u64, String> {
     with_reader(app, |connection| {
-        let mut statement = connection
-            .prepare("SELECT source_id, kind, generation FROM lists ORDER BY source_id, kind")?;
+        let mut statement = connection.prepare(
+            "SELECT source_id, kind, generation FROM lists
+             WHERE kind IN ('vod', 'series')
+             ORDER BY source_id, kind",
+        )?;
         let rows = statement
             .query_map([], |row| {
                 Ok((
@@ -613,6 +623,115 @@ fn order_clause(order: &str) -> Result<&'static str, String> {
     }
 }
 
+fn query_index_rows(
+    connection: &Connection,
+    source_id: &str,
+    kind: &str,
+    hidden_category_ids: &[String],
+    by_rating: bool,
+    order: &str,
+    limit: u32,
+) -> rusqlite::Result<Vec<String>> {
+    const VISIBLE_FILTERED: &str = "source_id = ?1 AND kind = ?2
+           AND (category_id IS NULL
+                OR category_id NOT IN (SELECT value FROM json_each(?3)))";
+    const VISIBLE_ALL: &str = "source_id = ?1 AND kind = ?2";
+    let has_hidden = !hidden_category_ids.is_empty();
+    let hidden = if has_hidden {
+        serde_json::to_string(hidden_category_ids).unwrap_or_else(|_| "[]".to_string())
+    } else {
+        String::new()
+    };
+
+    if by_rating {
+        let has_unranked: bool = connection.query_row(
+            "SELECT EXISTS (SELECT 1 FROM items
+             WHERE source_id = ?1 AND kind = ?2 AND f_rank IS NULL)",
+            params![source_id, kind],
+            |row| row.get(0),
+        )?;
+        let threshold: Option<f64> = if has_hidden {
+            connection
+                .query_row(
+                    &format!(
+                        "SELECT rating FROM items WHERE {VISIBLE_FILTERED} AND rating IS NOT NULL
+                         ORDER BY rating DESC, ord ASC LIMIT 1 OFFSET ?4"
+                    ),
+                    params![source_id, kind, hidden, limit.saturating_sub(1)],
+                    |row| row.get(0),
+                )
+                .optional()?
+        } else {
+            connection
+                .query_row(
+                    &format!(
+                        "SELECT rating FROM items WHERE {VISIBLE_ALL} AND rating IS NOT NULL
+                         ORDER BY rating DESC, ord ASC LIMIT 1 OFFSET ?3"
+                    ),
+                    params![source_id, kind, limit.saturating_sub(1)],
+                    |row| row.get(0),
+                )
+                .optional()?
+        };
+        let min_rating = threshold.unwrap_or(0.0);
+        // Once facets exist, SQLite can break provider-rating ties with the
+        // exact year and title-rank order `sortCatalogItems` uses, returning
+        // `limit` rows instead of thousands of tied candidates.
+        let (tie_order, row_limit) = if !has_unranked {
+            ("rating DESC, COALESCE(f_year, 0) DESC, f_rank ASC", limit)
+        } else {
+            ("rating DESC, ord ASC", MAX_POOL)
+        };
+        let raws = if has_hidden {
+            let mut statement = connection.prepare_cached(&format!(
+                "SELECT raw FROM items WHERE {VISIBLE_FILTERED} AND rating IS NOT NULL AND rating >= ?4
+                 ORDER BY {tie_order} LIMIT ?5"
+            ))?;
+            let rows = statement
+                .query_map(
+                    params![source_id, kind, hidden, min_rating, row_limit],
+                    |row| row.get::<_, String>(0),
+                )?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            rows
+        } else {
+            let mut statement = connection.prepare_cached(&format!(
+                "SELECT raw FROM items WHERE {VISIBLE_ALL} AND rating IS NOT NULL AND rating >= ?3
+                 ORDER BY {tie_order} LIMIT ?4"
+            ))?;
+            let rows = statement
+                .query_map(params![source_id, kind, min_rating, row_limit], |row| {
+                    row.get::<_, String>(0)
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            rows
+        };
+        return Ok(raws);
+    }
+
+    if has_hidden {
+        let mut statement = connection.prepare_cached(&format!(
+            "SELECT raw FROM items WHERE {VISIBLE_FILTERED} ORDER BY {order} LIMIT ?4"
+        ))?;
+        let rows = statement
+            .query_map(params![source_id, kind, hidden, limit], |row| {
+                row.get::<_, String>(0)
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    } else {
+        let mut statement = connection.prepare_cached(&format!(
+            "SELECT raw FROM items WHERE {VISIBLE_ALL} ORDER BY {order} LIMIT ?3"
+        ))?;
+        let rows = statement
+            .query_map(params![source_id, kind, limit], |row| {
+                row.get::<_, String>(0)
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+}
+
 /// A pre-ordered candidate pool of at most `limit` items per source, with the
 /// user's hidden categories left out.
 #[tauri::command(async)]
@@ -637,53 +756,16 @@ pub fn catalog_index_rows(
                 rows: Vec::new(),
             });
         }
-        let hidden = serde_json::to_string(&source.hidden_category_ids)
-            .map_err(|_| "Invalid hidden categories".to_string())?;
-        let mut source_rows = with_connection(&app, |connection| {
-            const VISIBLE: &str = "source_id = ?1 AND kind = ?2
-                   AND (category_id IS NULL
-                        OR category_id NOT IN (SELECT value FROM json_each(?3)))";
-            if by_rating {
-                // The frontend breaks rating ties by year and title, which the
-                // index does not know, so the pool takes every item tied with
-                // the last one it needs.
-                let threshold: Option<f64> = connection
-                    .query_row(
-                        &format!(
-                            "SELECT rating FROM items WHERE {VISIBLE} AND rating IS NOT NULL
-                             ORDER BY rating DESC, ord ASC LIMIT 1 OFFSET ?4"
-                        ),
-                        params![source.source_id, kind, hidden, limit.saturating_sub(1)],
-                        |row| row.get(0),
-                    )
-                    .optional()?;
-                let mut statement = connection.prepare_cached(&format!(
-                    "SELECT raw FROM items WHERE {VISIBLE} AND rating IS NOT NULL AND rating >= ?4
-                     ORDER BY rating DESC, ord ASC LIMIT ?5"
-                ))?;
-                let raws = statement
-                    .query_map(
-                        params![
-                            source.source_id,
-                            kind,
-                            hidden,
-                            threshold.unwrap_or(0.0),
-                            MAX_POOL
-                        ],
-                        |row| row.get::<_, String>(0),
-                    )?
-                    .collect::<rusqlite::Result<Vec<_>>>()?;
-                return Ok(raws);
-            }
-            let mut statement = connection.prepare_cached(&format!(
-                "SELECT raw FROM items WHERE {VISIBLE} ORDER BY {order} LIMIT ?4"
-            ))?;
-            let raws = statement
-                .query_map(params![source.source_id, kind, hidden, limit], |row| {
-                    row.get::<_, String>(0)
-                })?
-                .collect::<rusqlite::Result<Vec<_>>>()?;
-            Ok(raws)
+        let mut source_rows = with_reader(&app, |connection| {
+            query_index_rows(
+                connection,
+                &source.source_id,
+                &kind,
+                &source.hidden_category_ids,
+                by_rating,
+                order,
+                limit,
+            )
         })?
         .into_iter()
         .filter_map(|raw| {
@@ -701,6 +783,138 @@ pub fn catalog_index_rows(
         &format!("kind={kind} rows={}", rows.len()),
     );
     Ok(IndexRows { ready: true, rows })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexedItemRow {
+    source_id: String,
+    raw: Box<RawValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    imdb: Option<ImdbFacts>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexedItemsByIds {
+    ready: bool,
+    rows: Vec<IndexedItemRow>,
+}
+
+fn items_by_ids_from(
+    connection: &Connection,
+    kind: &str,
+    source_ids: &[&str],
+    item_ids: &[String],
+) -> rusqlite::Result<Option<Vec<IndexedItemRow>>> {
+    let transaction = connection.unchecked_transaction()?;
+    for &source_id in source_ids {
+        let Some((_, skipped)) = list_generation(&transaction, source_id, kind)? else {
+            return Ok(None);
+        };
+        if skipped > 0 {
+            return Ok(None);
+        }
+        let missing_facets: bool = transaction.query_row(
+            "SELECT EXISTS (SELECT 1 FROM items
+             WHERE source_id = ?1 AND kind = ?2 AND f_rank IS NULL AND f_id IS NULL)",
+            params![source_id, kind],
+            |row| row.get(0),
+        )?;
+        if missing_facets {
+            return Ok(None);
+        }
+    }
+    let allowed: std::collections::HashSet<&str> = source_ids.iter().copied().collect();
+    let mut statement = transaction.prepare_cached(
+        "SELECT source_id, raw, imdb_tconst, imdb_rating, imdb_votes FROM items
+         WHERE kind = ?1 AND f_id = ?2",
+    )?;
+    let mut rows = Vec::with_capacity(item_ids.len());
+    for item_id in item_ids {
+        let found = statement
+            .query_map(params![kind, item_id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    imdb_facts(row.get(2)?, row.get(3)?, row.get(4)?),
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        for (source_id, raw, imdb) in found {
+            if !allowed.contains(source_id.as_str()) {
+                continue;
+            }
+            if let Ok(raw) = RawValue::from_string(raw) {
+                rows.push(IndexedItemRow {
+                    source_id,
+                    raw,
+                    imdb,
+                });
+            }
+        }
+    }
+    drop(statement);
+    transaction.finish()?;
+    Ok(Some(rows))
+}
+
+/// Look up specific indexed items by their NexiTV `f_id` without loading the
+/// full catalogue into the webview (e.g. Home's cached recommendation picks).
+#[tauri::command(async)]
+pub fn catalog_index_items_by_ids(
+    app: tauri::AppHandle,
+    kind: String,
+    sources: Vec<PageSource>,
+    item_ids: Vec<String>,
+) -> Result<IndexedItemsByIds, String> {
+    let start = Instant::now();
+    validate_page_kind(&kind)?;
+    if item_ids.len() > MAX_ROWS_PER_REQUEST {
+        return Err("Too many catalog items requested".to_string());
+    }
+    if sources.is_empty() || sources.len() > MAX_SOURCES {
+        return Ok(IndexedItemsByIds {
+            ready: false,
+            rows: Vec::new(),
+        });
+    }
+    for source in &sources {
+        validate_source_id(&source.source_id)?;
+        if !ensure_indexed(&app, &source.source_id, &kind, &source.scope)? {
+            return Ok(IndexedItemsByIds {
+                ready: false,
+                rows: Vec::new(),
+            });
+        }
+    }
+    if item_ids.is_empty() {
+        return Ok(IndexedItemsByIds {
+            ready: true,
+            rows: Vec::new(),
+        });
+    }
+    let source_ids: Vec<&str> = sources.iter().map(|s| s.source_id.as_str()).collect();
+    let result = match with_reader(&app, |connection| {
+        items_by_ids_from(connection, &kind, &source_ids, &item_ids)
+    })? {
+        Some(rows) => IndexedItemsByIds { ready: true, rows },
+        None => IndexedItemsByIds {
+            ready: false,
+            rows: Vec::new(),
+        },
+    };
+    crate::perf::log(
+        "rust:index_items_by_ids",
+        Some(start.elapsed().as_millis()),
+        &format!(
+            "kind={kind} requested={} returned={} ready={}",
+            item_ids.len(),
+            result.rows.len(),
+            result.ready
+        ),
+    );
+    Ok(result)
 }
 
 // ---------------------------------------------------------------------------
@@ -1060,8 +1274,113 @@ struct PageHeader<'a> {
     head: Vec<KeyRow>,
 }
 
-/// Whether the pages can be served from the index; loads the facets so the
-/// first page query is quick.
+enum LightSourceState {
+    Ready { total: u64 },
+    Building { pending: u64, total: u64 },
+    Unavailable,
+}
+
+/// Checks whether a source's facets are ready without reading all `FacetRow`s
+/// into RAM. Uses the partial `items_unranked` index so steady-state checks
+/// finish in milliseconds and allocate zero facet memory.
+fn check_source_status(
+    connection: &Connection,
+    source_id: &str,
+    kind: &str,
+) -> rusqlite::Result<LightSourceState> {
+    let transaction = connection.unchecked_transaction()?;
+    let Some((generation, skipped)) = list_generation(&transaction, source_id, kind)? else {
+        return Ok(LightSourceState::Unavailable);
+    };
+    if skipped > 0 {
+        return Ok(LightSourceState::Unavailable);
+    }
+    if let Some(facets) = facet_cache_get(source_id, kind, generation) {
+        return Ok(LightSourceState::Ready {
+            total: facets.rows.len() as u64,
+        });
+    }
+    let has_pending: bool = transaction.query_row(
+        "SELECT EXISTS (SELECT 1 FROM items WHERE source_id = ?1 AND kind = ?2 AND f_rank IS NULL)",
+        params![source_id, kind],
+        |row| row.get(0),
+    )?;
+    if has_pending {
+        let (pending, total): (u64, u64) = transaction.query_row(
+            "SELECT (SELECT COUNT(*) FROM items WHERE source_id = ?1 AND kind = ?2
+                        AND f_rank IS NULL),
+                    (SELECT COUNT(*) FROM items WHERE source_id = ?1 AND kind = ?2)",
+            params![source_id, kind],
+            |row| Ok((row.get::<_, i64>(0)? as u64, row.get::<_, i64>(1)? as u64)),
+        )?;
+        transaction.finish()?;
+        return Ok(LightSourceState::Building { pending, total });
+    }
+    let total: u64 = transaction.query_row(
+        "SELECT COUNT(*) FROM items WHERE source_id = ?1 AND kind = ?2",
+        params![source_id, kind],
+        |row| Ok(row.get::<_, i64>(0)? as u64),
+    )?;
+    transaction.finish()?;
+    Ok(LightSourceState::Ready { total })
+}
+
+fn page_status_only(
+    app: &tauri::AppHandle,
+    kind: &str,
+    sources: &[PageSource],
+) -> Result<PageStatus, String> {
+    validate_page_kind(kind)?;
+    if sources.is_empty() || sources.len() > MAX_SOURCES {
+        return Ok(PageStatus {
+            state: "unavailable",
+            pending: 0,
+            total: 0,
+        });
+    }
+    let (mut pending, mut total) = (0u64, 0u64);
+    let mut unavailable = false;
+    for source in sources {
+        validate_source_id(&source.source_id)?;
+        if !ensure_indexed(app, &source.source_id, kind, &source.scope)? {
+            unavailable = true;
+            continue;
+        }
+        match with_reader(app, |c| check_source_status(c, &source.source_id, kind))? {
+            LightSourceState::Ready { total: rows } => total += rows,
+            LightSourceState::Building {
+                pending: waiting,
+                total: rows,
+            } => {
+                pending += waiting;
+                total += rows;
+            }
+            LightSourceState::Unavailable => unavailable = true,
+        }
+    }
+    if unavailable {
+        return Ok(PageStatus {
+            state: "unavailable",
+            pending,
+            total,
+        });
+    }
+    if pending > 0 {
+        return Ok(PageStatus {
+            state: "building",
+            pending,
+            total,
+        });
+    }
+    Ok(PageStatus {
+        state: "ready",
+        pending: 0,
+        total,
+    })
+}
+
+/// Whether the pages can be served from the index, without eagerly loading
+/// every catalogue's facets into memory before the user opens a page.
 #[tauri::command(async)]
 pub fn catalog_index_page_status(
     app: tauri::AppHandle,
@@ -1069,14 +1388,7 @@ pub fn catalog_index_page_status(
     sources: Vec<PageSource>,
 ) -> Result<PageStatus, String> {
     let start = Instant::now();
-    let status = match page_sources(&app, &kind, &sources)? {
-        Ok(facets) => PageStatus {
-            state: "ready",
-            pending: 0,
-            total: facets.iter().map(|f| f.rows.len() as u64).sum(),
-        },
-        Err(status) => status,
-    };
+    let status = page_status_only(&app, &kind, &sources)?;
     crate::perf::log(
         "rust:index_page_status",
         Some(start.elapsed().as_millis()),
@@ -1820,5 +2132,127 @@ mod tests {
         assert!(has_provider_id("vod", &movie));
         assert!(has_provider_id("series", &series));
         assert!(!has_provider_id("vod", &missing));
+    }
+
+    #[test]
+    fn status_check_reports_readiness_without_populating_facet_cache() {
+        let (path, mut connection) = test_database("light-status");
+        let source = "xtream-light-status";
+        ingest_json(
+            &mut connection,
+            source,
+            r#"[{"stream_id":1,"name":"A"},{"stream_id":2,"name":"B"}]"#,
+        );
+        assert!(matches!(
+            check_source_status(&connection, source, "vod").unwrap(),
+            LightSourceState::Building {
+                pending: 2,
+                total: 2
+            }
+        ));
+        give_facets(&connection, source);
+        assert!(matches!(
+            check_source_status(&connection, source, "vod").unwrap(),
+            LightSourceState::Ready { total: 2 }
+        ));
+        assert!(
+            facet_cache_get(source, "vod", 1).is_none(),
+            "status check must not eagerly hydrate SourceFacets into RAM"
+        );
+        drop(connection);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn items_by_ids_returns_requested_rows_with_imdb_and_gates_on_facets() {
+        let (path, mut connection) = test_database("by-ids");
+        let source_a = "xtream-by-ids-a";
+        let source_b = "xtream-by-ids-b";
+        ingest_json(
+            &mut connection,
+            source_a,
+            r#"[{"stream_id":1,"name":"Alpha"},{"stream_id":2,"name":"Beta"}]"#,
+        );
+        ingest_json(
+            &mut connection,
+            source_b,
+            r#"[{"stream_id":3,"name":"Gamma"}]"#,
+        );
+        // Before facets are populated, lookup reports not ready.
+        assert!(
+            items_by_ids_from(&connection, "vod", &[source_a], &["id-0".to_string()])
+                .unwrap()
+                .is_none()
+        );
+        give_facets(&connection, source_a);
+        give_facets(&connection, source_b);
+        connection
+            .execute(
+                "UPDATE items SET f_id = 'a-1', imdb_tconst = 'tt1234567', imdb_rating = 8.4, imdb_votes = 4200
+                 WHERE source_id = ?1 AND ord = 1",
+                params![source_a],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "UPDATE items SET f_id = 'b-0' WHERE source_id = ?1 AND ord = 0",
+                params![source_b],
+            )
+            .unwrap();
+
+        let rows = items_by_ids_from(
+            &connection,
+            "vod",
+            &[source_a],
+            &["a-1".to_string(), "b-0".to_string(), "missing".to_string()],
+        )
+        .unwrap()
+        .expect("ready once facets exist");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].source_id, source_a);
+        assert_eq!(
+            rows[0].imdb.as_ref().map(|f| f.id.as_str()),
+            Some("tt1234567")
+        );
+        assert_eq!(rows[0].imdb.as_ref().and_then(|f| f.rating), Some(8.4));
+        drop(connection);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn rating_rows_break_ties_by_year_and_rank_when_facets_exist() {
+        let (path, mut connection) = test_database("rating-ties");
+        let source = "xtream-rating-ties";
+        ingest_json(
+            &mut connection,
+            source,
+            r#"[
+                {"stream_id":1,"name":"Older","rating":"9.0"},
+                {"stream_id":2,"name":"Newer B","rating":"9.0"},
+                {"stream_id":3,"name":"Newer A","rating":"9.0"}
+            ]"#,
+        );
+        connection
+            .execute_batch(&format!(
+                "UPDATE items SET f_id = 'id-0', f_title = 'Older', f_year = 2019, f_rank = 2 WHERE source_id = '{source}' AND ord = 0;
+                 UPDATE items SET f_id = 'id-1', f_title = 'Newer B', f_year = 2024, f_rank = 1 WHERE source_id = '{source}' AND ord = 1;
+                 UPDATE items SET f_id = 'id-2', f_title = 'Newer A', f_year = 2024, f_rank = 0 WHERE source_id = '{source}' AND ord = 2;"
+            ))
+            .unwrap();
+        let rows = query_index_rows(
+            &connection,
+            source,
+            "vod",
+            &[],
+            true,
+            "rating DESC, ord ASC",
+            2,
+        )
+        .unwrap();
+        assert_eq!(rows.len(), 2, "must cap at limit once facets break ties");
+        assert!(rows[0].contains("Newer A"));
+        assert!(rows[1].contains("Newer B"));
+        drop(connection);
+        let _ = std::fs::remove_file(path);
     }
 }

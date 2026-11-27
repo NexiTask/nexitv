@@ -29,14 +29,38 @@ interface WorkerReply {
   error?: string | undefined;
 }
 
+/** Idle delay before terminating the facet worker so it does not hold a thread and heap forever. */
+const WORKER_IDLE_MS = 10_000;
+
 let facetWorker: Worker | null = null;
+let workerIdleTimer: ReturnType<typeof setTimeout> | null = null;
 let nextTaskId = 1;
 const pendingTasks = new Map<
   number,
   { resolve: (result: CatalogFacetTaskResult) => void; reject: (error: Error) => void }
 >();
 
+function cancelWorkerIdleTermination(): void {
+  if (workerIdleTimer !== null) {
+    clearTimeout(workerIdleTimer);
+    workerIdleTimer = null;
+  }
+}
+
+function scheduleWorkerIdleTermination(): void {
+  if (!facetWorker || pendingTasks.size > 0 || runs.size > 0) return;
+  cancelWorkerIdleTermination();
+  workerIdleTimer = setTimeout(() => {
+    workerIdleTimer = null;
+    if (pendingTasks.size === 0 && runs.size === 0 && facetWorker) {
+      facetWorker.terminate();
+      facetWorker = null;
+    }
+  }, WORKER_IDLE_MS);
+}
+
 function getFacetWorker(): Worker | null {
+  cancelWorkerIdleTermination();
   if (facetWorker) return facetWorker;
   if (typeof Worker === 'undefined') return null;
   try {
@@ -211,6 +235,8 @@ export function buildCatalogFacets(
     if (next) {
       rerun.delete(kind);
       void buildCatalogFacets(kind, next);
+    } else {
+      scheduleWorkerIdleTermination();
     }
   });
   runs.set(kind, run);
@@ -219,6 +245,7 @@ export function buildCatalogFacets(
 
 /** Clears module state between isolated tests. */
 export function resetCatalogFacetBuilderForTests(): void {
+  cancelWorkerIdleTermination();
   facetWorker?.terminate();
   facetWorker = null;
   pendingTasks.clear();

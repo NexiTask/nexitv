@@ -127,6 +127,15 @@ fn open_database(path: &std::path::Path) -> Result<rusqlite::Connection, String>
         .pragma_update(None, "journal_mode", "WAL")
         .map_err(|error| format!("IMDb database unavailable: {error}"))?;
     connection
+        .pragma_update(None, "busy_timeout", 5_000)
+        .map_err(|error| format!("IMDb database unavailable: {error}"))?;
+    connection
+        .pragma_update(None, "cache_size", -8_000)
+        .map_err(|error| format!("IMDb database unavailable: {error}"))?;
+    connection
+        .pragma_update(None, "journal_size_limit", 16 * 1024 * 1024)
+        .map_err(|error| format!("IMDb database unavailable: {error}"))?;
+    connection
         .execute_batch(
             "CREATE TABLE IF NOT EXISTS titles (
                 tconst  TEXT PRIMARY KEY,
@@ -218,6 +227,17 @@ fn age_secs(connection: &rusqlite::Connection, name: &str) -> Option<u64> {
 /// NFKD, like the frontend and like catalog_search's normalizer.
 /// Step 0 checked the mirror against the production functions: 0/2000 drift.
 pub(crate) fn title_key(value: &str) -> String {
+    if value.is_ascii() {
+        let mut out = String::with_capacity(value.len());
+        for byte in value.bytes() {
+            if byte == b'&' {
+                out.push_str("and");
+            } else if byte.is_ascii_alphanumeric() {
+                out.push(byte.to_ascii_lowercase() as char);
+            }
+        }
+        return out;
+    }
     static NFKD: std::sync::OnceLock<DecomposingNormalizerBorrowed<'static>> =
         std::sync::OnceLock::new();
     let nfkd = NFKD.get_or_init(DecomposingNormalizerBorrowed::new_nfkd);
@@ -384,7 +404,7 @@ async fn refresh_locked(app: &tauri::AppHandle, manual: bool) -> Result<usize, S
     .map_err(|error| format!("IMDb parse failed: {error}"))??;
 
     emit_import(&app, "matching", None, None);
-    let matched = backfill(&app)?;
+    let matched = backfill(&app, true)?;
     with_connection(&app, |connection| {
         meta_set(connection, "last_refresh", now_secs());
         meta_set(connection, "titles", titles as u64);
@@ -481,6 +501,7 @@ fn rematch_locked(app: &tauri::AppHandle) -> Result<usize, String> {
         }
         std::thread::sleep(FACET_POLL);
     }
+    let mut reparsed = false;
     if cached {
         let (keys, tt_ids) = catalog_index::match_universe(app)?;
         let parsed: (HashSet<String>, HashSet<String>) = with_connection(app, |connection| {
@@ -512,9 +533,10 @@ fn rematch_locked(app: &tauri::AppHandle) -> Result<usize, String> {
                 meta_set(connection, "titles", titles as u64);
                 Ok(())
             })?;
+            reparsed = true;
         }
     }
-    backfill(app)
+    backfill(app, reparsed)
 }
 
 /// IMDb's TSV escaping: a literal `\N` is a null field; nothing is quoted.
@@ -698,7 +720,7 @@ type MatchUpdate = (
 
 /// Fill the `imdb_*` columns for index rows without a match. Exact key + year
 /// only; candidates were pre-filtered to the catalogue's keys at parse time.
-fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
+fn backfill(app: &tauri::AppHandle, resync_all: bool) -> Result<usize, String> {
     let start = Instant::now();
     // Taken before matching, so a list that changes mid-pass is seen again.
     let lists = catalog_index::lists_fingerprint(app)?;
@@ -803,13 +825,15 @@ fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
             Ok(())
         })?;
     }
-    let refreshed = resync_matched(app)?;
+    let refreshed = resync_matched(app, resync_all)?;
     with_connection(app, |connection| {
         meta_set(connection, "last_backfill", now_secs());
         meta_set(connection, "lists_hash", lists);
         Ok(())
     })?;
-    catalog_index::invalidate_imdb_facets();
+    if matched > 0 || refreshed > 0 {
+        catalog_index::invalidate_imdb_facets();
+    }
     crate::perf::log(
         "imdb:backfill",
         Some(start.elapsed().as_millis()),
@@ -818,22 +842,28 @@ fn backfill(app: &tauri::AppHandle) -> Result<usize, String> {
     Ok(matched)
 }
 
-/// Bring every already-identified row up to the stored dumps: a weekly
-/// refresh moves ratings and votes, a provider-embedded `tt…` id arrives with
-/// no rating at all, and a re-ingest carries only what was stored before.
-/// Rows whose title left the dumps keep their last values. Returns the rows
-/// that changed.
-fn resync_matched(app: &tauri::AppHandle) -> Result<usize, String> {
+/// Bring already-identified rows up to the stored dumps: a weekly refresh
+/// moves ratings and votes (`resync_all = true`), while a rematch on unchanged
+/// dumps only needs to fill provider-embedded `tt…` ids that arrived without a
+/// rating (`resync_all = false`). Rows whose title left the dumps keep their
+/// last values. Returns the rows that changed.
+fn resync_matched(app: &tauri::AppHandle, resync_all: bool) -> Result<usize, String> {
+    let query = if resync_all {
+        "SELECT rowid, imdb_tconst FROM items
+         WHERE rowid > ?1 AND kind IN ('vod', 'series') AND imdb_tconst IS NOT NULL
+         ORDER BY rowid LIMIT ?2"
+    } else {
+        "SELECT rowid, imdb_tconst FROM items
+         WHERE rowid > ?1 AND kind IN ('vod', 'series')
+           AND imdb_tconst IS NOT NULL AND imdb_rating IS NULL
+         ORDER BY rowid LIMIT ?2"
+    };
     let mut changed = 0usize;
     let mut cursor: i64 = 0;
     loop {
         let batch: Vec<(i64, String)> = catalog_index::with_reader(app, |connection| {
             connection
-                .prepare(
-                    "SELECT rowid, imdb_tconst FROM items
-                     WHERE rowid > ?1 AND kind IN ('vod', 'series') AND imdb_tconst IS NOT NULL
-                     ORDER BY rowid LIMIT ?2",
-                )?
+                .prepare(query)?
                 .query_map(params![cursor, BACKFILL_BATCH], |row| {
                     Ok((row.get(0)?, row.get(1)?))
                 })?

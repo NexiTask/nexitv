@@ -133,6 +133,16 @@ describe('typed Tauri IPC wrapper', () => {
       { kind: 'vod', sources: [{ sourceId: 'xtream-one', scope: 'sources-abc' }] },
     ],
     [
+      'catalogIndexItemsByIds',
+      ['series', [{ sourceId: 'xtream-one', scope: 'sources-abc' }], ['xtream-one:series:42']],
+      'catalog_index_items_by_ids',
+      {
+        kind: 'series',
+        sources: [{ sourceId: 'xtream-one', scope: 'sources-abc' }],
+        itemIds: ['xtream-one:series:42'],
+      },
+    ],
+    [
       'catalogIndexPageRows',
       ['live', [{ sourceId: 'xtream-one', scope: 'sources-abc' }], '3', [1, 8388609], true],
       'catalog_index_page_rows',

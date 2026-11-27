@@ -77,6 +77,7 @@ pub fn run() {
             sources::catalog_cache::catalog_cache_load,
             sources::catalog_cache::catalog_cache_delete,
             sources::catalog_index::catalog_index_rows,
+            sources::catalog_index::catalog_index_items_by_ids,
             sources::catalog_index::catalog_index_page_status,
             sources::catalog_index::catalog_index_page,
             sources::catalog_index::catalog_index_page_rows,
