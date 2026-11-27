@@ -77,10 +77,8 @@ export function HomePage() {
     showRecommendations,
     recommendationsHomeLimit,
   );
-  const { cards: recommendationCards } = useSeriesRecommendations(
-    watchNext,
-    showRecommendations && recommendationsEnabled,
-  );
+  const { cards: recommendationCards, isLoading: recommendationsLoading } =
+    useSeriesRecommendations(watchNext, showRecommendations && recommendationsEnabled);
   const recommendations = useMemo(
     () =>
       mixSeriesRecommendations(recommendationCards, automatedItems).slice(
@@ -174,9 +172,17 @@ export function HomePage() {
     return (streamFoldingEnabled ? selectFoldedLiveCatalog(pool) : pool).slice(0, 20);
   }, [useFullCatalog, liveQuery.data, livePool.items, streamFoldingEnabled]);
 
-  const isLoading = useFullCatalog
-    ? moviesQuery.isLoading || seriesQuery.isLoading || liveQuery.isLoading
-    : !poolsSettled;
+  const recentMoviesLoading = useFullCatalog ? moviesQuery.isLoading : !recentMoviePool.settled;
+  const popularMoviesLoading = useFullCatalog ? moviesQuery.isLoading : !popularMoviePool.settled;
+  const recentSeriesLoading = useFullCatalog ? seriesQuery.isLoading : !recentSeriesPool.settled;
+  const popularSeriesLoading = useFullCatalog ? seriesQuery.isLoading : !popularSeriesPool.settled;
+  const liveChannelsLoading = useFullCatalog ? liveQuery.isLoading : !livePool.settled;
+  const isLoading =
+    recentMoviesLoading ||
+    popularMoviesLoading ||
+    recentSeriesLoading ||
+    popularSeriesLoading ||
+    liveChannelsLoading;
   const firstRowsLogged = useRef(false);
   useEffect(() => {
     if (firstRowsLogged.current || isLoading || !(recentMovies.length || recentSeries.length))
@@ -198,7 +204,7 @@ export function HomePage() {
     recentSeries.length > 0 ||
     popularMovies.length > 0 ||
     liveChannels.length > 0;
-  const showLoadError = Boolean(catalogError) && !hasCatalogData;
+  const showLoadError = Boolean(catalogError) && !hasCatalogData && !isLoading;
   const errorPresentation = getErrorPresentation(catalogError, 'Home');
   const failedCatalogQueries = fullQueries.filter((query) => query.isError);
   const isRetrying = failedCatalogQueries.some((query) => query.isFetching);
@@ -214,7 +220,7 @@ export function HomePage() {
     upcoming: showUpcomingOnHome,
     continueWatching: continueWatchingItems.length > 0,
     watchNext: watchNextItems.length > 0,
-    recommendations: recommendations.length > 0,
+    recommendations: recommendations.length > 0 || recommendationsLoading,
     recentMovies: true,
     recentSeries: true,
     popularMovies: true,
@@ -225,7 +231,9 @@ export function HomePage() {
     .filter((section) => section.enabled && sectionVisible[section.id])
     .map((section) => section.id);
 
-  const renderSection = (id: HomeSectionId, loading: boolean): ReactNode => {
+  // Each section renders independently so fast/local rows never wait behind
+  // slower catalogue or recommendation queries.
+  const renderSection = (id: HomeSectionId): ReactNode => {
     switch (id) {
       case 'upcoming':
         return (
@@ -237,9 +245,7 @@ export function HomePage() {
           />
         );
       case 'continueWatching':
-        return loading ? (
-          <CarouselSkeleton key={id} title="Continue Watching" />
-        ) : (
+        return (
           <HorizontalCarousel
             key={id}
             title="Continue Watching"
@@ -262,7 +268,9 @@ export function HomePage() {
           />
         );
       case 'recommendations':
-        return (
+        return recommendations.length === 0 ? (
+          <CarouselSkeleton key={id} title="Recommendations" count={recommendationsHomeLimit} />
+        ) : (
           <RecommendationTrailers
             key={id}
             fullWidth
@@ -285,7 +293,7 @@ export function HomePage() {
           </RecommendationTrailers>
         );
       case 'recentMovies':
-        return loading ? (
+        return recentMoviesLoading ? (
           <CarouselSkeleton key={id} title="Recently Added Movies" />
         ) : (
           <HorizontalCarousel
@@ -297,7 +305,7 @@ export function HomePage() {
           />
         );
       case 'recentSeries':
-        return loading ? (
+        return recentSeriesLoading ? (
           <CarouselSkeleton key={id} title="Recently Added Series" />
         ) : (
           <HorizontalCarousel
@@ -309,7 +317,7 @@ export function HomePage() {
           />
         );
       case 'popularMovies':
-        return loading ? (
+        return popularMoviesLoading ? (
           <CarouselSkeleton key={id} title="Popular Movies" />
         ) : (
           <HorizontalCarousel
@@ -321,7 +329,7 @@ export function HomePage() {
           />
         );
       case 'popularSeries':
-        return loading ? (
+        return popularSeriesLoading ? (
           <CarouselSkeleton key={id} title="Popular Series" />
         ) : (
           <HorizontalCarousel
@@ -333,7 +341,7 @@ export function HomePage() {
           />
         );
       case 'liveChannels':
-        return loading ? (
+        return liveChannelsLoading ? (
           <CarouselSkeleton key={id} title="Live TV Channels" isLiveTv />
         ) : (
           <HorizontalCarousel
@@ -370,10 +378,6 @@ export function HomePage() {
             actionLabel="Manage Sources"
             onAction={() => navigate('/settings?section=sources')}
           />
-        ) : isLoading ? (
-          <div className={`${styles.homeScrollContainer} subtle-scrollbar`}>
-            {activeSectionIds.map((id) => renderSection(id, true))}
-          </div>
         ) : showLoadError ? (
           <ErrorState
             title={errorPresentation.title}
@@ -385,7 +389,7 @@ export function HomePage() {
           />
         ) : (
           <div className={`${styles.homeScrollContainer} subtle-scrollbar`}>
-            {activeSectionIds.map((id) => renderSection(id, false))}
+            {activeSectionIds.map((id) => renderSection(id))}
           </div>
         )}
       </div>

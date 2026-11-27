@@ -40,6 +40,7 @@ vi.mock('@/platform/desktop', () => ({ desktopApi: { isDesktop: () => true } }))
 vi.mock('@/modules/catalog/public/data/useCategories', () => ({
   useVisibleCatalog: catalogMocks.useVisibleCatalog,
   useCategories: catalogMocks.useCategories,
+  useHiddenCategoryIds: () => new Set<string>(),
 }));
 vi.mock('@/modules/catalog/data/useCategories', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/modules/catalog/data/useCategories')>();
@@ -309,5 +310,39 @@ it('looks up Home recommendation picks by id from the index without loading the 
     read.mockRestore();
     byIds.mockRestore();
     imdb.mockRestore();
+  }
+});
+
+it('shows a non-blocking loading indicator on RecommendationsList while saved picks load', async () => {
+  const previousSaved = useLibraryStore.getState().savedItems;
+  useLibraryStore.setState({ savedItems: [] });
+  let resolveCached!: (value: { generatedAt: number; picks: [] } | null) => void;
+  const status = vi.spyOn(tauriApi, 'chatGptStatus').mockResolvedValue({
+    activeClient: 'client',
+    accounts: [{ clientId: 'client', label: 'Test', planPermission: true }],
+  });
+  const read = vi.spyOn(tauriApi, 'recommendationsCached').mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        resolveCached = resolve;
+      }),
+  );
+  try {
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <RecommendationsList next={[]} onOpen={vi.fn()} />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('Loading recommendations…')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'No recommendations to show' })).toBeNull();
+    await waitFor(() => expect(read).toHaveBeenCalledOnce());
+    act(() => resolveCached(null));
+    expect(await screen.findByRole('heading', { name: 'No recommendations to show' })).toBeTruthy();
+  } finally {
+    useLibraryStore.setState({ savedItems: previousSaved });
+    status.mockRestore();
+    read.mockRestore();
   }
 });

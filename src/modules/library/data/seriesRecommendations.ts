@@ -15,7 +15,7 @@ interface Candidate {
   item: MediaItem;
 }
 
-interface Inputs {
+export interface RecommendationInputs {
   catalogue: MediaItem[];
   favorites: MediaItem[];
   saved?: MediaItem[] | undefined;
@@ -85,7 +85,10 @@ function upcomingSeries(releases: UpcomingRelease[], today: string) {
 
 export function collectAutomatedRecommendations(
   library: MediaItem[],
-  viewing: Pick<Inputs, 'history' | 'trackedSeries' | 'next' | 'started' | 'upcoming' | 'today'> & {
+  viewing: Pick<
+    RecommendationInputs,
+    'history' | 'trackedSeries' | 'next' | 'started' | 'upcoming' | 'today'
+  > & {
     watched: string[];
   },
 ) {
@@ -137,7 +140,7 @@ function summarize(items: MediaItem[], categories: Map<string, string>): string[
     .map(([genre]) => genre);
 }
 
-export function collectSeriesRecommendations(input: Inputs) {
+export function collectSeriesRecommendations(input: RecommendationInputs) {
   const catalogue = input.catalogue.filter((item) => item.type === 'series');
   const byId = new Map(catalogue.map((item) => [item.id, item]));
   const current = (item: MediaItem) =>
